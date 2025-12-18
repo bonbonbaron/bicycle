@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 #include "Window.h"
+#include <functional>
 
 struct Point {
   Color color;         // color it's given (duh)
@@ -17,6 +18,7 @@ struct NamedPoint {
   Point point;
 };
 
+using SelectionCallback = std::function<void(Point&)>;
 using PointMap = std::map<std::string, Point>;
 
 class Constellation : public Window {
@@ -32,8 +34,14 @@ class Constellation : public Window {
     void setPoint( const std::string&& name, const Point&& pos );
     void react( const int input ) override;
     void update() override;
-
+    auto getSelectedPoint() const -> const Point&;
+    void setSelecting( const bool selecting );
+    auto isSelecting() const -> bool;
+    void setCallback( SelectionCallback selCallback);
   private:
     PointMap _points{};
+    bool _selecting{};
+    int _idx{};
+    SelectionCallback _selCallback{};
 };
     
