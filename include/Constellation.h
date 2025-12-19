@@ -1,3 +1,4 @@
+#pragma once
 #include <map>
 #include <string>
 #include <vector>
@@ -18,7 +19,7 @@ struct NamedPoint {
   Point point;
 };
 
-using SelectionCallback = std::function<void(Point&)>;
+using SelectionCallback = std::function<void()>;
 using PointMap = std::map<std::string, Point>;
 
 class Constellation : public Window {
@@ -35,6 +36,7 @@ class Constellation : public Window {
     void react( const int input ) override;
     void update() override;
     auto getSelectedPoint() const -> const Point&;
+    auto getSelectedPointName() const -> const std::string;
     void setSelecting( const bool selecting );
     auto isSelecting() const -> bool;
     void setCallback( SelectionCallback selCallback);
@@ -42,6 +44,7 @@ class Constellation : public Window {
     PointMap _points{};
     bool _selecting{};
     int _idx{};
+    std::string _selectedKey;
     SelectionCallback _selCallback{};
 };
     

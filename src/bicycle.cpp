@@ -39,7 +39,7 @@ namespace bicycle {
     do {
       erase();
       refresh();  // erase() interfere's with consequent rendering if it isn't triggered here.
-      cm.back()->react( i );  // Let the topmost window alone receive key-presses.
+      cm.getCurrentContext()->react( i );  // Let the topmost window alone receive key-presses.
       cm.refreshAll();  // clears, updates, and repaints each window prior to displaying
       mvprintw( 1, 1, "Number of windows on bicycle stack: %d", cm.size() );
       doupdate();  // displays results of the above window-painting

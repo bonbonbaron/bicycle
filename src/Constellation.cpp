@@ -35,6 +35,7 @@ void Constellation::setCallback( SelectionCallback selCallback) {
 }
 
 void Constellation::react( const int input ) {
+  auto it = _points.begin();
   if ( _selecting ) {
     switch ( input ) {
       case 'j':
@@ -56,15 +57,26 @@ void Constellation::react( const int input ) {
         }
         break;
       case ' ':
+        for ( int i = 0; i < _idx; ++i, it++ );
+        _selectedKey = it->first;
         setSelecting( false );
     }
   }
 }
 
-auto Constellation::getSelectedPoint() const -> const Point& {
-  auto it = _points.begin();
+auto Constellation::getSelectedPointName() const -> const std::string {
   assert ( _idx >= 0 && _idx < _points.size() );
-  for ( int i = 0; i < _idx; ++i, it++ );
+  assert ( !_selecting );
+  auto it = _points.find( _selectedKey );
+  assert( it != _points.end() );
+  return it->first;
+}
+
+auto Constellation::getSelectedPoint() const -> const Point& {
+  assert ( _idx >= 0 && _idx < _points.size() );
+  assert ( !_selecting );
+  auto it = _points.find( _selectedKey );
+  assert( it != _points.end() );
   return it->second;
 }
 
@@ -81,8 +93,8 @@ void Constellation::update() {
     print( p.second.symbol, p.second.x, p.second.y );
   }
   if ( _selecting ) {
-    auto it = _points.begin();
-    for ( int i = 0; i < _idx; ++i, it++ );
+    auto it = _points.find( _selectedKey );
+    assert( it != _points.end() );
     mvprintw( it->second.y, it->second.x - 2, ">" );
   }
 }

@@ -10,12 +10,14 @@ auto WindowManager::back() const -> const std::shared_ptr<Window> {
 void WindowManager::push( const std::shared_ptr<Window> win ) {
   if ( _population < _windows.size() ) {
     _windows.at(_population++) = win;
+    _currContext = win;
   }
 }
 
 void WindowManager::pop() {
   if ( _population > 0 ) {
     _windows.at(--_population) = nullptr;
+    defaultContext();
   }
 }
 
@@ -31,6 +33,20 @@ void WindowManager::refreshAll() {
   }
   // Deferred adds are handled here.
 }
+
+
+auto WindowManager::getCurrentContext() -> std::shared_ptr<Window> {
+  return _currContext;
+}
+
+void WindowManager::contextOverride( std::shared_ptr<Window> win ) {
+  _currContext = win;
+}
+
+void WindowManager::defaultContext() {
+  _currContext = back();
+}
+
 
 auto WindowManager::size() const -> int {
   return _population;
