@@ -5,27 +5,34 @@
 #include "Window.h"
 #include <functional>
 #include <optional>
+#include <cassert>
 
+// I think it has to be a class not struct to inherit enabled proeprly.
+template<typename T, typename... Args>
+class Point : public T {
+  public:
+    Point( Args&... args ) : T( args... ) {};
+    Color color{};         // color it's given (duh)
+    bool good{};         // are you a GOOD boy or a BAD boy??
+    int x{}, y{};            // where this symbol draws relative to the window
+    std::string symbol;  // how it appears on the screen
+};
+
+template<typename T>
+using PointMap = std::map<std::string, struct Point<T>>;
 
 template<typename T>
 class Constellation : public Window {
-  struct Point {
-    Color color;         // color it's given (duh)
-    int x, y;            // where this symbol draws relative to the window
-    std::string symbol;  // how it appears on the screen
-    T userData;
-  };
 
   struct NamedPoint {
     NamedPoint( const std::string name, const Color color, const int x, const int y, const std::string symbol ) :
       name(name),
       point(color, x, y, symbol ) {}
     std::string name;
-    Point point;
+    Point<T> point;
   };
 
   using SelectionCallback = std::function<void()>;
-  using PointMap = std::map<std::string, struct Point>;
 
   public:
 
@@ -45,16 +52,23 @@ class Constellation : public Window {
     }
   }
 
+  void add( const T& t, const std::string name, const int x, const int y, const Color color = Color::WHITE ) {
+    _points[ name ] = Point<T>( color, x, y, name, t );
+  }
 
-  auto getPoints() const -> const PointMap& {
+  void add( const T& t, const std::string name, const std::string symbol, const int x, const int y, const Color color = Color::WHITE ) {
+    _points[ name ] = Point<T>( color, x, y, symbol, t );
+  }
+
+  auto getPoints() const -> const PointMap<T>& {
     return _points;
   }
 
-  void setPoint( const std::string& name, const Point& point ) {
+  void setPoint( const std::string& name, const Point<T>& point ) {
     _points[ name ] = (point);
   }
 
-  void setPoint( const std::string&& name, const Point&& point ) {
+  void setPoint( const std::string&& name, const Point<T>&& point ) {
     _points[ name ] = (point);
   }
 
@@ -103,7 +117,7 @@ class Constellation : public Window {
     return {};
   }
 
-  auto getSelectedPoint() const -> const std::optional<Point&> {
+  auto getSelectedPoint() const -> const std::optional<Point<T>&> {
     // If we're busy selecting something, we shouldn't be able to get back a selection yet.
     if ( !_selecting ) {
       auto it = _points.find( _selectedKey );
@@ -133,14 +147,7 @@ class Constellation : public Window {
     }
   }
 
-  void removePoint( const std::string& key ) {
-    auto it = _points.find( key );
-    if ( it != _points.end() ) {
-      _points.erase( it );
-    }
-  }
-
-  auto getUserData( const std::string& name ) -> std::optional<T&> {
+  auto getPoint( const std::string& name ) -> std::optional<Point<T>&> {
     auto it = _points.find( name );
     if ( it != _points.end() ) {
       return {it->second};
@@ -148,9 +155,20 @@ class Constellation : public Window {
     return {};
   }
 
+  // The user may want to extract specific members into a coherent group.
+  auto filter( std::function<bool(Point<T>&)> f ) -> PointMap<T> {
+    PointMap<T> newMap{};
+    for ( auto& c : _points ) {
+      if ( f( c.second ) == true ) {
+        newMap[ c.first ] = c.second;
+      }
+    }
+    return newMap;
+  }
+
   private:
-  PointMap _points{};
-  bool _selecting{};
+  PointMap<T> _points{};
+  bool _selecting{ false };
   int _idx{};
   std::string _selectedKey;
   SelectionCallback _selCallback{};
