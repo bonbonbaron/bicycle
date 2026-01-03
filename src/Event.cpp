@@ -1,8 +1,21 @@
 #include "Event.h"
 #include <cassert>
 
+// YAML can handle primitive operands. Fields in data structures need to be added manually.
+Event::Event( YAML::Node& ymlConditions ) {
+  // The first operand of every condition is a smart pointer.
+  // At construction time we look for the data that goes by a key.
+  // If we find it, we point at that object and apply the second operand.
+  // If we want to use structs, we need to extend this class and add specific getters 
+  // for the fields of the structures we want.
+}
+
 auto Event::getState() const -> EventState {
   return _state;
+}
+
+void Event::addCondition( const Operand operand1, const int operand2, const ConditionOp& op ) {
+  _conditions.emplace_back( operand1, operand2, op );
 }
 
 auto Event::Condition::isMet() const -> bool {
