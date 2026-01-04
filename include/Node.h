@@ -6,7 +6,6 @@
 class Node {
   public:
     Node();
-    void load();
     void run();  // traverses event tree
     void traverse( const std::string& neighbor ) const;
 
