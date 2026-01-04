@@ -14,6 +14,15 @@ auto Event::getState() const -> EventState {
   return _state;
 }
 
+void Event::setState( const EventState state ) {
+  _state =  state;
+}
+
+void Event::resetState() {
+  _state =  EventState::READY;
+}
+
+
 void Event::addCondition( const Operand operand1, const int operand2, const ConditionOp& op ) {
   _conditions.emplace_back( operand1, operand2, op );
 }

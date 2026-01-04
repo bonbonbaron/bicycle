@@ -3,6 +3,7 @@
 #include <variant>
 #include <bitset>
 #include <yaml-cpp/yaml.h>
+#include <functional>
 
 enum class EventState { READY, FAILED, CONDITION_FAILED, IN_PROGRESS, SUCCESS };
 
@@ -23,9 +24,11 @@ class Event {
     auto meetsAllConditions() const -> bool;  // THIS, my boy, allows games to be pure data.
     auto meetsAnyCondition() const -> bool;  // THIS, my boy, allows games to be pure data.
     void addCondition( const Operand operand1, const int operand2, const ConditionOp& op );
+    void setState( const EventState state );
+    void resetState();
 
-    /// Must be overridden.
-    virtual void run() = 0;  // Absence of args implies events can be unconditional.
+    /// May be overridden.
+    virtual auto run() -> EventState;  // Absence of args implies events can be unconditional.
 
   private:
 
@@ -42,6 +45,7 @@ class Event {
     };
     EventState _state{};
     std::vector<Condition> _conditions{};
+    std::function<void()> _func{};
 };
 
 /* Categories of actions:
