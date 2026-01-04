@@ -1,6 +1,6 @@
-#include "Sequence.h"
+#include "Fallback.h"
 
-auto Sequence::run() -> EventState {
+auto Fallback::run() -> EventState {
   EventState state{EventState::SUCCESS};  // in case there's nothing in _events
   for ( auto& e : _events ) {
     // Skip already-completed events.
@@ -8,8 +8,8 @@ auto Sequence::run() -> EventState {
       continue;
     }
     auto state = e.run();
-    // Stop on the first event that fails.
-    if ( state != EventState::SUCCESS ) {
+    // Stop on the first event that succeeds.
+    if ( state == EventState::SUCCESS ) {
       break;
     }
   }
@@ -17,7 +17,7 @@ auto Sequence::run() -> EventState {
   return getState();
 }
 
-void Sequence::reset() {
+void Fallback::reset() {
   for ( auto& e : _events ) {
     e.reset();
   }

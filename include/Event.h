@@ -25,7 +25,7 @@ class Event {
     auto meetsAnyCondition() const -> bool;  // THIS, my boy, allows games to be pure data.
     void addCondition( const Operand operand1, const int operand2, const ConditionOp& op );
     void setState( const EventState state );
-    void resetState();
+    virtual void reset();
 
     /// May be overridden.
     virtual auto run() -> EventState;  // Absence of args implies events can be unconditional.

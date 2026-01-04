@@ -18,7 +18,7 @@ void Event::setState( const EventState state ) {
   _state =  state;
 }
 
-void Event::resetState() {
+void Event::reset() {
   _state =  EventState::READY;
 }
 
