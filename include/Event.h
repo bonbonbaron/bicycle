@@ -4,7 +4,7 @@
 #include <bitset>
 #include <yaml-cpp/yaml.h>
 
-enum class EventState { FAILED, IN_PROGRESS, SUCCESS };
+enum class EventState { READY, FAILED, CONDITION_FAILED, IN_PROGRESS, SUCCESS };
 
 class Event {
   public: 
@@ -18,17 +18,18 @@ class Event {
     };
 
     Event() = default;
-    Event( YAML::Node& ymlConditions );
+    Event( YAML::Node& cfg );
     auto getState() const -> EventState;
     auto meetsAllConditions() const -> bool;  // THIS, my boy, allows games to be pure data.
     auto meetsAnyCondition() const -> bool;  // THIS, my boy, allows games to be pure data.
     void addCondition( const Operand operand1, const int operand2, const ConditionOp& op );
 
     /// Must be overridden.
-    virtual void run( bool condition ) = 0;
+    virtual void run() = 0;  // Absence of args implies events can be unconditional.
 
   private:
 
+    // A more accurate name is "precondition," as one unmet blocks the event.
     struct Condition {
       Condition( const Operand operand1, const int operand2, const ConditionOp op ) :
         operand1(operand1),
@@ -42,3 +43,7 @@ class Event {
     EventState _state{};
     std::vector<Condition> _conditions{};
 };
+
+/* Categories of actions:
+ *  bicycle (oh, please get rid of Constellation
+ */

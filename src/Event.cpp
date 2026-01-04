@@ -1,13 +1,13 @@
 #include "Event.h"
 #include <cassert>
+#include <unordered_map>
+#include <functional>
+
+std::unordered_map<int, std::function<void(int)>> map{};
 
 // YAML can handle primitive operands. Fields in data structures need to be added manually.
-Event::Event( YAML::Node& ymlConditions ) {
-  // The first operand of every condition is a smart pointer.
-  // At construction time we look for the data that goes by a key.
-  // If we find it, we point at that object and apply the second operand.
-  // If we want to use structs, we need to extend this class and add specific getters 
-  // for the fields of the structures we want.
+Event::Event( YAML::Node& rootCfg ) {
+
 }
 
 auto Event::getState() const -> EventState {
