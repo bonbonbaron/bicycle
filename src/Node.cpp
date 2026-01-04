@@ -8,7 +8,7 @@ void Node::run() {
   _eventRoot.run();
 }
 
-auto Node::isNeighborOpen( const std::string& neighbor ) const -> bool {
+auto Node::isEdgeOpen( const std::string& neighbor ) const -> bool {
   const auto edge = _edges.find( neighbor );
   if ( edge != _edges.end() ) {
     return edge->second.open;
@@ -16,31 +16,15 @@ auto Node::isNeighborOpen( const std::string& neighbor ) const -> bool {
   return false;
 }
 
-auto Node::getNeighbor( const std::string& neighbor ) -> std::optional<std::shared_ptr<Node>> {
+auto Node::getEdge( const std::string& neighbor ) -> std::optional<Edge> {
   auto edge = _edges.find( neighbor );
   if ( edge != _edges.end() ) {
-    return { edge->second.node };
+    return { edge->second };
   }
   return {};
 }
 
-auto Node::getNeighbors() const -> const std::vector<std::shared_ptr<Node>> {
-  std::vector<std::shared_ptr<Node>> neighbors{};
-  for ( const auto& e : _edges ) {
-    if ( e.second.open ) {
-      neighbors.push_back( e.second.node );
-    }
-  }
-  return neighbors;
-}
-
-auto Node::getEdges() const -> const std::vector<Edge> {
-  std::vector<Edge> edges{};
-  for ( const auto& e : _edges ) {
-    if ( e.second.open ) {
-      edges.push_back( e.second );
-    }
-  }
-  return edges;
+auto Node::getEdges() const -> const std::map<std::string, Edge>&  {
+  return _edges;
 }
 

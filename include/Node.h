@@ -15,10 +15,9 @@ class Node {
   public:
     Node(const YAML::Node& cfg);
     void run();  // traverses event tree
-    auto isNeighborOpen( const std::string& neighbor ) const -> bool;
-    auto getNeighbor( const std::string& neighbor ) -> std::optional<std::shared_ptr<Node>>;
-    auto getNeighbors() const -> const std::vector<std::shared_ptr<Node>>;
-    auto getEdges() const -> const std::vector<Edge>;
+    auto isEdgeOpen( const std::string& neighbor ) const -> bool;
+    auto getEdge( const std::string& neighbor ) -> std::optional<Edge>;
+    auto getEdges() const -> const std::map<std::string, Edge>&;
 
   private:
     std::map<std::string, Edge> _edges{};
