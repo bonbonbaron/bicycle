@@ -10,6 +10,10 @@ Event::Event( YAML::Node& rootCfg ) {
 
 }
 
+auto Event::run() -> EventState {
+  return _func();
+}
+
 auto Event::getState() const -> EventState {
   return _state;
 }

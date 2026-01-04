@@ -45,7 +45,7 @@ class Event {
     };
     EventState _state{};
     std::vector<Condition> _conditions{};
-    std::function<void()> _func{};
+    std::function<EventState()> _func{};
 };
 
 /* Categories of actions:
