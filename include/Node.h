@@ -12,11 +12,9 @@
 #include "Event.h"
 #include "Config.h"
 
-struct Edge;
-
 class Node {
   public:
-    Node( Config::Node& cfg);
+    Node( YmlNode& cfg);
     void run();  // traverses event tree
     auto isEdgeOpen( const std::string& neighbor ) const -> bool;
     void openEdge ( const std::string& neighbor );

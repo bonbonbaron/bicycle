@@ -2,7 +2,7 @@ DBG=-g
 STD=-std=c++20
 
 BICREPO := $(shell git rev-parse --show-toplevel)
-BICSRCS := bicycle Window Dialogue Menu Sequence WindowManager ColorPalette MidiPlayer Config Event Node
+BICSRCS := bicycle Window Dialogue Menu Sequence WindowManager ColorPalette MidiPlayer Event Node
 BICINCS := bicycle ColorPalette Context Dialogue Menu Constellation MidiPlayer Window WindowManager
 BICINCS := $(BICINCS:%=$(BICREPO)/include/%.h)
 

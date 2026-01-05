@@ -1,6 +1,6 @@
 #include "Node.h"
 
-Node::Node( Config::Node& cfg) { 
+Node::Node( YmlNode& cfg) { 
   _name = cfg.readRequired<std::string>( "name" );
   _desc = cfg.readRequired<std::string>( "desc" );
   // TODO node edges
