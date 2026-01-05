@@ -48,6 +48,3 @@ class Event {
     std::function<EventState()> _func{};
 };
 
-/* Categories of actions:
- *  bicycle (oh, please get rid of Constellation
- */

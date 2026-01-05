@@ -1,7 +1,10 @@
 #include "Node.h"
 
 Node::Node(const YAML::Node& cfg) { 
-  // TODO
+  _name = cfg.readRequired<std::string>( "name" );
+  _desc = cfg.readRequired<std::string>( "name" );
+  // TODO node edges
+  // TODO event tree
 }
 
 void Node::run() {
@@ -16,7 +19,21 @@ auto Node::isEdgeOpen( const std::string& neighbor ) const -> bool {
   return false;
 }
 
-auto Node::getEdge( const std::string& neighbor ) -> std::optional<Edge> {
+void Node::openEdge ( const std::string& neighbor ) {
+  auto edge = _edges.find( neighbor );
+  if ( edge != _edges.end() ) {
+    edge->second.open = true;
+  }
+}
+
+void Node::closeEdge ( const std::string& neighbor ) {
+  auto edge = _edges.find( neighbor );
+  if ( edge != _edges.end() ) {
+    edge->second.open = false;
+  }
+}
+
+auto Node::getEdge( const std::string& neighbor ) const -> std::optional<Edge> {
   auto edge = _edges.find( neighbor );
   if ( edge != _edges.end() ) {
     return { edge->second };
