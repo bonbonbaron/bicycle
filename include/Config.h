@@ -11,7 +11,6 @@ class Config {
 
   public:
   Config();
-  private:
 
   class Node {
     public:
@@ -74,5 +73,6 @@ class Config {
       YAML::Node _wrappedNode{};
   };  // private class Node
 
-  Node _root;
+  private:
+    Node _root;
 };

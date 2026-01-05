@@ -1,8 +1,8 @@
 #include "Node.h"
 
-Node::Node(const YAML::Node& cfg) { 
+Node::Node( Config::Node& cfg) { 
   _name = cfg.readRequired<std::string>( "name" );
-  _desc = cfg.readRequired<std::string>( "name" );
+  _desc = cfg.readRequired<std::string>( "desc" );
   // TODO node edges
   // TODO event tree
 }
