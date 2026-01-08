@@ -3,7 +3,9 @@
 Node::Node( YmlNode& cfg) { 
   _name = cfg.readRequired<std::string>( "name" );
   _desc = cfg.readRequired<std::string>( "desc" );
-  // TODO node edges
+  for ( const auto& e : cfg.getChild( "edges" ) ) {
+    Edge edge{e};
+  }
   // TODO event tree
 }
 

@@ -2,7 +2,6 @@
 
 #include <vector>
 #include <string>
-#include <yaml-cpp/yaml.h>
 #include <optional>
 #include <map>
 #include <vector>
@@ -10,7 +9,7 @@
 
 #include "Edge.h"
 #include "Event.h"
-#include "Config.h"
+#include "YmlNode.h"
 
 class Node {
   public:
@@ -23,6 +22,7 @@ class Node {
     auto getEdges() const -> const std::map<std::string, Edge>&;
 
   private:
+    // Design how edges are going to rely on game data... use optional openif: <some-condition>
     std::map<std::string, Edge> _edges{};
     Event _eventRoot{};
     std::string _name;

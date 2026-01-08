@@ -1,3 +1,4 @@
+#pragma once
 #include <yaml-cpp/yaml.h>
 #include <string_view>
 #include <iostream>

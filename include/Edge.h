@@ -1,12 +1,20 @@
 #pragma once
-#include "Node.h"
 #include <memory>
 
-struct Node;
+#include "YmlNode.h"
+#include "Node.h"
+#include "Condition.h"
 
 struct Edge {
-  std::string name;  // e.g. Door
-  bool open{true};
-  int weight{};
-  std::shared_ptr<Node> node{};
+  Edge( const YmlNode& e ) {
+    name = e.readRequired( "name" );
+    open = e.readOptional( "open" ).value_or;
+    weight = e.readOptional( "weight" ).value_or( 0 );
+    endpointFilename = e.readRequired( "endpoint" );
+  }
+
+  std::string name;              // e.g. Door
+  Condition open{};              // e.g. "Do you have more than 0 keys?"
+  int weight{};                  // e.g. Number of random battles may be proportional to travel distance.
+  std::string endpointFilename;  // Endpoint file's basename (no path or extension)
 };
