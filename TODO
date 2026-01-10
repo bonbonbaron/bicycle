@@ -1,9 +1,1 @@
-I want to make config-reading easier  by having a list of things that each class expects:
-
-Battle:
-  shared pointer to destintion Battle member  |  optional  |   dialogue   
-  shared pointer to destination required  |  combatants.enemyList
-  required  partyList
-  and every other thing you can expect to read from a battle.
-
-I think it'll come clearer to me how to properly do this as I go about it. Like with everythign else.
+replace Conditions with lambdas  because they're WAY more flexible

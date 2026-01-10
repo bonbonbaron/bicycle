@@ -28,7 +28,7 @@ class WindowManager {
     WindowManager( const WindowManager& ) = delete;
     WindowManager& operator=( WindowManager& ) = delete;
     // Member vars
-    // We have to use an array despite stack-like functionality to protect the iterator from vectors' and lists' memory reallocations.
+    // We have to use an array despite stack-like functionality to protect the iterator from vector/list reallocations.
     std::shared_ptr<Window> _currContext{};
     std::array<std::shared_ptr<Window>, MAX_NUM_WINDOWS> _windows;
     int _population{};

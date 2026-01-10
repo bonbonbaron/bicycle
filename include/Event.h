@@ -1,32 +1,38 @@
-#include <vector>
+#pragma once
 #include <functional>
+#include <string>
+#include <map>
+#include <cursesw.h>
+#include <yaml-cpp/node/convert.h>
 
-#include "YmlNode.h"
-#include "Condition.h"
+#include "EventRegistry.h"
 
-enum class EventState { READY, FAILED, CONDITION_FAILED, IN_PROGRESS, SUCCESS };
+struct Event {
+  EventState state{ EventState::READY };
+  std::function<EventState()> run{};
+};
 
-// TODO move Condition to its own file so Edges can use them too.
-class Event {
-  public: 
 
-    Event() = default;
-    Event( YAML::Node& cfg );
-    auto getState() const -> EventState;
-    auto meetsAllConditions() const -> bool;  // THIS, my boy, allows games to be pure data.
-    auto meetsAnyCondition() const -> bool;  // THIS, my boy, allows games to be pure data.
-    void addCondition( const Operand operand1, const int operand2, const ConditionOp& op );
-    void setState( const EventState state );
-    virtual void reset();
 
-    /// May be overridden.
-    virtual auto run() -> EventState;  // Absence of args implies events can be unconditional.
-
-  private:
-
-    // A more accurate name is "precondition," as one unmet blocks the event.
-    EventState _state{};
-    std::vector<Condition> _conditions{};
-    std::function<EventState()> _func{};
+// Provide yaml-cpp library with template option for Edge's specific struct
+template<>
+struct YAML::convert<Event> {
+  static YAML::Node encode(const std::string& rhs) { return YAML::Node(rhs); }
+  static bool decode(const YAML::Node& node, Event& rhs) {
+    if (!node.IsScalar()) {
+      return false;
+    }
+    auto eventName = node.as<std::string>();
+    auto& reg = EventRegistry::get();
+    auto it = reg.find( eventName );
+    if ( it == reg.end() ) {
+      std::cerr << "Event " << eventName << " not found in EventRegistry instance. Exiting...\n";
+      endwin();
+      exit(1);
+    }
+    rhs.run = it->second;
+      
+    return true;
+  }
 };
 

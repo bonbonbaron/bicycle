@@ -1,0 +1,8 @@
+name: "some new node"
+event: "i do know"
+edges:
+  "The bedroom door to Michael's room2":
+    endpointFilename: michaelnotbeinggay
+  "The bedroom door to Michael's room3":
+    endpointFilename: michaelnotbeinggay
+

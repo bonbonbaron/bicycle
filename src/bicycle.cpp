@@ -34,16 +34,20 @@ namespace bicycle {
     // Ensure the developer remembered to initialize ncurses before running the bicycle engine.
     assert( initState == true );
     int i{};
-    auto& cm = WindowManager::getInstance();
+    auto& wm = WindowManager::getInstance();
 
+    // Hypothesis: There'll only ever be one node active. Nodes contain business logic, or "controller" in MVC-speak.
+    //             So, being in charge of springing the windows up, it'll update before the windows do.
+    //             But if a menu has control, that's where that line of thinking breaks down. 
+    //             Perhaps better: NOdes could extend Context, and we'd change WindowManager to a ContextManager.
+    //
     do {
       erase();
-      refresh();  // erase() interfere's with consequent rendering if it isn't triggered here.
-      cm.getCurrentContext()->react( i );  // Let the topmost window alone receive key-presses.
-      cm.refreshAll();  // clears, updates, and repaints each window prior to displaying
-      mvprintw( 1, 1, "Number of windows on bicycle stack: %d", cm.size() );
+      refresh();  // erase() interferes with consequent rendering if it isn't triggered here.
+      wm.getCurrentContext()->react( i );  // Let the topmost window alone receive key-presses.
+      wm.refreshAll();  // clears, updates, and repaints each window prior to displaying
       doupdate();  // displays results of the above window-painting
-    } while ( cm.size() > 0 && ( i = getch() ) != 'q' );
+    } while ( wm.size() > 0 && ( i = getch() ) != 'q' );
 
     return endwin();
   }

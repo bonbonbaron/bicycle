@@ -1,30 +1,37 @@
 #pragma once
 
-#include <vector>
 #include <string>
-#include <optional>
 #include <map>
-#include <vector>
-#include <memory>
 
 #include "Edge.h"
 #include "Event.h"
 #include "YmlNode.h"
+#include <yaml-cpp/node/convert.h>
 
-class Node {
-  public:
-    Node( YmlNode& cfg);
-    void run();  // traverses event tree
-    auto isEdgeOpen( const std::string& neighbor ) const -> bool;
-    void openEdge ( const std::string& neighbor );
-    void closeEdge ( const std::string& neighbor );
-    auto getEdge( const std::string& neighbor ) const -> std::optional<Edge>;
-    auto getEdges() const -> const std::map<std::string, Edge>&;
+// TODO turn this into a class so devs can't screw around with its internals
+namespace bicycle {  // prevent clash with YAML::Node
+  struct Node {
+      std::string name;
+      std::string desc;
+      std::map<std::string, Edge> edges{};
+      Event event{};
+  };
+}
 
-  private:
-    // Design how edges are going to rely on game data... use optional openif: <some-condition>
-    std::map<std::string, Edge> _edges{};
-    Event _eventRoot{};
-    std::string _name;
-    std::string _desc;
+// Provide yaml-cpp library with template option for Edge's specific struct
+template<>
+struct YAML::convert<bicycle::Node> {
+  static YAML::Node encode(const std::string& rhs) { return YAML::Node(rhs); }
+  static bool decode(const YAML::Node& node, bicycle::Node& rhs) {
+    if (!node.IsMap()) {
+      return false;
+    }
+    rhs.name = node["name"].as<std::string>();
+    if ( auto desc = node["desc"] ) {
+      rhs.desc = desc.as<std::string>();
+    }
+    rhs.edges = node["edges"].as<std::map<std::string, Edge>>();
+    rhs.event = node["event"].as<Event>();
+    return true;
+  }
 };
