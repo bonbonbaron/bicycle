@@ -6,6 +6,7 @@
 #include "Edge.h"
 #include "Node.h"
 #include "Event.h"
+#include "Timer.h"
 
 using namespace std;
 
@@ -33,5 +34,7 @@ int main() {
   }
   n.run();
 
+  Timer timer{ []() { cout << "timer's doin' stuff\n"; }, chrono::milliseconds( 500 ), true };
+  this_thread::sleep_until( Clock::now() + chrono::seconds( 3 ) );
   return 0;
 }

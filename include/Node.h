@@ -2,6 +2,8 @@
 
 #include <string>
 #include <map>
+#include <memory>
+#include <functional>
 
 #include "Edge.h"
 #include "Event.h"
@@ -17,11 +19,15 @@ namespace bicycle {  // prevent clash with YAML::Node
       auto getEdges() const -> const std::map<std::string, Edge>&;
       void setEvent( const Event& event );
       void run();
+      void onInput( const int input );
+      void onTimer( const int timerId );
     private:
       std::string _name;
       std::string _desc;
       std::map<std::string, Edge> _edges{};
       Event _event{};
+      std::map<unsigned char, std::function<void()>> _onInputTriggers{};
+      std::map<unsigned char, std::function<void()>> _onTimerTriggers{};
   };
 }
 
