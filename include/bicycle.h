@@ -6,7 +6,7 @@
 namespace bicycle {
   int run();
   auto isInit() -> bool;
-  void init_ncurses();
+  void init();
 
   void pop();
 

@@ -3,6 +3,7 @@
 #include <array>
 #include <memory>
 #include <cursesw.h>
+#include <mutex>
 
 constexpr int MAX_NUM_WINDOWS{50};
 
@@ -33,4 +34,5 @@ class WindowManager {
     std::shared_ptr<Window> _currWindow{};
     std::array<std::shared_ptr<Window>, MAX_NUM_WINDOWS> _windows;
     int _population{};
+    std::mutex _mut{};
 };

@@ -53,6 +53,7 @@ auto WindowManager::size() const -> int {
 }
 
 void WindowManager::render() {
+  std::unique_lock<std::mutex> l( _mut );  // This lets both timers and the controller trigger rendering.
   erase();
   refresh();  // erase() interferes with consequent rendering if it isn't triggered here.
   // getCurrentWindow()->react( i );  // Let the topmost window alone receive key-presses.

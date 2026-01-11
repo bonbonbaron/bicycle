@@ -8,7 +8,7 @@ namespace bicycle {
     return _initState;
   }
 
-  void init_ncurses() {
+  void init() {
     setlocale(LC_ALL, "");
     initscr();
     start_color();
@@ -30,11 +30,12 @@ namespace bicycle {
 
   // Battle is pushed to bicyle stack before this.
   int run() {
-    // Ensure the developer remembered to initialize ncurses before running the bicycle engine.
+    // Ensure the developer remembered to bicycle::init() before running the bicycle engine.
     assert( _initState == true );
     int i{};
     auto& wm = WindowManager::getInstance();
 
+    // TODO Let timers trigger rendering too, not just inputs. 
     do {
       wm.render();
     } while ( wm.size() > 0 && ( i = getch() ) != 'q' );
