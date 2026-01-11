@@ -20,12 +20,12 @@ class WindowManager {
     auto back() const -> const std::shared_ptr<Window>;
     void push( const std::shared_ptr<Window> win );
     void pop();
-    void refreshAll();
     void contextOverride( std::shared_ptr<Window> win );
     void defaultWindow();
     auto getCurrentWindow() -> std::shared_ptr<Window>;
 
   private:
+    void refreshAll();
     WindowManager() = default;
     WindowManager( const WindowManager& ) = delete;
     WindowManager& operator=( WindowManager& ) = delete;

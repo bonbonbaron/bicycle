@@ -8,6 +8,7 @@ auto WindowManager::back() const -> const std::shared_ptr<Window> {
 }
 
 void WindowManager::push( const std::shared_ptr<Window> win ) {
+  std::unique_lock<std::mutex> l( _mut );  // This lets both timers and the controller trigger rendering.
   if ( _population < _windows.size() ) {
     _windows.at(_population++) = win;
     _currWindow = win;
@@ -15,6 +16,7 @@ void WindowManager::push( const std::shared_ptr<Window> win ) {
 }
 
 void WindowManager::pop() {
+  std::unique_lock<std::mutex> l( _mut );  // This lets both timers and the controller trigger rendering.
   if ( _population > 0 ) {
     _windows.at(--_population) = nullptr;
     defaultWindow();

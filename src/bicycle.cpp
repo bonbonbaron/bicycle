@@ -28,14 +28,11 @@ namespace bicycle {
     wm.push( shared );
   }
 
-  // Battle is pushed to bicyle stack before this.
   int run() {
-    // Ensure the developer remembered to bicycle::init() before running the bicycle engine.
     assert( _initState == true );
     int i{};
     auto& wm = WindowManager::getInstance();
 
-    // TODO Let timers trigger rendering too, not just inputs. 
     do {
       wm.render();
     } while ( wm.size() > 0 && ( i = getch() ) != 'q' );
