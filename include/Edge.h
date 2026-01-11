@@ -25,7 +25,7 @@ class Edge {
     std::optional<std::function<bool()>> _condition{};  // e.g. "do you have at least one key?"
 };
 
-// Provide yaml-cpp library with template option for Edge's specific struct
+// Provide yaml-cpp library with template candidate for Edge's specific struct
 template<>
 struct YAML::convert<Edge> {
   static YAML::Node encode(const std::string& rhs) { return YAML::Node(rhs); }

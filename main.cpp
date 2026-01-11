@@ -3,10 +3,10 @@
 #include <string>
 #include <vector>
 #include <map>
-#include "Edge.h"
-#include "Node.h"
-#include "Event.h"
-#include "Timer.h"
+#include <bicycle/Edge.h>
+#include <bicycle/Node.h>
+#include <bicycle/Event.h>
+#include <bicycle/Timer.h>
 
 using namespace std;
 
@@ -34,7 +34,7 @@ int main() {
   }
   n.run();
 
-  Timer timer{ []() { cout << "timer's doin' stuff\n"; }, chrono::milliseconds( 500 ), true };
+  Timer timer{ []() { cout << "timer's doin' stuff\n"; }, };
   this_thread::sleep_until( Clock::now() + chrono::seconds( 3 ) );
   return 0;
 }

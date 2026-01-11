@@ -3,12 +3,15 @@
 #include <string>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <functional>
 
 #include "Edge.h"
 #include "Event.h"
 #include "YmlNode.h"
 #include <yaml-cpp/node/convert.h>
+      
+static std::mutex _nodeMut{};
 
 namespace bicycle {  // prevent clash with YAML::Node
   class Node {
@@ -28,10 +31,10 @@ namespace bicycle {  // prevent clash with YAML::Node
       Event _event{};
       std::map<unsigned char, std::function<void()>> _onInputTriggers{};
       std::map<unsigned char, std::function<void()>> _onTimerTriggers{};
-  };
-}
+  };  // class Node
+}  // namespace bicycle
 
-// Provide yaml-cpp library with template option for Node's specific struct
+// Provide yaml-cpp library with template candidate for Node's specific struct
 template<>
 struct YAML::convert<bicycle::Node> {
   static YAML::Node encode(const std::string& rhs) { return YAML::Node(rhs); }

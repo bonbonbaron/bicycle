@@ -12,7 +12,7 @@ struct Event {
   std::function<EventState()> run{};
 };
 
-// Provide yaml-cpp library with template option for Event's specific struct
+// Provide yaml-cpp library with template candidate for Event's specific struct
 template<>
 struct YAML::convert<Event> {
   static YAML::Node encode(const std::string& rhs) { return YAML::Node(rhs); }

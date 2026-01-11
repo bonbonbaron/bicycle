@@ -28,6 +28,7 @@ void Node::run() {
 
 // Not sure this is the place to put these event triggers, but putting stakes in the ground here.
 void Node::onInput( const int input ) {
+  std::unique_lock l( _nodeMut );
   auto trigger = _onInputTriggers.find( input );
   if ( trigger != _onInputTriggers.end() ) {
     trigger->second();
@@ -35,6 +36,7 @@ void Node::onInput( const int input ) {
 }
 
 void Node::onTimer( const int input ) {
+  std::unique_lock l( _nodeMut );
   auto trigger = _onInputTriggers.find( input );
   if ( trigger != _onTimerTriggers.end() ) {
     trigger->second();
