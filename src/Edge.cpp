@@ -2,6 +2,8 @@
 #include <string_view>
 #include <iostream>
 #include "Node.h"
+#include <bicycle.h>
+#include "Controller.h"
 
 #include <yaml-cpp/yaml.h>
 
@@ -30,9 +32,10 @@ void Edge::loadEndpoint() const {
   constexpr std::string_view SUFFIX { ".yml" };
   if ( ! _condition.has_value() || (*_condition)() ) {
     auto cfg = YAML::LoadFile( NODE_DIR.data() + _endpointFilename + SUFFIX.data() );
-    auto node = cfg.as<bicycle::Node>();
+    auto& ctlr = Controller::getInstance();
+    ctlr = cfg.as<bicycle::Node>();
     std::cout << "loaded " << _endpointFilename << "\n";
-    node.run();
+    ctlr.run();
   }
 }
 

@@ -11,10 +11,10 @@
 #include "YmlNode.h"
 #include <yaml-cpp/node/convert.h>
       
-static std::mutex _nodeMut{};
+static std::mutex _nodeMut{};  // There'll only ever be one node active.
 
 namespace bicycle {  // prevent clash with YAML::Node
-  class Node {
+  class Node : public std::enable_shared_from_this<Node> {
     public:
       void setName( const std::string& );
       void setDesc( const std::string& );
@@ -23,14 +23,14 @@ namespace bicycle {  // prevent clash with YAML::Node
       void setEvent( const Event& event );
       void run();
       void onInput( const int input );
-      void onTimer( const int timerId );
+      void onTimer( const std::string timerName );
     private:
       std::string _name;
       std::string _desc;
       std::map<std::string, Edge> _edges{};
       Event _event{};
       std::map<unsigned char, std::function<void()>> _onInputTriggers{};
-      std::map<unsigned char, std::function<void()>> _onTimerTriggers{};
+      std::map<std::string, std::function<void()>> _onTimerTriggers{};
   };  // class Node
 }  // namespace bicycle
 

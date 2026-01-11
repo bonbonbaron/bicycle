@@ -26,6 +26,10 @@ void Node::run() {
   _event.run();
 }
 
+// TODO how do i avoid having to make every menu's inputs explicit?
+//      The nature of the inputs is going to change based on stage in node's events.
+//      Let's figure out what that entails later.
+
 // Not sure this is the place to put these event triggers, but putting stakes in the ground here.
 void Node::onInput( const int input ) {
   std::unique_lock l( _nodeMut );
@@ -35,9 +39,10 @@ void Node::onInput( const int input ) {
   }
 }
 
+// TODO we need a way to grab the current active node to call its onTimer().
 void Node::onTimer( std::string timerName ) {
   std::unique_lock l( _nodeMut );
-  auto trigger = _onTimerTriggers.find( input );
+  auto trigger = _onTimerTriggers.find( timerName );
   if ( trigger != _onTimerTriggers.end() ) {
     trigger->second();
   }

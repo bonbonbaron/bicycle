@@ -18,14 +18,14 @@ namespace bicycle {
     _initState = true;
   }
 
-  void pop() {
-    auto& wm = WindowManager::getInstance();
-    wm.pop();
-  }
-
   void push( std::shared_ptr<Window> shared ) {
     auto& wm = WindowManager::getInstance();
     wm.push( shared );
+  }
+
+  void pop() {
+    auto& wm = WindowManager::getInstance();
+    wm.pop();
   }
 
   int run() {
@@ -39,4 +39,10 @@ namespace bicycle {
 
     return endwin();
   }
+
+  auto getController() -> bicycle::Node& {
+    auto& wm = WindowManager::getInstance();
+    return wm.getController();
+  }
+
 } // namespace bicycle

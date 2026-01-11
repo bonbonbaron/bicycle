@@ -4,13 +4,13 @@
 #include "WindowManager.h"
 
 namespace bicycle {
-  int run();
   auto isInit() -> bool;
   void init();
 
-  void pop();
-
   void push( std::shared_ptr<Window> shared );
+  void pop();
+  int run();
+  auto getController() -> bicycle::Node&;
 
   template<typename T, typename... Args>
     void push( Args&&... args ) {
