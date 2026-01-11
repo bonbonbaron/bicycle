@@ -10,7 +10,6 @@ namespace bicycle {
   void push( std::shared_ptr<Window> shared );
   void pop();
   int run();
-  auto getController() -> bicycle::Node&;
 
   template<typename T, typename... Args>
     void push( Args&&... args ) {

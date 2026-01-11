@@ -40,9 +40,4 @@ namespace bicycle {
     return endwin();
   }
 
-  auto getController() -> bicycle::Node& {
-    auto& wm = WindowManager::getInstance();
-    return wm.getController();
-  }
-
 } // namespace bicycle
