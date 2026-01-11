@@ -25,13 +25,13 @@ int main() {
   cr["imnotgay"] = [](){ cout << "I'm NOT GAY I SWEAR\n"; return true; };
 
   auto n = cfg.as<bicycle::Node>();
-  for ( const auto& [k,edge] : n.edges ) {
+  for ( const auto& [k,edge] : n.getEdges() ) {
     cout << "\tname: " << k << "\n";
     cout << "\tweight: " << edge.getWeight() << "\n";
     cout << "\tendpointFilename: " << edge.getEndpoint() << "\n";
     edge.loadEndpoint();
   }
-  n.event.run();
+  n.run();
 
   return 0;
 }

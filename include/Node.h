@@ -8,17 +8,24 @@
 #include "YmlNode.h"
 #include <yaml-cpp/node/convert.h>
 
-// TODO turn this into a class so devs can't screw around with its internals
 namespace bicycle {  // prevent clash with YAML::Node
-  struct Node {
-      std::string name;
-      std::string desc;
-      std::map<std::string, Edge> edges{};
-      Event event{};
+  class Node {
+    public:
+      void setName( const std::string& );
+      void setDesc( const std::string& );
+      void setEdges( const std::map<std::string, Edge>& edges );
+      auto getEdges() const -> const std::map<std::string, Edge>&;
+      void setEvent( const Event& event );
+      void run();
+    private:
+      std::string _name;
+      std::string _desc;
+      std::map<std::string, Edge> _edges{};
+      Event _event{};
   };
 }
 
-// Provide yaml-cpp library with template option for Edge's specific struct
+// Provide yaml-cpp library with template option for Node's specific struct
 template<>
 struct YAML::convert<bicycle::Node> {
   static YAML::Node encode(const std::string& rhs) { return YAML::Node(rhs); }
@@ -26,12 +33,12 @@ struct YAML::convert<bicycle::Node> {
     if (!node.IsMap()) {
       return false;
     }
-    rhs.name = node["name"].as<std::string>();
+    rhs.setName( node["name"].as<std::string>() );
     if ( auto desc = node["desc"] ) {
-      rhs.desc = desc.as<std::string>();
+      rhs.setDesc( desc.as<std::string>() );
     }
-    rhs.edges = node["edges"].as<std::map<std::string, Edge>>();
-    rhs.event = node["event"].as<Event>();
+    rhs.setEdges( node["edges"].as<std::map<std::string, Edge>>() );
+    rhs.setEvent( node["event"].as<Event>() );
     return true;
   }
 };

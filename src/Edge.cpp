@@ -32,7 +32,7 @@ void Edge::loadEndpoint() const {
     auto cfg = YAML::LoadFile( NODE_DIR.data() + _endpointFilename + SUFFIX.data() );
     auto node = cfg.as<bicycle::Node>();
     std::cout << "loaded " << _endpointFilename << "\n";
-    node.event.run();
+    node.run();
   }
 }
 
