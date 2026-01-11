@@ -11,7 +11,8 @@ class EventRegistry : public std::map<std::string, std::function<EventState()>> 
       static EventRegistry registry;
       return registry;
     }
-    void add( const std::string& name, const std::function<EventState()>& eventFunc );  // Allows you to more easily make an event mapping
+    // Allows you to more easily make an event mapping
+    void add( const std::string& name, const std::function<EventState()>& eventFunc );
   private:
     EventRegistry() = default;
     EventRegistry( const EventRegistry& rhs ) = delete;

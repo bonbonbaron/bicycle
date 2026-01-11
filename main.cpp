@@ -35,6 +35,11 @@ int main() {
   n.run();
 
   Timer timer{ []() { cout << "timer's doin' stuff\n"; }, };
-  this_thread::sleep_until( Clock::now() + chrono::seconds( 3 ) );
+  this_thread::sleep_until( Clock::now() + chrono::milliseconds( 300 ) );
   return 0;
 }
+
+/* Current problem: Even if the node has an input reader, it doesn't know whom to send that to. Is it for the current menu? Windows aren't reacting anymore.
+ *                  It's the controller's job to mess with the model now, and the view's job to represent it.
+ *                  How can MVC marry up with the stack architecture?
+ *                  If things have keys, maybe we can align them that way. 

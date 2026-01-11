@@ -2,6 +2,8 @@
 #include <functional>
 #include <string>
 #include <map>
+#include <optional>
+
 #include <cursesw.h>
 #include <yaml-cpp/node/convert.h>
 
@@ -23,6 +25,7 @@ struct YAML::convert<Event> {
     auto eventName = node.as<std::string>();
     auto& reg = EventRegistry::get();
     auto it = reg.find( eventName );
+    /* TODO consider selecting among auto, onTimer, and onInput behaviors here */
     if ( it == reg.end() ) {
       std::cerr << "Event " << eventName << " not found in EventRegistry instance. Exiting...\n";
       endwin();
