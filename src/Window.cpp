@@ -31,33 +31,6 @@ void Window::clear() {
   wclear( _win );
 }
 
-void Window::react( const int input ) {
-  wclear( _win );
-  switch ( input ) {
-    case 'h':
-      hide();
-      break;
-    case 's':
-      show();
-      wprintw( _win, "trying to show\n" );
-      break;
-    case 'x':
-      wprintw( _win, "X: %d", getX() );
-      break;
-    case 'y':
-      wprintw( _win, "Y: %d", getY() );
-      break;
-    default:
-      break;
-  }
-  // const auto& cp = ColorPalette::getInstance();
-  if ( _showBorder ) {
-    box( _win, 0, 0 );
-  }
-  wbkgd( _win, _colorPair );
-  wrefresh( _win);
-}
-
 auto Window::getX() const -> int{
   return getbegx( _win );
 }

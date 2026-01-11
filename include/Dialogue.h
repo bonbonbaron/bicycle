@@ -16,7 +16,6 @@ class Dialogue : public Window {
     Dialogue( const std::string& s, const int x, const int y, const int w, const int h );
     Dialogue( const std::string&& s, const int x, const int y, const int w, const int h );
     // Public functions
-    void react( const int input ) override;
     void update() override;
   private:
     // Private members

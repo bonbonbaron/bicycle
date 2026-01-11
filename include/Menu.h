@@ -17,7 +17,6 @@ class Menu : public Window {
   public:
     Menu( const std::vector<MenuItem>& v, const int x, const int y, const int h );
     Menu() = delete;  // ensure they pass in items.
-    void react( const int input ) override;
     const MenuItem& getCurrMenuItem() const;
     void update() override;
   private:

@@ -10,14 +10,14 @@ auto WindowManager::back() const -> const std::shared_ptr<Window> {
 void WindowManager::push( const std::shared_ptr<Window> win ) {
   if ( _population < _windows.size() ) {
     _windows.at(_population++) = win;
-    _currContext = win;
+    _currWindow = win;
   }
 }
 
 void WindowManager::pop() {
   if ( _population > 0 ) {
     _windows.at(--_population) = nullptr;
-    defaultContext();
+    defaultWindow();
   }
 }
 
@@ -35,19 +35,28 @@ void WindowManager::refreshAll() {
 }
 
 
-auto WindowManager::getCurrentContext() -> std::shared_ptr<Window> {
-  return _currContext;
+auto WindowManager::getCurrentWindow() -> std::shared_ptr<Window> {
+  return _currWindow;
 }
 
 void WindowManager::contextOverride( std::shared_ptr<Window> win ) {
-  _currContext = win;
+  _currWindow = win;
 }
 
-void WindowManager::defaultContext() {
-  _currContext = back();
+void WindowManager::defaultWindow() {
+  _currWindow = back();
 }
 
 
 auto WindowManager::size() const -> int {
   return _population;
 }
+
+void WindowManager::render() {
+  erase();
+  refresh();  // erase() interferes with consequent rendering if it isn't triggered here.
+  // getCurrentWindow()->react( i );  // Let the topmost window alone receive key-presses.
+  refreshAll();  // clears, updates, and repaints each window prior to displaying
+  doupdate();  // displays results of the above window-painting
+}
+

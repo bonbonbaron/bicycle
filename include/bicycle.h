@@ -1,7 +1,6 @@
 #pragma once
 #include <string>
 #include <cassert>
-#include "Context.h"
 #include "WindowManager.h"
 
 namespace bicycle {

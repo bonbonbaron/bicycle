@@ -1,11 +1,10 @@
 #pragma once
 #include <string>
-#include "Context.h"
 #include "ColorPalette.h"
 
 static constexpr int WINDOW_PADDING{2};
 
-class Window : public Context {
+class Window {
   public:
     // i know this doesn't align with ncurses' paramter order, but I like my order better :)
     Window( const int w, const int h );
@@ -15,8 +14,8 @@ class Window : public Context {
     void show();
     void hide();
     void clear();
+    virtual void update() = 0;
     void repaint();
-    void react( const int input ) override;
     const char* getCurrItemName() const;
     const char* getCurrItemDesc() const;
     auto getX() const -> int;

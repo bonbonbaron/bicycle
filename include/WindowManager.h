@@ -14,14 +14,15 @@ class WindowManager {
       return cm;
     }
 
+    void render();
     auto size() const -> int;
     auto back() const -> const std::shared_ptr<Window>;
     void push( const std::shared_ptr<Window> win );
     void pop();
     void refreshAll();
     void contextOverride( std::shared_ptr<Window> win );
-    void defaultContext();
-    auto getCurrentContext() -> std::shared_ptr<Window>;
+    void defaultWindow();
+    auto getCurrentWindow() -> std::shared_ptr<Window>;
 
   private:
     WindowManager() = default;
@@ -29,7 +30,7 @@ class WindowManager {
     WindowManager& operator=( WindowManager& ) = delete;
     // Member vars
     // We have to use an array despite stack-like functionality to protect the iterator from vector/list reallocations.
-    std::shared_ptr<Window> _currContext{};
+    std::shared_ptr<Window> _currWindow{};
     std::array<std::shared_ptr<Window>, MAX_NUM_WINDOWS> _windows;
     int _population{};
 };
