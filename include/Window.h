@@ -4,7 +4,7 @@
 
 static constexpr int WINDOW_PADDING{2};
 
-class Window {
+class Window : Body {
   public:
     // i know this doesn't align with ncurses' paramter order, but I like my order better :)
     Window( const int w, const int h );

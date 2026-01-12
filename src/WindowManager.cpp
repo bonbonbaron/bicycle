@@ -36,20 +36,6 @@ void WindowManager::refreshAll() {
   // Deferred adds are handled here.
 }
 
-
-auto WindowManager::getCurrentWindow() -> std::shared_ptr<Window> {
-  return _currWindow;
-}
-
-void WindowManager::contextOverride( std::shared_ptr<Window> win ) {
-  _currWindow = win;
-}
-
-void WindowManager::defaultWindow() {
-  _currWindow = back();
-}
-
-
 auto WindowManager::size() const -> int {
   return _population;
 }
@@ -58,7 +44,7 @@ void WindowManager::render() {
   std::unique_lock<std::mutex> l( _mut );  // This lets both timers and the controller trigger rendering.
   erase();
   refresh();  // erase() interferes with consequent rendering if it isn't triggered here.
-  // getCurrentWindow()->react( i );  // Let the topmost window alone receive key-presses.
+  _windows.back()->react( i );  // Let the topmost window alone receive key-presses.
   refreshAll();  // clears, updates, and repaints each window prior to displaying
   doupdate();  // displays results of the above window-painting
 }
