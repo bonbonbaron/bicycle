@@ -3,43 +3,63 @@
 #include <string>
 #include <vector>
 #include <map>
-#include <bicycle/Edge.h>
-#include <bicycle/Node.h>
-#include <bicycle/Event.h>
-#include <bicycle/Timer.h>
+#include <memory>
 
 using namespace std;
 
-EventState idk() {
-  cout << "i did an event!\n";
-  return EventState::SUCCESS;
+struct Person {
+  Person() {}
+  Person( const Person& e  ) = default;
+  string name;
+  string hobby;
+  unsigned age{};
+  std::shared_ptr<Person> _friend{};
+};
+
+void dispPerson( const Person& p ) {
+  cout << "name: " << p.name << "\n";
+  cout << "hobby: " << p.hobby << "\n";
+  cout << "age: " << p.age << "\n";
+  if ( p._friend != nullptr ) {
+    cout << "friend:\n";
+    dispPerson( *p._friend );
+  }
 }
+
+static auto convertPerson( const YAML::Node& node ) -> Person {
+  Person p;
+  p.name = node["name"].as<string>();
+  p.hobby = node["hobby"].as<string>();
+  p.age = node["age"].as<unsigned>();
+  if ( auto n = node["friend"] ) {
+    p._friend = std::make_shared<Person>( convertPerson( n ) );
+  }
+  return p;
+}
+
+// Provide yaml-cpp library with template candidate for SequenceNode's specific struct
+template<>
+struct YAML::convert<Person> {
+  static YAML::Node encode(const string& rhs) { return YAML::Node(rhs); }
+  static bool decode(const YAML::Node& node, Person& rhs) {
+    if (!node.IsMap()) {
+      return false;
+    }
+
+    rhs = convertPerson( node );
+      
+    return true;
+  }
+};
 
 int main() {
   auto cfg = YAML::LoadFile("./test.yml");
+  auto peeps = cfg.as<vector<Person>>();
 
-  auto& er = EventRegistry::get();
-  er["idk"] = idk;
-  er["i do know"] = [](){ cout << "I'm actually quite straight.\n"; return EventState::SUCCESS; };
-
-  auto& cr = ConditionRegistry::get();
-  cr["imnotgay"] = [](){ cout << "I'm NOT GAY I SWEAR\n"; return true; };
-
-  auto n = cfg.as<bicycle::Node>();
-  for ( const auto& [k,edge] : n.getEdges() ) {
-    cout << "\tname: " << k << "\n";
-    cout << "\tweight: " << edge.getWeight() << "\n";
-    cout << "\tendpointFilename: " << edge.getEndpoint() << "\n";
-    edge.loadEndpoint();
+  for ( const auto& p : peeps ) {
+    dispPerson( p );
   }
-  n.run();
+  
 
-  Timer timer{ []() { cout << "timer's doin' stuff\n"; }, };
-  this_thread::sleep_until( Clock::now() + chrono::milliseconds( 300 ) );
   return 0;
 }
-
-/* Current problem: Even if the node has an input reader, it doesn't know whom to send that to. Is it for the current menu? Windows aren't reacting anymore.
- *                  It's the controller's job to mess with the model now, and the view's job to represent it.
- *                  How can MVC marry up with the stack architecture?
- *                  If things have keys, maybe we can align them that way. 

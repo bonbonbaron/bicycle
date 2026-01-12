@@ -1,8 +1,20 @@
-name: "some new node"
-event: "i do know"
-edges:
-  "The bedroom door to Michael's room2":
-    endpointFilename: michaelnotbeinggay
-  "The bedroom door to Michael's room3":
-    endpointFilename: michaelnotbeinggay
-
+- name: michael
+  hobby: "loving Woody"
+  age: 38
+  friend:
+    name: wesley 
+    hobby: "eating cogs"
+    age: 59
+    friend: 
+      name: james
+      hobby: "eating logs"
+      age: 2
+- name: charlie
+  hobby: "killing ducks"
+  age: 38
+- name: bill
+  hobby: "eating pork"
+  age: 39
+- name: carl
+  hobby: "banging chicks"
+  age: 41
