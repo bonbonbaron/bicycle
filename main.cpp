@@ -35,12 +35,8 @@ static C c;
 
 int main() {
   Blackboard bb;
-  bb.set<C>( "tiger", c);
+  bb.set<int>( "tiger", 45);
   cout << bb.get<int>("tiger") << "\n";
 
-  auto& reg = ActionRegistry::get();
-
-  auto cc = *reg["C Action"];
-  cc.f();
   return 0;
 }
