@@ -8,38 +8,40 @@ auto ActionNode::getState() const -> ActionState {
   return _state;
 }
 
-auto FallbackNode::run() -> ActionState {
-  ActionState state{ActionState::SUCCESS};  // in case there's nothing in _actions
-  for ( auto& e : _actions ) {
-    // Skip already-completed events.
-    if ( e->getState() == ActionState::SUCCESS ) {
-      continue;
-    }
-    auto state = e->run();
-    // Stop on the first event that succeeds.
-    if ( state == ActionState::SUCCESS ) {
-      break;
-    }
-  }
-  setState(state);
-  return getState();
+void ActionNode::run() {
+  _state = _action();
 }
 
-auto SequenceNode::run() -> ActionState {
+void FallbackNode::run() {
   ActionState state{ActionState::SUCCESS};  // in case there's nothing in _actions
   for ( auto& e : _actions ) {
     // Skip already-completed events.
     if ( e->getState() == ActionState::SUCCESS ) {
       continue;
     }
-    auto state = e->run();
-    // Stop on the first event that fails.
-    if ( state != ActionState::SUCCESS ) {
+    e->run();
+    // Stop on the first event that succeeds.
+    if ( e->getState() == ActionState::SUCCESS ) {
       break;
     }
   }
   setState(state);
-  return getState();
+}
+
+void SequenceNode::run() {
+  ActionState state{ActionState::SUCCESS};  // in case there's nothing in _actions
+  for ( auto& e : _actions ) {
+    // Skip already-completed events.
+    if ( e->getState() == ActionState::SUCCESS ) {
+      continue;
+    }
+    e->run();
+    // Stop on the first event that fails.
+    if ( e->getState() != ActionState::SUCCESS ) {
+      break;
+    }
+  }
+  setState(state);
 }
 
 void SequenceNode::reset() {

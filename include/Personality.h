@@ -21,16 +21,15 @@ class Tree;
  * but bb->get<Type>() would've sufficed. Bicycle simplifies life.  */
 
 // Inheritors of ActionNode will implement their ports.
-using Action = std::function<ActionState()>;
 class ActionNode {
   public:
     // For making shared pointers that outlive YAML reader scopes.
     ActionNode() = default;
-    ActionNode( const ActionNode& );
-    auto operator=( const ActionNode& ) -> ActionNode&;
+    ActionNode( const ActionNode& ) = default;
+    auto operator=( const ActionNode& ) -> ActionNode& = default;
     void setAction( const Action& action );
     auto getState() const -> ActionState;
-    virtual auto run() -> ActionState;  // runs only if READY or ONGOING; returns state otherwise.
+    virtual void run();  // runs only if READY or ONGOING; returns state otherwise.
     virtual void reset();
   protected:
     std::shared_ptr<Tree> _tree{};
@@ -42,10 +41,10 @@ class ActionNode {
 
 class SequenceNode : public ActionNode {
   public:
-    SequenceNode();
-    SequenceNode( const SequenceNode& );
-    auto operator=( const SequenceNode& ) -> SequenceNode&;
-    auto run() -> ActionState override;
+    SequenceNode() = default;
+    SequenceNode( const SequenceNode& ) = default;
+    auto operator=( const SequenceNode& ) -> SequenceNode& = default;
+    void run() override;
     void reset() override;
     void addActionNode( const std::shared_ptr<ActionNode>& _actions );
     void fillSequenceWithActionPtrs( const YAML::Node& rhs );
@@ -55,17 +54,18 @@ class SequenceNode : public ActionNode {
 
 class FallbackNode : public SequenceNode {
   public:
-    FallbackNode();
-    FallbackNode( const FallbackNode& );
-    auto operator=( const FallbackNode& ) -> FallbackNode&;
-    auto run() -> ActionState override;
+    FallbackNode() = default;
+    FallbackNode( const FallbackNode& ) = default;
+    auto operator=( const FallbackNode& ) -> FallbackNode& = default;
+    void run() override;
 };
 
 class Tree {
   public:
     void setRoot( const std::shared_ptr<ActionNode> action );
-    auto run() -> ActionState;
+    void run();
     auto getBlackboard() -> Blackboard&;
+    // TODO propagate BB shared ptrs throughout the tree somehow
   private:
     std::shared_ptr<ActionNode> _root{};
     Blackboard _bb;
