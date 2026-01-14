@@ -9,7 +9,32 @@ enum class ActionState { READY, FAILED, IN_PROGRESS, SUCCESS };
 
 using ActFunc = std::function<ActionState()>;
 using BbKey = std::string;
-using Blackboard = std::map<BbKey, std::any>;
+class Blackboard {
+  public:
+    template<typename T>
+      auto get( const BbKey& key ) -> T {
+        auto v = _bb.find( key ); 
+        if ( v == _bb.end() ) {
+          endwin();
+          std::cerr << "Couldn't find key " << key << " in blackboard! Exiting...\n";
+          exit(1);
+        }
+        return std::any_cast<T>(v->second);
+      }
+
+    template <typename T>
+    void set ( const BbKey& key, const T& val ) {
+      _bb[ key ] = val;
+    }
+
+    template <typename T>
+    void set ( const BbKey&& key, const T& val ) {
+      _bb[ key ] = val;
+    }
+
+  private:
+    std::map<BbKey, std::any> _bb{};
+};
 
 class Action;
 using ActionPtr = Action*;  // TODO how can i use smart pointers if it bombs saying the weak ptr is not set on construction?

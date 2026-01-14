@@ -34,8 +34,9 @@ static B b;
 static C c;
 
 int main() {
-  // b.f();
-  // c.f();
+  Blackboard bb;
+  bb.set<C>( "tiger", c);
+  cout << bb.get<int>("tiger") << "\n";
 
   auto& reg = ActionRegistry::get();
 
