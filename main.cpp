@@ -4,25 +4,23 @@
 #include <vector>
 #include <map>
 #include <memory>
+#include <any>
 
 using namespace std;
 
-template<typename T>
-class A {
-  protected:
-    T t;
-    int _i;
-};
+using Map = map<int, any>;
 
-class B : protected A<int> {
-  public:
-    B(int i) {
-      _i = i;
-      cout << "i is " << _i << "\n";
-    }
+struct A {
+  double d{45};
+  string s{"your mother"};
 };
 
 int main() {
-  B b{ 45 };
+  Map m;
+  m[1] = 45;
+  m[2] = "hello there";
+  m[3] = A();
+
+  cout << any_cast<A>(m[3]).s << "\n";
   return 0;
 }

@@ -1,5 +1,13 @@
 #include "Personality.h"
 
+void ActionNode::reset() {
+  setState( ActionState::READY );
+}
+
+auto ActionNode::getState() const -> ActionState {
+  return _state;
+}
+
 auto FallbackNode::run() -> ActionState {
   ActionState state{ActionState::SUCCESS};  // in case there's nothing in _actions
   for ( auto& e : _actions ) {

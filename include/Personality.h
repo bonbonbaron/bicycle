@@ -15,21 +15,10 @@
 using BbKey = std::string;
 using Blackboard = std::map<BbKey, std::any>;
 
-// Our purpose with the ports idea is to establish type-safe BB access.
-template <typename T>
-struct InputPort {
-  const BbKey key;
-  auto get() const -> T&;
-};
-
-template <typename T>
-struct OutputPort {
-  const BbKey key;
-  void set( const T& t );
-  void set( const T&& t );
-};
-
 class Tree;
+
+/* ROS' creators claimed ports' existence were a contract,
+ * but bb->get<Type>() would've sufficed. Bicycle simplifies life.  */
 
 // Inheritors of ActionNode will implement their ports.
 using Action = std::function<ActionState()>;
