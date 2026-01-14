@@ -22,6 +22,7 @@ struct B : public Action {
 struct C : public Action {
   C() : Action( "C Action" ) {
     f = [&]() {
+      auto bb = getBlackboard();
       cout << "will this work?\n";
       return ActionState::FAILED;
     };

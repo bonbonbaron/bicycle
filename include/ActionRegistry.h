@@ -12,7 +12,7 @@ using BbKey = std::string;
 using Blackboard = std::map<BbKey, std::any>;
 
 class Action;
-using ActionPtr = Action*;
+using ActionPtr = Action*;  // TODO how can i use smart pointers if it bombs saying the weak ptr is not set on construction?
 
 class ActionRegistry : public std::map<std::string, ActionPtr> {
   public:
@@ -37,7 +37,6 @@ class ActionRegistry : public std::map<std::string, ActionPtr> {
 };
 
 
-// class Action : public std::enable_shared_from_this<Action> {
 class Action {
   public:
     Action( const std::string&& name ) {
@@ -49,6 +48,7 @@ class Action {
       _bb = bb;
     }
 
+    // TODO add function for getting any arbitrary object out of Blackboard.
     auto getBlackboard() const -> std::shared_ptr<Blackboard> {
       return _bb;
     }
