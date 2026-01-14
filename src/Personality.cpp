@@ -1,15 +1,15 @@
 #include "Personality.h"
 
-auto FallbackNode::run() -> EventState {
-  EventState state{EventState::SUCCESS};  // in case there's nothing in _events
-  for ( auto& e : _events ) {
+auto FallbackNode::run() -> ActionState {
+  ActionState state{ActionState::SUCCESS};  // in case there's nothing in _actions
+  for ( auto& e : _actions ) {
     // Skip already-completed events.
-    if ( e->getState() == EventState::SUCCESS ) {
+    if ( e->getState() == ActionState::SUCCESS ) {
       continue;
     }
     auto state = e->run();
     // Stop on the first event that succeeds.
-    if ( state == EventState::SUCCESS ) {
+    if ( state == ActionState::SUCCESS ) {
       break;
     }
   }
@@ -17,23 +17,16 @@ auto FallbackNode::run() -> EventState {
   return getState();
 }
 
-void FallbackNode::reset() {
-  for ( auto& e : _events ) {
-    e->reset();
-  }
-  setState( EventState::READY );
-}
-
-auto SequenceNode::run() -> EventState {
-  EventState state{EventState::SUCCESS};  // in case there's nothing in _events
-  for ( auto& e : _events ) {
+auto SequenceNode::run() -> ActionState {
+  ActionState state{ActionState::SUCCESS};  // in case there's nothing in _actions
+  for ( auto& e : _actions ) {
     // Skip already-completed events.
-    if ( e->getState() == EventState::SUCCESS ) {
+    if ( e->getState() == ActionState::SUCCESS ) {
       continue;
     }
     auto state = e->run();
     // Stop on the first event that fails.
-    if ( state != EventState::SUCCESS ) {
+    if ( state != ActionState::SUCCESS ) {
       break;
     }
   }
@@ -42,24 +35,24 @@ auto SequenceNode::run() -> EventState {
 }
 
 void SequenceNode::reset() {
-  for ( auto& e : _events ) {
+  for ( auto& e : _actions ) {
     e->reset();
   }
-  setState( EventState::READY );
+  setState( ActionState::READY );
 }
 
-void Sequence::fillSequenceWithActionPtrs( YAML::Node& node ) {
+void SequenceNode::fillSequenceWithActionPtrs( const YAML::Node& node ) {
   for ( const auto& n : node ) {
-    std::shared_ptr<Action> action;
+    std::shared_ptr<ActionNode> actionNode;
     if ( auto seq = n["seq"] ) {
-      action = makeShared<SequenceNode>( seq );
+      actionNode = makeShared<SequenceNode>( seq );
     }
     else if ( auto fall = n["fall"] ) {
-      action = makeShared<FallbackNode>( fall );
+      actionNode = makeShared<FallbackNode>( fall );
     }
     else {
-      action = std::make_shared<Action>( n.as<Action>() );
+      actionNode = std::make_shared<ActionNode>( n.as<ActionNode>() );
     }
-    addAction( action );
+    addActionNode( actionNode );
   }
 }

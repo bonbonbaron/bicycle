@@ -3,7 +3,7 @@
 #include <string>
 #include <map>
 
-enum class ActionState { READY, FAILED, IN_PROGRESS, DONE };
+enum class ActionState { READY, FAILED, IN_PROGRESS, SUCCESS };
 
 class ActionRegistry : public std::map<std::string, std::function<ActionState()>> {
   public:

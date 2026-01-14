@@ -1,3 +1,15 @@
+20260112: 
+  grafting trees onto each other
+  input & output ports in tree nodes
+  blackboard (map of std::any) with the tree's structure
+  shared pointers to the tree's structure
+  std::any for map
+  option between a key and raw value for a node's function argument
+  figure out what the function internals are going to look like for Battle as an test case
+  wrap up Body and Personality into Entity
+  Window can be a body with some special side functions. Will all entites work like that? Time will tell.
+  conceive of a file with all the static commands for YAML, like showMenu, onTimer, etc.
+
 "Event" keeps confusing me. What I really mean is Action; DOING something, not just "Something happened."
 Some actions happen uncondtionally; others must be triggered:
  * by logic

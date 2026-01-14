@@ -1,44 +1,72 @@
 #pragma once
-#include <cursesw.h>
 #include <algorithm>
+#include <any>
+#include <cursesw.h>
 #include <functional>
 #include <string>
 #include <map>
 #include <memory>
 #include <variant>
+#include <vector>
+#include <yaml-cpp/yaml.h>
 
 #include "ActionRegistry.h"
 
+using BbKey = std::string;
+using Blackboard = std::map<BbKey, std::any>;
+
+// Our purpose with the ports idea is to establish type-safe BB access.
+template <typename T>
+struct InputPort {
+  const BbKey key;
+  auto get() const -> T&;
+};
+
+template <typename T>
+struct OutputPort {
+  const BbKey key;
+  void set( const T& t );
+  void set( const T&& t );
+};
+
+class Tree;
+
+// Inheritors of ActionNode will implement their ports.
 using Action = std::function<ActionState()>;
 class ActionNode {
   public:
     // For making shared pointers that outlive YAML reader scopes.
+    ActionNode() = default;
     ActionNode( const ActionNode& );
     auto operator=( const ActionNode& ) -> ActionNode&;
+    void setAction( const Action& action );
+    auto getState() const -> ActionState;
     virtual auto run() -> ActionState;  // runs only if READY or ONGOING; returns state otherwise.
     virtual void reset();
+  protected:
+    std::shared_ptr<Tree> _tree{};
     void setState( const ActionState state );
-    auto getState() const -> ActionState;
-    void setAction( ( const Action& action );
   private:
-    ActionState state{ ActionState::READY };
     Action _action{};
+    ActionState _state{ ActionState::READY };
 };
 
 class SequenceNode : public ActionNode {
   public:
+    SequenceNode();
     SequenceNode( const SequenceNode& );
     auto operator=( const SequenceNode& ) -> SequenceNode&;
     auto run() -> ActionState override;
     void reset() override;
-    void addAction( const std::shared_ptr<ActionNode>& _actions );
-    void fillSequenceWithActionPtrs( YAML::Node& rhs );
-  private:
+    void addActionNode( const std::shared_ptr<ActionNode>& _actions );
+    void fillSequenceWithActionPtrs( const YAML::Node& rhs );
+  protected:
     std::vector<std::shared_ptr<ActionNode>> _actions{};
 };
 
 class FallbackNode : public SequenceNode {
   public:
+    FallbackNode();
     FallbackNode( const FallbackNode& );
     auto operator=( const FallbackNode& ) -> FallbackNode&;
     auto run() -> ActionState override;
@@ -48,14 +76,16 @@ class Tree {
   public:
     void setRoot( const std::shared_ptr<ActionNode> action );
     auto run() -> ActionState;
+    auto getBlackboard() -> Blackboard&;
   private:
     std::shared_ptr<ActionNode> _root{};
+    Blackboard _bb;
 };
 
 struct Quirk {
-  Tree tree{}
+  Tree tree{};
   int priority{};  // higher values take precedence
-}
+};
 
 using Personality = std::map< std::string, Quirk >;
 
@@ -87,7 +117,7 @@ struct YAML::convert<ActionNode> {
 
 // Helper function converting raw object to shared_ptr since yaml-cpp only deals in default constructors for rhs.
 template<typename T>
-static auto makeShared<T>( const YAML::Node& node ) -> std::shared_ptr<T>{
+static auto makeShared( const YAML::Node& node ) -> std::shared_ptr<T>{
   return std::make_shared<T>( node.as<T>() );
 }
 
@@ -100,7 +130,7 @@ struct YAML::convert<SequenceNode> {
     if (!node.IsSequence()) {
       return false;
     }
-    rhs.fillSequenceWithActionPtrs( node )
+    rhs.fillSequenceWithActionPtrs( node );
     return true;
   }
 };  // SequenceNode YML conversion
@@ -113,7 +143,7 @@ struct YAML::convert<FallbackNode> {
     if (!node.IsSequence()) {
       return false;
     }
-    rhs.fillSequenceWithActionPtrs( node )
+    rhs.fillSequenceWithActionPtrs( node );
     return true;
   }
 };   // FallbackNode YML conversion
@@ -127,11 +157,11 @@ struct YAML::convert<Tree> {
       return false;
     }
     // You can reuse the same file as either a sequence or fallback/selector.
-    if ( n = node["seq"] ) {
-      rhs.setRoot( makeShared<SequenceNode>( n ) );
+    if ( auto& n = node["seq"] ) {
+      rhs.setRoot( static_pointer_cast<ActionNode>( makeShared<SequenceNode>( n ) ) );
     }
-    else if ( n = node["fall"] ) {
-      rhs.setRoot( makeShared<SequenceNode>( n ) );
+    else if ( auto& n = node["fall"] ) {
+      rhs.setRoot( static_pointer_cast<ActionNode>( makeShared<FallbackNode>( n ) ) );
     }
     else {
       rhs.setRoot( std::make_shared<ActionNode>( node.as<ActionNode>() ) );
@@ -152,7 +182,7 @@ struct YAML::convert<Quirk> {
     auto treeName = node["tree"].as<std::string>();
     constexpr std::string_view TREE_DIR{ "./tree/" };  // TODO add base dir path
     try {
-      auto treeNode = YAML::LoadFile();
+      auto treeNode = YAML::LoadFile( TREE_DIR.data() + treeName + ".yml" );
       rhs.tree = treeNode.as<Tree>();
     }
     catch ( const std::exception& e ) {
@@ -165,15 +195,7 @@ struct YAML::convert<Quirk> {
   }
 };   // Quirk YML conversion
 
-// Provide yaml-cpp library with template candidate for Quirk's specific struct
-template<>
-struct YAML::convert<Personality> {
-  static YAML::Node encode(const std::string& rhs) { return YAML::Node(rhs); }
-  static bool decode(const YAML::Node& node, Quirk& rhs) {
-    if (!node.IsMap()) {
-      return false;
-    }
-    rhs = node.as<Personality>();
-    return true;
-  }
-};
+// Although ROS provides far more (and too many in my opinion) node types than I do,
+// I think simplicity brings speed with it. For instance, conditions belong in if-
+// statements, not glorified structures bloating both size and computation time.
+

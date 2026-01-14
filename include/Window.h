@@ -1,6 +1,7 @@
 #pragma once
 #include <string>
 #include "ColorPalette.h"
+#include "Body.h"
 
 static constexpr int WINDOW_PADDING{2};
 
