@@ -9,7 +9,7 @@ auto ActionNode::getState() const -> ActionState {
 }
 
 void ActionNode::run() {
-  _state = _action();
+  _state = _action.f();
 }
 
 void FallbackNode::run() {

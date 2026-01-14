@@ -12,9 +12,6 @@
 
 #include "ActionRegistry.h"
 
-using BbKey = std::string;
-using Blackboard = std::map<BbKey, std::any>;
-
 class Tree;
 
 /* ROS' creators claimed ports' existence were a contract,

@@ -5,22 +5,40 @@
 #include <map>
 #include <memory>
 #include <any>
+#include <functional>
+#include <bicycle/ActionRegistry.h>
 
 using namespace std;
 
-using Map = map<int, any>;
-
-struct A {
-  double d{45};
-  string s{"your mother"};
+struct B : public Action {
+  B() : Action( "B action" ) {
+    f = [&]() { 
+      cout << "my favorite number is 45\n"; 
+      return ActionState::SUCCESS;
+    };
+  }
 };
 
-int main() {
-  Map m;
-  m[1] = 45;
-  m[2] = "hello there";
-  m[3] = A();
+struct C : public Action {
+  C() : Action( "C Action" ) {
+    f = [&]() {
+      cout << "will this work?\n";
+      return ActionState::FAILED;
+    };
+  }
+};
 
-  cout << any_cast<A>(m[3]).s << "\n";
+
+static B b;
+static C c;
+
+int main() {
+  // b.f();
+  // c.f();
+
+  auto& reg = ActionRegistry::get();
+
+  auto cc = *reg["C Action"];
+  cc.f();
   return 0;
 }
