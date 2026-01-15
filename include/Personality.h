@@ -32,7 +32,7 @@ class ActionNode {
     std::shared_ptr<Tree> _tree{};
     void setState( const ActionState state );
   private:
-    Action _action{};
+    Action _action{};  // TODO initialize with key in constructor
     ActionState _state{ ActionState::READY };
 };
 
@@ -88,14 +88,9 @@ struct YAML::convert<ActionNode> {
       return false;
     }
     auto actionName = node.as<std::string>();
-    auto& reg = ActionRegistry::get();
-    auto it = reg.find( actionName );
-    if ( it == reg.end() ) {
-      std::cerr << "ActionNode " << actionName << " not found in ActionRegistry instance. Exiting...\n";
-      endwin();
-      exit(1);
-    }
-    rhs.setAction( it->second );
+    auto& reg = ActionRegistry::getInstance();
+    auto& it = reg.at( actionName );
+    rhs.setAction( *it );
       
     return true;
   }

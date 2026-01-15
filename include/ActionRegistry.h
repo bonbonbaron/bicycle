@@ -11,15 +11,26 @@ using ActFunc = std::function<ActionState()>;
 using BbKey = std::string;
 class Blackboard {
   public:
+
+    // TODO how do i return a reference to a map's value?
     template<typename T>
       auto get( const BbKey& key ) -> T {
-        auto v = _bb.find( key ); 
-        if ( v == _bb.end() ) {
+        try {
+          auto& val = _bb.at( key );
+          try {
+            return std::any_cast<T>( _bb.at( key ) ); 
+          }
+          catch ( const std::bad_any_cast &e ) {
+            std::cerr << "blackboard tried to cast key " << key << "'s value to the wrong type. It contains a " << val.type().name() << ".\n";
+            endwin();
+            exit(1);
+          }
+        }
+        catch ( const std::out_of_range& e ) {
+          std::cerr << "blackboard hasn't mapped for key " << key << " yet.\n";
           endwin();
-          std::cerr << "Couldn't find key " << key << " in blackboard! Exiting...\n";
           exit(1);
         }
-        return std::any_cast<T>(v->second);
       }
 
     template <typename T>
@@ -28,7 +39,7 @@ class Blackboard {
     }
 
     template <typename T>
-    void set ( const BbKey&& key, const T& val ) {
+    void set ( const BbKey&& key, const T&& val ) {
       _bb[ key ] = val;
     }
 
@@ -41,18 +52,22 @@ using ActionPtr = Action*;  // TODO how can i use smart pointers if it bombs say
 
 class ActionRegistry : public std::map<std::string, ActionPtr> {
   public:
-    static auto get() -> ActionRegistry& {
+    static auto getInstance() -> ActionRegistry& {
       static ActionRegistry registry;
       return registry;
     }
     // Allows you to more easily make an event mapping
-    void add( const std::string& name, const ActionPtr& actionFunc =  nullptr ) {
-      if ( actionFunc == nullptr ) {
-        std::cerr << "function " << name << " is null! Exiting...\n";
+    auto get( const std::string& name ) const -> ActionPtr {
+      return at( name );
+    }
+    // Allows you to more easily make an event mapping
+    void set( const std::string& name, const ActionPtr& action ) {
+      if ( action == nullptr ) {
+        std::cerr << "ActionRegistry::set(): ActionPtr " << name << " is null! Exiting...\n";
         endwin();
         exit(1);
       }
-      (*this)[name] = actionFunc;
+      (*this)[name] = action;
     }
 
   private:
@@ -64,9 +79,16 @@ class ActionRegistry : public std::map<std::string, ActionPtr> {
 
 class Action {
   public:
-    Action( const std::string&& name ) {
-      auto& reg = ActionRegistry::get();
-      reg.add( name, this );
+    Action() = default;
+    Action( const std::string&& name, const ActFunc& f ) : f(f) {
+      auto& reg = ActionRegistry::getInstance();
+      // Protect devs from null function pointers.
+      if ( f == nullptr ) {
+        std::cerr << "Action::Action(): function " << name << " is null! Exiting...\n";
+        endwin();
+        exit(1);
+      }
+      reg.set( name, this );
     }
 
     void setBlackboard( std::shared_ptr<Blackboard> bb ) {
@@ -74,7 +96,7 @@ class Action {
     }
 
     // TODO add function for getting any arbitrary object out of Blackboard.
-    auto getBlackboard() const -> std::shared_ptr<Blackboard> {
+    auto getBlackboard() -> std::shared_ptr<Blackboard> {
       return _bb;
     }
 
@@ -82,8 +104,8 @@ class Action {
       this->f = f;
     }
 
-    ActFunc f{};
+    ActFunc f{};  // nullptr by default; guess they're ultimately function pointers
 
   private:
-    std::shared_ptr<Blackboard> _bb{};
+    std::shared_ptr<Blackboard> _bb{ std::make_shared<Blackboard>() };
 };

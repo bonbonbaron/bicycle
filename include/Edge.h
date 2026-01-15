@@ -41,13 +41,8 @@ struct YAML::convert<Edge> {
     if ( auto conditionName = node["condition"] ) {
       
       auto& reg = ConditionRegistry::get();
-      auto it = reg.find( conditionName.as<std::string>() );
-      if ( it == reg.end() ) {
-        std::cerr << "Condition " << conditionName.as<std::string>() << " not found in ConditionRegistry instance. Exiting...\n";
-        endwin();
-        exit(1);
-      }
-      rhs.setCondition( it->second );
+      auto& it = reg.at( conditionName.as<std::string>() );
+      rhs.setCondition( it );
     }  // if this edge is conditional
     return true;
   }

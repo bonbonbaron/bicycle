@@ -9,34 +9,25 @@
 #include <bicycle/ActionRegistry.h>
 
 using namespace std;
-
-struct B : public Action {
-  B() : Action( "B action" ) {
-    f = [&]() { 
-      cout << "my favorite number is 45\n"; 
-      return ActionState::SUCCESS;
-    };
-  }
-};
+using enum ActionState;
 
 struct C : public Action {
-  C() : Action( "C Action" ) {
-    f = [&]() {
-      auto bb = getBlackboard();
-      cout << "will this work?\n";
-      return ActionState::FAILED;
-    };
-  }
+  C() : Action( "C Action", 
+        [&]() {
+          auto bb = getBlackboard();
+          auto b = bb->get<int>("hi");
+          cout << "seeing int " << b << "\n";
+          return FAILED;
+        }) {}
 };
 
-
-static B b;
 static C c;
 
 int main() {
-  Blackboard bb;
-  bb.set<int>( "tiger", 45);
-  cout << bb.get<int>("tiger") << "\n";
-
+  auto& reg = ActionRegistry::getInstance();
+  auto cc = reg.get( "C Action" );
+  auto bb = cc->getBlackboard();
+  bb->set<int>( "hi", 45 );
+  cc->f();
   return 0;
 }

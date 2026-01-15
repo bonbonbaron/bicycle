@@ -27,7 +27,7 @@ void Node::onInput( const int input ) {
   std::unique_lock l( _nodeMut );
   auto trigger = _onInputTriggers.find( input );
   if ( trigger != _onInputTriggers.end() ) {
-    trigger->second();
+    trigger->second();  // call triggered function
   }
 }
 
@@ -36,6 +36,6 @@ void Node::onTimer( std::string timerName ) {
   std::unique_lock l( _nodeMut );
   auto trigger = _onTimerTriggers.find( timerName );
   if ( trigger != _onTimerTriggers.end() ) {
-    trigger->second();
+    trigger->second();  // call triggered function
   }
 }
