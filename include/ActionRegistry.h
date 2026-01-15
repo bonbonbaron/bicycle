@@ -48,7 +48,7 @@ class Blackboard {
 };
 
 class Action;
-using ActionPtr = Action*;  // TODO how can i use smart pointers if it bombs saying the weak ptr is not set on construction?
+using ActionPtr = Action*;  // TODO Figure out how to make this a smart pointer due to circular dependency.
 
 class ActionRegistry : public std::map<std::string, ActionPtr> {
   public:

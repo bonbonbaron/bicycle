@@ -1,62 +1,12 @@
-20260112: 
-  grafting trees onto each other
-  input & output ports in tree nodes
-  blackboard (map of std::any) with the tree's structure
-  shared pointers to the tree's structure
-  std::any for map
-  option between a key and raw value for a node's function argument
-  figure out what the function internals are going to look like for Battle as an test case
-  wrap up Body and Personality into Entity
-  Window can be a body with some special side functions. Will all entites work like that? Time will tell.
-  conceive of a file with all the static commands for YAML, like showMenu, onTimer, etc.
-
-"Event" keeps confusing me. What I really mean is Action; DOING something, not just "Something happened."
-Some actions happen uncondtionally; others must be triggered:
- * by logic
- * by timer
- * by input
- * (later) by network activity
-And it makes sense that sometimes we're not listening to the player's input; something else is transpiring
- outside the player's control.
-Is it necessarily a behavior tree then? Not  necessarily, but it migth help. 
-Certain elements are repeatable:
- listen for menu selection input: move the cursor around, select the current item, or cancel.
- SIDE NOTE: the above statement hints at the separation between action and presentation.
- =========  For a menu, back-side, I may point at a lambda, but front-side point at its representation.
-            That splits the behavior and representation of a menu item or any other widget.
-            So let's tweak the front-side in YAML and the back in C++.
-
-            The front side has the following properties:
-             location
-             string symbol
-             color
-            
-            The back side *universally* has these:
-             behavior tree
-               behavior node
-                 action
-                 (optional) trigger
-
-It may be true that if something doesn't have a front side, it has no back side either. Ghosts aren't real.
-
-
-Therefore the idea that a node has its own behavior was ill-conceived. Every entity has its own behavior.
-Okay, so we're back to entities again. A menu is an entity.
-This means from a player perspective, entities can have focus.
-
-Seems now as though a lot of design wisdom can be pulled from jollybean.
-
-Action is a lambda that returns ActionState.
-Behavior Tree is a tree of Action nodes whose flow is controlled by its states.
-Trigger is an input, timer, or logic.
-Priority determines whether a tree interrupts an active tree.
-Quirk is a trio of behavior tree, priority, and trigger.
-Personality is a set of quirks.
-Body is the flip-side of Personality; the imaginary membrane between them separates controller from view.
-
-Only things that concern me about the above:
-============================================
- 1) Can multiple entities listen to input at once? That might not be good but also gives flexibility.
- 2) Having a bunch of willy nilly actions reintroduces the problem of blackboards lacking requisites for action.
-
-
+graft trees onto each other
+propagate blackboard shared pointers throughout tree
+test tree
+test personality
+make onTimer() easy
+make onInput() easy
+-----
+Make Windows extend Body
+remake Battle to test feasibility and refine it
+-----
+wrap up Body and Personality into Entity
+-----
