@@ -11,8 +11,6 @@ using ActFunc = std::function<ActionState()>;
 using BbKey = std::string;
 class Blackboard {
   public:
-
-    // TODO how do i return a reference to a map's value?
     template<typename T>
       auto get( const BbKey& key ) -> T {
         try {
@@ -20,12 +18,14 @@ class Blackboard {
           try {
             return std::any_cast<T>( _bb.at( key ) ); 
           }
+          // Catch bad casting of std::any.
           catch ( const std::bad_any_cast &e ) {
             std::cerr << "blackboard tried to cast key " << key << "'s value to the wrong type. It contains a " << val.type().name() << ".\n";
             endwin();
             exit(1);
           }
         }
+        // Catch blackboard missing a key.
         catch ( const std::out_of_range& e ) {
           std::cerr << "blackboard hasn't mapped for key " << key << " yet.\n";
           endwin();
@@ -84,7 +84,7 @@ class Action {
       auto& reg = ActionRegistry::getInstance();
       // Protect devs from null function pointers.
       if ( f == nullptr ) {
-        std::cerr << "Action::Action(): function " << name << " is null! Exiting...\n";
+        std::cerr << "Action::Action(): Action " << name << "'s function is null! Exiting...\n";
         endwin();
         exit(1);
       }
