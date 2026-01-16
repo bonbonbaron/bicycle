@@ -3,6 +3,7 @@
 #include <string>
 #include <map>
 #include <memory>
+#include <any>
 #include <cursesw.h>
 
 enum class ActionState { READY, FAILED, IN_PROGRESS, SUCCESS };
@@ -34,14 +35,14 @@ class Blackboard {
       }
 
     template <typename T>
-    void set ( const BbKey& key, const T& val ) {
-      _bb[ key ] = val;
-    }
+      void set ( const BbKey& key, const T& val ) {
+        _bb[ key ] = val;
+      }
 
     template <typename T>
-    void set ( const BbKey&& key, const T&& val ) {
-      _bb[ key ] = val;
-    }
+      void set ( const BbKey&& key, const T&& val ) {
+        _bb[ key ] = val;
+      }
 
   private:
     std::map<BbKey, std::any> _bb{};
@@ -58,7 +59,14 @@ class ActionRegistry : public std::map<std::string, ActionPtr> {
     }
     // Allows you to more easily make an event mapping
     auto get( const std::string& name ) const -> ActionPtr {
-      return at( name );
+      try {
+        return at( name );
+      }
+      catch ( const std::out_of_range& e ) {
+        std::cerr << "Action Registry hasn't mapped anything yet to key " << name << ".\n";
+        endwin();
+        exit(1);
+      }
     }
     // Allows you to more easily make an event mapping
     void set( const std::string& name, const ActionPtr& action ) {
@@ -95,17 +103,29 @@ class Action {
       _bb = bb;
     }
 
-    // TODO add function for getting any arbitrary object out of Blackboard.
-    auto getBlackboard() -> std::shared_ptr<Blackboard> {
-      return _bb;
-    }
+    // TODO there may need to be a reference variant of these. 
+    //      Wonder how we do that since any_cast() forces copying.
+    template<typename T>
+      auto get( const BbKey& key ) -> T {
+        return _bb->get<T>( key );
+      }
 
-    void set( const ActFunc f ) {
-      this->f = f;
-    }
+    template<typename T>
+      void set( const BbKey& key, T&& val ) {
+        _bb->set<T>( key, std::forward<T>( val ) );
+      }
 
     ActFunc f{};  // nullptr by default; guess they're ultimately function pointers
 
   private:
     std::shared_ptr<Blackboard> _bb{ std::make_shared<Blackboard>() };
 };
+
+// macro for defining actions
+#define ACT( _type_, ... )\
+  namespace _type_ {\
+    struct _type_ : public Action {\
+      _type_() : Action( #_type_, __VA_ARGS__ ) {}\
+    };\
+    static _type_ _;\
+  }
