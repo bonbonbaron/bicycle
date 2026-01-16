@@ -9,6 +9,12 @@ using enum ActionState;
 
 char* __cxa_demangle(const char* __mangled_name, char* __output_buffer, size_t* __length, int* __status);
 
+struct Man {
+  int hp;
+  int mp;
+  double intuition;
+};
+
 ACT( 
   C_Action, 
   [&]() {
@@ -21,7 +27,7 @@ ACT(
 int main() {
   auto& reg = ActionRegistry::getInstance();
   auto cc = reg.get( "C_Action" );
-  cc->set<int>( "hi", 45 );
+  cc->set<Man>( "hi", { 45, 42, 85.0 });
   cc->f();
   return 0;
 }

@@ -6,6 +6,7 @@
 #include <any>
 #include <cursesw.h>
 #include <cxxabi.h>
+#include <typeinfo>
 
 /* It seems like it shoudl be possible to determine the type of BB element, 
  * and then get it however it is. Because we could map keys to demangled
@@ -13,6 +14,7 @@
  * know how to operate on it in the caller? Yeah, that doesn't make sense.
  * But it would help to know what types "someVar" is expected to be everywhere.
  * I'd hate to have to memorize and do constant looking up of types.
+ */
 
 enum class ActionState { READY, FAILED, IN_PROGRESS, SUCCESS };
 
@@ -30,8 +32,10 @@ class Blackboard {
           // Catch bad casting of std::any.
           catch ( const std::bad_any_cast &e ) {
             int i;
-            auto s = __cxxabiv1::__cxa_demangle( val.type().name(), nullptr, 0, &i );
-            std::cerr << "blackboard tried to cast key " << key << "'s value to the wrong type. It contains type " << s << ".\n";
+            T t;
+            auto actual = __cxxabiv1::__cxa_demangle( val.type().name(), nullptr, 0, &i );
+            auto expect = __cxxabiv1::__cxa_demangle( typeid(t).name(), nullptr, 0, &i );
+            std::cerr << "\e[91mYou called a blackboard's get<" << expect << ">( \"" << key << "\" ) on a(n) " << actual << ". Go change it to get<" << actual << ">( \"" << key << "\" )! Exiting...\e[0m\n";
             endwin();
             exit(1);
           }
