@@ -5,6 +5,14 @@
 #include <memory>
 #include <any>
 #include <cursesw.h>
+#include <cxxabi.h>
+
+/* It seems like it shoudl be possible to determine the type of BB element, 
+ * and then get it however it is. Because we could map keys to demangled
+ * type names, and demangled type names to... but then how would the compiler
+ * know how to operate on it in the caller? Yeah, that doesn't make sense.
+ * But it would help to know what types "someVar" is expected to be everywhere.
+ * I'd hate to have to memorize and do constant looking up of types.
 
 enum class ActionState { READY, FAILED, IN_PROGRESS, SUCCESS };
 
@@ -21,7 +29,9 @@ class Blackboard {
           }
           // Catch bad casting of std::any.
           catch ( const std::bad_any_cast &e ) {
-            std::cerr << "blackboard tried to cast key " << key << "'s value to the wrong type. It contains a " << val.type().name() << ".\n";
+            int i;
+            auto s = __cxxabiv1::__cxa_demangle( val.type().name(), nullptr, 0, &i );
+            std::cerr << "blackboard tried to cast key " << key << "'s value to the wrong type. It contains type " << s << ".\n";
             endwin();
             exit(1);
           }
