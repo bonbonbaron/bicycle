@@ -4,6 +4,7 @@
 using namespace std;
 using enum ActionState;
 
+Action a{ [](ActArg) { return SUCCESS; } { "hi" }, { "there" } };
 
 // Now to figure out how to get references to talk directly through.
 int main() {
@@ -12,8 +13,7 @@ int main() {
   registerPortType<double>( "there" );
   registerPortType<double>( "my" );
   registerPortType<double>( "man" );
-    //Action( const std::string& name, ActFunc&& f, std::vector<BbKey> ins, std::vector<BbKey> outs ) {
-  Action a{ "A", [](ActArg& arg) { cout << "smell ya later bastahd\n"; auto d = arg.get<double>( "hi" ); return SUCCESS; }, { "hi" }, { "there" } };
   auto cc = actreg.get( "A" );
+  cc->execute();
   return 0;
 }

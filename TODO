@@ -1,6 +1,7 @@
 \graft trees onto each other
 \propagate blackboard shared pointers throughout tree
-input and output port specifications (why the distinction though?)
+\input and output port specifications (why the distinction though?)
+make it easy to stick that STATICALLY into the class def - but how?
 make set() and get() pass through the spec gates
 test tree through quirk
 figure out how trees retrigger or loop themselves. Rerun? How frequently? New attribute for frequency? "freq"? Without freq, we can assume it's a one-shot. Assume in units of ms. If 0, loop naturally.

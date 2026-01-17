@@ -15,43 +15,6 @@
 
 class Tree;
 
-enum class Direction { IN, OUT };
-
-struct Port {
-  Port( const std::type_index& type, const Direction&& dir ) : type( type ), dir( dir ) {}
-  const std::type_index type;
-  const Direction dir;
-};
-
-struct InputPort : public Port {
-  InputPort( const std::type_index& type ) : Port( type, Direction::IN ) {}
-};
-
-struct OutputPort : public Port {
-  OutputPort( const std::type_index& type ) : Port( type, Direction::OUT ) {}
-};
-
-using PortPair = std::pair<BbKey, std::type_info>;
-
-struct PortSet {
-  const std::map<BbKey, InputPort> in;
-  const std::map<BbKey, OutputPort> out;
-};
-
-#define IN( key, type ) { key, InputPort{ typeid( type ) } }
-#define OUT( key, type ) { key, OutputPort{ typeid( type ) } }
-
-static PortSet ps {
-  { 
-    IN( "1", double ),
-    IN( "2", int ),
-    IN( "3", std::string )
-  },
-  {
-    OUT( "4", Direction ),
-  }
-};
-
 /* ROS' creators claimed ports' existence were a contract,
  * but bb->get<Type>() would've sufficed. Bicycle simplifies life.  */
 
@@ -63,7 +26,7 @@ class ActionNode {
     ActionNode( const ActionNode& ) = default;
     auto operator=( const ActionNode& ) -> ActionNode& = default;
     static auto extractNode( const YAML::Node& node ) -> std::shared_ptr<ActionNode>;
-    void setAction( const Action& action );
+    void setAction( const std::shared_ptr<Action>& action );
     auto getState() const -> ActionState;
     virtual void setBlackboard ( const std::shared_ptr<Blackboard> bb );
     virtual void run();  // runs only if READY or ONGOING; returns state otherwise.
@@ -72,9 +35,9 @@ class ActionNode {
     void setState( const ActionState state );
     //virtual static auto getPortSet() const -> PortSet;
   private:
-    std::shared_ptr<Blackboard> _bb;
-    Action _action{};  // TODO initialize with key in constructor
+    std::shared_ptr<Action> _action{};  // TODO initialize with key in constructor
     ActionState _state{ ActionState::READY };
+    ActArg _arg;  // BB + PortSet
 };
 
 class SequenceNode : public ActionNode {
@@ -132,7 +95,7 @@ struct YAML::convert<ActionNode> {
     auto actionName = node.as<std::string>();
     auto& reg = ActionRegistry::getInstance();
     auto& it = reg.at( actionName );  // TODO try-catch for clearer errors
-    rhs.setAction( *it );
+    rhs.setAction( it->shared_from_this() );
 
     return true;
   }

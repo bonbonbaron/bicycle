@@ -27,11 +27,11 @@ auto ActionNode::getState() const -> ActionState {
 }
 
 void ActionNode::run() {
-  _state = _action.f();
+  _state = _action->f( _arg );
 }
 
 void ActionNode::setBlackboard ( const std::shared_ptr<Blackboard> bb ) {
-  _bb = bb;
+  _arg.setBlackboard( bb );
 }
 
 void FallbackNode::run() {
@@ -73,8 +73,9 @@ void SequenceNode::setBlackboard ( const std::shared_ptr<Blackboard> bb ) {
 }
 
 // Inheritors of ActionNode will implement their ports.
-void ActionNode::setAction( const Action& action ) {
+void ActionNode::setAction( const std::shared_ptr<Action>& action ) {
   _action = action;
+  _arg.setPortSet( _action->getPortSet() ); 
 }
 
 void SequenceNode::reset() {

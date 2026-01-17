@@ -5,51 +5,63 @@
 #include <memory>
 #include <any>
 #include <cxxabi.h>
-#include <typeinfo>
+#include <typeindex>
 
 #include "bicycle.h"
 
 enum class ActionState { READY, FAILED, IN_PROGRESS, SUCCESS };
 
-using ActFunc = std::function<ActionState()>;
 using BbKey = std::string;
-class Blackboard {
+using PortMap = std::map<BbKey, std::type_index>;
+
+struct PortSet {
+  PortMap in;
+  PortMap out;
+};
+
+using Blackboard = std::map<BbKey, std::any>;
+
+class ActArg {
   public:
     template<typename T>
-      auto get( const BbKey& key ) -> T {
-        try {
-          auto& val = _bb.at( key );
-          try {
-            return std::any_cast<T>( _bb.at( key ) ); 
-          }
-          // Catch bad casting of std::any.
-          catch ( const std::bad_any_cast &e ) {
-            int i;
-            T t;
-            auto actual = __cxxabiv1::__cxa_demangle( val.type().name(), nullptr, 0, &i );
-            auto expect = __cxxabiv1::__cxa_demangle( typeid(t).name(), nullptr, 0, &i );
-            bicycle::die( std::string("Your call to get<") + expect + ">( \"" + key + "\" ) should be get<" + actual + ">( \"" + key + "\" ).\n" );
-          }
+    auto get( const BbKey key ) -> T& {
+      try {
+        auto& type = _ps->in.at( key );
+        if ( type.name() != typeid(T).name() ) {
+          int i;
+          auto actual = __cxxabiv1::__cxa_demangle( type.name(), nullptr, 0, &i );
+          auto expect = __cxxabiv1::__cxa_demangle( typeid(T).name(), nullptr, 0, &i );
+          bicycle::die( std::string("Your call to get<") + expect + ">( \"" + key + "\" ) should be get<" + actual + ">( \"" + key + "\" ).\n" );
         }
-        // Catch blackboard missing a key.
-        catch ( const std::out_of_range& e ) {
-          bicycle::die( "blackboard hasn't mapped for key " + key + " yet." );
-        }
+        return std::any_cast<T&>( _bb->at( key ) );
       }
-
-    template <typename T>
-      void set ( const BbKey& key, const T& val ) {
-        _bb[ key ] = val;
+      // Catch blackboard missing a key.
+      catch ( const std::out_of_range& e ) {
+        bicycle::die( "blackboard hasn't mapped for key " + key + " yet." );
       }
-
-    template <typename T>
-      void set ( const BbKey&& key, const T&& val ) {
-        _bb[ key ] = val;
+    }
+    template<typename T>
+    void set( const BbKey key, const T& val ) {
+      auto& type = _ps->out.at( key );
+      if ( type.name() != typeid(T).name() ) {
+        bicycle::die( "bad arg" );  // IDGAF right now, jsut make it work
       }
-
+      return std::any_cast<T&>( _bb->at( key ) );
+    }
+    // BB is fed by ActionNode.
+    void setBlackboard( std::shared_ptr<Blackboard> bb ) {
+      _bb = bb;
+    }
+    // PS is fed by Action.
+    void setPortSet( std::shared_ptr<PortSet> ps ) {
+      _ps = ps;
+    }
   private:
-    std::map<BbKey, std::any> _bb{};
-};
+    std::shared_ptr<Blackboard> _bb;
+    std::shared_ptr<PortSet> _ps;
+};  // ActArg
+
+using ActFunc = std::function<ActionState(ActArg&)>;
 
 class Action;
 using ActionPtr = Action*;  // TODO Figure out how to make this a smart pointer due to circular dependency.
@@ -83,46 +95,56 @@ class ActionRegistry : public std::map<std::string, ActionPtr> {
     ActionRegistry& operator=( const ActionRegistry& ) = delete;
 };
 
+/* Although ActionFunc and ActionNode may seem already sufficient for behavior trees,
+ * the Action class exists as a practical necessity: parameter-less action funcs can't
+ * know about blackboards unless they're declared within the scope of a class/struct. 
+ * And ActionNodes are read from YAMLs; we're not going to define a different YAML type
+ * for every Action, so it's more feasible to separate the two. */
 
-class Action {
+/* Since we can't make static member functions virtual, we'll enforce a concept on 
+ * on Action's derived children. */
+
+class PortTypeRegistry : public std::map< const std::string, std::type_index > {
   public:
-    Action() = default;
-    Action( const std::string&& name, const ActFunc& f ) : f(f) {
-      auto& reg = ActionRegistry::getInstance();
-      // Protect devs from null function pointers.
-      if ( f == nullptr ) {
-        bicycle::die( "Action::Action(): Action " + name + "'s function is null!" );
-      }
-      reg.set( name, this );
+    static auto getInstance() -> PortTypeRegistry& {
+      static PortTypeRegistry ps;
+      return ps;
     }
-
-    void setBlackboard( std::shared_ptr<Blackboard> bb ) {
-      _bb = bb;
-    }
-
-    // TODO there may need to be a reference variant of these. 
-    //      Wonder how we do that since any_cast() forces copying.
-    template<typename T>
-      auto get( const BbKey& key ) -> T {
-        return _bb->get<T>( key );
-      }
-
-    template<typename T>
-      void set( const BbKey& key, T&& val ) {
-        _bb->set<T>( key, std::forward<T>( val ) );
-      }
-
-    ActFunc f{};  // nullptr by default; guess they're ultimately function pointers
-
   private:
-    std::shared_ptr<Blackboard> _bb{ std::make_shared<Blackboard>() };
+    PortTypeRegistry() = default;
+    PortTypeRegistry( const PortTypeRegistry& ) = delete;
+    PortTypeRegistry operator=( const PortTypeRegistry& ) = delete;
 };
 
-// macro for defining actions
-#define ACT( _type_, ... )\
-  namespace _type_ {\
-    struct _type_ : public Action {\
-      _type_() : Action( #_type_, __VA_ARGS__ ) {}\
-    };\
-    static _type_ _;\
-  }
+class Action : public std::enable_shared_from_this<Action> {
+  public:
+    Action( const std::string& name, ActFunc&& f, std::vector<BbKey> ins, std::vector<BbKey> outs ) : f(f) {
+      /* Register input and output ports */
+      auto& ptReg = PortTypeRegistry::getInstance();
+      for ( const auto& inputPortName : ins ) {
+        _portSet->in.insert( std::make_pair( inputPortName, ptReg.at( inputPortName ) ) );
+      }
+      for ( const auto& outputPortName : outs ) {
+        _portSet->out.insert( std::make_pair( outputPortName, ptReg.at( outputPortName ) ) );
+      }
+      /* Register this Action */
+      auto& actReg = ActionRegistry::getInstance();
+      actReg.set( name, this );
+    }
+    auto getPortSet() -> std::shared_ptr<PortSet> {
+      return _portSet;
+    }
+    ActFunc f;
+  protected:
+    std::shared_ptr<PortSet> _portSet{ std::make_shared<PortSet>() };  // universal for all entities
+    // TODO: This is not good. Actions are singletons. Multiple callers to actions need to have their own BBs.
+    //       And singletons need to own their own port sets.
+    std::shared_ptr<Blackboard> _bb;  // varies from entity to entity
+    ActionState _state;
+};  // Action
+
+template<typename T>
+static void registerPortType( BbKey&& key ) {
+  auto& reg = PortTypeRegistry::getInstance();
+  reg.insert( std::pair( key, std::type_index( typeid( T ) ) ) );
+}
