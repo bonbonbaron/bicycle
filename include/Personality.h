@@ -6,6 +6,7 @@
 #include <string>
 #include <map>
 #include <memory>
+#include <typeindex>
 #include <variant>
 #include <vector>
 #include <yaml-cpp/yaml.h>
@@ -13,6 +14,43 @@
 #include "ActionRegistry.h"
 
 class Tree;
+
+enum class Direction { IN, OUT };
+
+struct Port {
+  Port( const std::type_index& type, const Direction&& dir ) : type( type ), dir( dir ) {}
+  const std::type_index type;
+  const Direction dir;
+};
+
+struct InputPort : public Port {
+  InputPort( const std::type_index& type ) : Port( type, Direction::IN ) {}
+};
+
+struct OutputPort : public Port {
+  OutputPort( const std::type_index& type ) : Port( type, Direction::OUT ) {}
+};
+
+using PortPair = std::pair<BbKey, std::type_info>;
+
+struct PortSet {
+  const std::map<BbKey, InputPort> in;
+  const std::map<BbKey, OutputPort> out;
+};
+
+#define IN( key, type ) { key, InputPort{ typeid( type ) } }
+#define OUT( key, type ) { key, OutputPort{ typeid( type ) } }
+
+static PortSet ps {
+  { 
+    IN( "1", double ),
+    IN( "2", int ),
+    IN( "3", std::string )
+  },
+  {
+    OUT( "4", Direction ),
+  }
+};
 
 /* ROS' creators claimed ports' existence were a contract,
  * but bb->get<Type>() would've sufficed. Bicycle simplifies life.  */
@@ -24,14 +62,17 @@ class ActionNode {
     ActionNode() = default;
     ActionNode( const ActionNode& ) = default;
     auto operator=( const ActionNode& ) -> ActionNode& = default;
+    static auto extractNode( const YAML::Node& node ) -> std::shared_ptr<ActionNode>;
     void setAction( const Action& action );
     auto getState() const -> ActionState;
+    virtual void setBlackboard ( const std::shared_ptr<Blackboard> bb );
     virtual void run();  // runs only if READY or ONGOING; returns state otherwise.
     virtual void reset();
   protected:
-    std::shared_ptr<Tree> _tree{};
     void setState( const ActionState state );
+    //virtual static auto getPortSet() const -> PortSet;
   private:
+    std::shared_ptr<Blackboard> _bb;
     Action _action{};  // TODO initialize with key in constructor
     ActionState _state{ ActionState::READY };
 };
@@ -43,7 +84,8 @@ class SequenceNode : public ActionNode {
     auto operator=( const SequenceNode& ) -> SequenceNode& = default;
     void run() override;
     void reset() override;
-    void addActionNode( const std::shared_ptr<ActionNode>& _actions );
+    void setBlackboard ( const std::shared_ptr<Blackboard> bb ) override;
+    void addActionNode( const std::shared_ptr<ActionNode>& actions );
     void fillSequenceWithActionPtrs( const YAML::Node& rhs );
   protected:
     std::vector<std::shared_ptr<ActionNode>> _actions{};
@@ -60,12 +102,10 @@ class FallbackNode : public SequenceNode {
 class Tree {
   public:
     void setRoot( const std::shared_ptr<ActionNode> action );
+    auto getRoot() ->  const std::shared_ptr<ActionNode>;
     void run();
-    auto getBlackboard() -> Blackboard&;
-    // TODO propagate BB shared ptrs throughout the tree somehow
   private:
     std::shared_ptr<ActionNode> _root{};
-    Blackboard _bb;
 };
 
 struct Quirk {
@@ -73,7 +113,9 @@ struct Quirk {
   int priority{};  // higher values take precedence
 };
 
-using Personality = std::map< std::string, Quirk >;
+struct Personality : public std::map< std::string, Quirk > {
+  void distributeBlackboard( std::shared_ptr<Blackboard> bb );
+};
 
 // =======================================================
 // ********************** YAML ***************************
@@ -89,9 +131,9 @@ struct YAML::convert<ActionNode> {
     }
     auto actionName = node.as<std::string>();
     auto& reg = ActionRegistry::getInstance();
-    auto& it = reg.at( actionName );
+    auto& it = reg.at( actionName );  // TODO try-catch for clearer errors
     rhs.setAction( *it );
-      
+
     return true;
   }
 }; // ActionNode YML conversion
@@ -138,20 +180,15 @@ struct YAML::convert<Tree> {
       return false;
     }
     // You can reuse the same file as either a sequence or fallback/selector.
-    if ( auto& n = node["seq"] ) {
-      rhs.setRoot( static_pointer_cast<ActionNode>( makeShared<SequenceNode>( n ) ) );
-    }
-    else if ( auto& n = node["fall"] ) {
-      rhs.setRoot( static_pointer_cast<ActionNode>( makeShared<FallbackNode>( n ) ) );
-    }
-    else {
-      rhs.setRoot( std::make_shared<ActionNode>( node.as<ActionNode>() ) );
-    }
+    auto actionNode = ActionNode::extractNode( node );
+    rhs.setRoot( std::make_shared<ActionNode>( node.as<ActionNode>() ) );
     return true;
   }
 };   // Tree YML conversion
 
-// Provide yaml-cpp library with template candidate for Quirk's specific struct
+constexpr std::string_view TREE_DIR{ "./config/personality/tree/" };  // TODO add base dir path
+                                                                      //
+                                                                      // Provide yaml-cpp library with template candidate for Quirk's specific struct
 template<>
 struct YAML::convert<Quirk> {
   static YAML::Node encode(const std::string& rhs) { return YAML::Node(rhs); }
@@ -161,15 +198,12 @@ struct YAML::convert<Quirk> {
     }
     // You can reuse the same file as either a sequence or fallback/selector.
     auto treeName = node["tree"].as<std::string>();
-    constexpr std::string_view TREE_DIR{ "./tree/" };  // TODO add base dir path
     try {
       auto treeNode = YAML::LoadFile( TREE_DIR.data() + treeName + ".yml" );
       rhs.tree = treeNode.as<Tree>();
     }
     catch ( const std::exception& e ) {
-      std::cerr << "Quirk node couldn't find " << treeName << ".yml in " << TREE_DIR.data() << "\n";
-      endwin();
-      exit(1);
+      bicycle::die( std::string("Quirk node couldn't find ") + TREE_DIR.data() + treeName + std::string(".yml\n") );
     }
     rhs.priority = node["priority"].as<int>();
     return true;

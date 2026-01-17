@@ -4,17 +4,10 @@
 #include <map>
 #include <memory>
 #include <any>
-#include <cursesw.h>
 #include <cxxabi.h>
 #include <typeinfo>
 
-/* It seems like it shoudl be possible to determine the type of BB element, 
- * and then get it however it is. Because we could map keys to demangled
- * type names, and demangled type names to... but then how would the compiler
- * know how to operate on it in the caller? Yeah, that doesn't make sense.
- * But it would help to know what types "someVar" is expected to be everywhere.
- * I'd hate to have to memorize and do constant looking up of types.
- */
+#include "bicycle.h"
 
 enum class ActionState { READY, FAILED, IN_PROGRESS, SUCCESS };
 
@@ -35,16 +28,12 @@ class Blackboard {
             T t;
             auto actual = __cxxabiv1::__cxa_demangle( val.type().name(), nullptr, 0, &i );
             auto expect = __cxxabiv1::__cxa_demangle( typeid(t).name(), nullptr, 0, &i );
-            std::cerr << "\e[91mYou called a blackboard's get<" << expect << ">( \"" << key << "\" ) on a(n) " << actual << ". Go change it to get<" << actual << ">( \"" << key << "\" )! Exiting...\e[0m\n";
-            endwin();
-            exit(1);
+            bicycle::die( std::string("Your call to get<") + expect + ">( \"" + key + "\" ) should be get<" + actual + ">( \"" + key + "\" ).\n" );
           }
         }
         // Catch blackboard missing a key.
         catch ( const std::out_of_range& e ) {
-          std::cerr << "blackboard hasn't mapped for key " << key << " yet.\n";
-          endwin();
-          exit(1);
+          bicycle::die( "blackboard hasn't mapped for key " + key + " yet." );
         }
       }
 
@@ -77,17 +66,13 @@ class ActionRegistry : public std::map<std::string, ActionPtr> {
         return at( name );
       }
       catch ( const std::out_of_range& e ) {
-        std::cerr << "Action Registry hasn't mapped anything yet to key " << name << ".\n";
-        endwin();
-        exit(1);
+        bicycle::die( "Action Registry hasn't mapped anything yet to key " + name + "." );
       }
     }
     // Allows you to more easily make an event mapping
     void set( const std::string& name, const ActionPtr& action ) {
       if ( action == nullptr ) {
-        std::cerr << "ActionRegistry::set(): ActionPtr " << name << " is null! Exiting...\n";
-        endwin();
-        exit(1);
+        bicycle::die( "ActionRegistry::set(): ActionPtr " + name + " is null!" );
       }
       (*this)[name] = action;
     }
@@ -106,9 +91,7 @@ class Action {
       auto& reg = ActionRegistry::getInstance();
       // Protect devs from null function pointers.
       if ( f == nullptr ) {
-        std::cerr << "Action::Action(): Action " << name << "'s function is null! Exiting...\n";
-        endwin();
-        exit(1);
+        bicycle::die( "Action::Action(): Action " + name + "'s function is null!" );
       }
       reg.set( name, this );
     }

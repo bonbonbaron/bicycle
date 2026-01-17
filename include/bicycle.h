@@ -6,6 +6,7 @@
 namespace bicycle {
   auto isInit() -> bool;
   void init();
+  void die( const std::string& s );
 
   void push( std::shared_ptr<Window> shared );
   void pop();

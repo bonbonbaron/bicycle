@@ -1,8 +1,19 @@
-#include <cursesw.h>
-#include "WindowManager.h"
+#include "bicycle.h"
 
 namespace bicycle {
   static bool _initState{};
+
+  void die( const std::string&& s ) {
+    std::cerr << "\e[91m" << s << "\e[0m\n";
+    endwin();
+    exit(1);
+  }
+
+  void die( const std::string& s ) {
+    std::cerr << "\e[91m" << s << "\e[0m\n";
+    endwin();
+    exit(1);
+  }
 
   auto isInit() -> bool {
     return _initState;
