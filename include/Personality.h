@@ -26,7 +26,7 @@ class ActionNode {
     ActionNode( const ActionNode& ) = default;
     auto operator=( const ActionNode& ) -> ActionNode& = default;
     static auto extractNode( const YAML::Node& node ) -> std::shared_ptr<ActionNode>;
-    void setAction( const std::shared_ptr<Action>& action );
+    void setAction( const ActionPtr& action );
     auto getState() const -> ActionState;
     virtual void setBlackboard ( const std::shared_ptr<Blackboard> bb );
     virtual void run();  // runs only if READY or ONGOING; returns state otherwise.
@@ -98,9 +98,20 @@ struct YAML::convert<ActionNode> {
       return false;
     }
     auto actionName = node.as<std::string>();
-    auto& reg = ActionRegistry::getInstance();
-    auto& it = reg.at( actionName );  // TODO try-catch for clearer errors
-    rhs.setAction( it->shared_from_this() );
+    try {
+      const auto& it = ActionRegistry::get( actionName );  // TODO try-catch for clearer errors
+      rhs.setAction( it );
+    }
+    catch ( const YAML::Exception& e ) {
+      throw e;  // Throw so upper level can tell us what file had the issue.
+    }
+    catch ( const std::out_of_range& e ) {
+      std::cerr << "No such key " << actionName << " set in ActionRegistry.\n";
+      bicycle::die( e.what() );
+    }
+    catch ( const std::exception& e ) {
+      bicycle::die( e.what() );
+    }
 
     return true;
   }
@@ -144,19 +155,30 @@ template<>
 struct YAML::convert<Tree> {
   static YAML::Node encode(const std::string& rhs) { return YAML::Node(rhs); }
   static bool decode(const YAML::Node& node, Tree& rhs) {
-    if (!node.IsMap()) {
-      return false;
+    try {
+      if (!node.IsMap()) {
+        return false;
+      }
+      // You can reuse the same file as either a sequence or fallback/selector.
+      auto actionNode = ActionNode::extractNode( node );
+      rhs.setRoot( std::make_shared<ActionNode>( node.as<ActionNode>() ) );
+      return true;
     }
-    // You can reuse the same file as either a sequence or fallback/selector.
-    auto actionNode = ActionNode::extractNode( node );
-    rhs.setRoot( std::make_shared<ActionNode>( node.as<ActionNode>() ) );
-    return true;
+    catch ( const YAML::TypedBadConversion<Tree>& e ) {
+      throw e;
+    }
+    catch ( const YAML::InvalidNode& e ) {
+      throw e;
+    }
+    catch (const YAML::Exception& e) {
+      throw e;
+    }
   }
 };   // Tree YML conversion
 
-constexpr std::string_view TREE_DIR{ "/home/bonbonbaron/hack/bicycle-rpg/config/personality/tree/" };  // TODO add base dir path
-                                                                      //
-                                                                      // Provide yaml-cpp library with template candidate for Quirk's specific struct
+constexpr std::string_view TREE_DIR{ "/home/bonbonbaron/hack/bicycle-rpg/config/personality/tree/" };  
+
+// Provide yaml-cpp library with template candidate for Quirk's specific struct
 template<>
 struct YAML::convert<Quirk> {
   static YAML::Node encode(const std::string& rhs) { return YAML::Node(rhs); }
@@ -166,12 +188,18 @@ struct YAML::convert<Quirk> {
     }
     // You can reuse the same file as either a sequence or fallback/selector.
     auto treeName = node["tree"].as<std::string>();
+    const std::string FILENAME =  TREE_DIR.data() + treeName + ".yml";
     try {
-      auto treeNode = YAML::LoadFile( TREE_DIR.data() + treeName + ".yml" );
+      auto treeNode = YAML::LoadFile(FILENAME);
       rhs.tree = treeNode.as<Tree>();
     }
+    catch ( const YAML::Exception e ) {
+      std::cerr << "Error processing " << FILENAME << ":\n";
+      bicycle::die( e.what() );
+    }
     catch ( const std::exception& e ) {
-      bicycle::die( std::string("Quirk node couldn't find ") + TREE_DIR.data() + treeName + std::string(".yml\n") );
+      std::cerr << "Miscellaneous error:\n";
+      bicycle::die( e.what() );
     }
     rhs.priority = node["priority"].as<int>();
     return true;

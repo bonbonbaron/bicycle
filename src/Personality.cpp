@@ -2,17 +2,23 @@
 
 auto ActionNode::extractNode( const YAML::Node& node ) -> std::shared_ptr<ActionNode> {
   std::shared_ptr<ActionNode> actionNode;
-  if ( auto seq = node["seq"] ) {
-    actionNode = makeShared<SequenceNode>( seq );
+  if ( node.IsSequence() ) {
+    bicycle::die( "idk how to process sequences yet" );
   }
-  else if ( auto fall = node["fall"] ) {
-    actionNode = makeShared<FallbackNode>( fall );
+  else if ( node.IsMap() ) {
+    if ( auto seq = node["seq"] ) {
+      actionNode = makeShared<SequenceNode>( seq );
+    }
+    else if ( auto fall = node["fall"] ) {
+      actionNode = makeShared<FallbackNode>( fall );
+    }
+    else if ( auto treeName = node["tree"] ) {  // graft on another tree as a sub-tree
+      auto treeNode = YAML::LoadFile( TREE_DIR.data() + treeName.as<std::string>() + ".yml" );
+      actionNode = treeNode.as<Tree>().getRoot();
+    }
+    // Otherwise, extract the node recursively.
   }
-  else if ( auto treeName = node["tree"] ) {  // graft on another tree as a sub-tree
-    auto treeNode = YAML::LoadFile( TREE_DIR.data() + treeName.as<std::string>() + ".yml" );
-    actionNode = treeNode.as<Tree>().getRoot();
-  }
-  else {
+  else {  // if it's a scalar
     actionNode = std::make_shared<ActionNode>( node.as<ActionNode>() );
   }
   return actionNode;
@@ -77,7 +83,7 @@ void SequenceNode::setBlackboard ( const std::shared_ptr<Blackboard> bb ) {
 }
 
 // Inheritors of ActionNode will implement their ports.
-void ActionNode::setAction( const std::shared_ptr<Action>& action ) {
+void ActionNode::setAction( const ActionPtr& action ) {
   _action = action;
   _arg.setPortSet( _action->getPortSet() ); 
 }
