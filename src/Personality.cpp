@@ -1,6 +1,6 @@
 #include "Personality.h"
 
-static auto extractNode( const YAML::Node& node ) -> std::shared_ptr<ActionNode> {
+auto ActionNode::extractNode( const YAML::Node& node ) -> std::shared_ptr<ActionNode> {
   std::shared_ptr<ActionNode> actionNode;
   if ( auto seq = node["seq"] ) {
     actionNode = makeShared<SequenceNode>( seq );
@@ -16,6 +16,10 @@ static auto extractNode( const YAML::Node& node ) -> std::shared_ptr<ActionNode>
     actionNode = std::make_shared<ActionNode>( node.as<ActionNode>() );
   }
   return actionNode;
+}
+
+void ActionNode::setState( const ActionState& state ) {
+  _state = state;
 }
 
 void ActionNode::reset() {

@@ -1,0 +1,6 @@
+seq:
+- sayHi
+- sayHo
+- fall:
+  - chooseTgt
+  - eatTgt

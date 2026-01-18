@@ -32,7 +32,7 @@ class ActionNode {
     virtual void run();  // runs only if READY or ONGOING; returns state otherwise.
     virtual void reset();
   protected:
-    void setState( const ActionState state );
+    void setState( const ActionState& state );
     //virtual static auto getPortSet() const -> PortSet;
   private:
     std::shared_ptr<Action> _action{};  // TODO initialize with key in constructor
@@ -76,9 +76,14 @@ struct Quirk {
   int priority{};  // higher values take precedence
 };
 
+#if 1
+using Personality = std::map< std::string, Quirk >;
+#else
 struct Personality : public std::map< std::string, Quirk > {
+  Personality() = default;
   void distributeBlackboard( std::shared_ptr<Blackboard> bb );
 };
+#endif
 
 // =======================================================
 // ********************** YAML ***************************
@@ -149,7 +154,7 @@ struct YAML::convert<Tree> {
   }
 };   // Tree YML conversion
 
-constexpr std::string_view TREE_DIR{ "./config/personality/tree/" };  // TODO add base dir path
+constexpr std::string_view TREE_DIR{ "/home/bonbonbaron/hack/bicycle-rpg/config/personality/tree/" };  // TODO add base dir path
                                                                       //
                                                                       // Provide yaml-cpp library with template candidate for Quirk's specific struct
 template<>
