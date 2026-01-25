@@ -153,6 +153,10 @@ void Personality::distributeBlackboard( std::shared_ptr<Blackboard> bb ) {
   }
 }
 
+auto Personality::hasTrigger( const std::string& key ) -> bool {
+  return _quirks.find( key ) != _quirks.end();
+}
+
 void Tree::run() {
   auto root = getRoot();
   root->run();

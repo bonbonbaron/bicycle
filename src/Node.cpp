@@ -18,24 +18,11 @@ auto Node::getEdges() const -> const std::map<std::string, Edge>& {
   return _edges;
 }
 
+constexpr std::string_view ON_START{ "onStart" };
 void Node::run() {
-  // TODO figger it out
-}
-
-// Not sure this is the place to put these event triggers, but putting stakes in the ground here.
-void Node::onInput( const int input ) {
-  std::unique_lock l( _nodeMut );
-  auto trigger = _onInputTriggers.find( input );
-  if ( trigger != _onInputTriggers.end() ) {
-    trigger->second();  // call triggered function
-  }
-}
-
-// TODO we need a way to grab the current active node to call its onTimer().
-void Node::onTimer( std::string timerName ) {
-  std::unique_lock l( _nodeMut );
-  auto trigger = _onTimerTriggers.find( timerName );
-  if ( trigger != _onTimerTriggers.end() ) {
-    trigger->second();  // call triggered function
+  for ( auto& e : _entities ) {
+    if ( e.personality.hasTrigger( ON_START.data() ) ) {
+      e.personality.trigger( ON_START.data() );
+    }
   }
 }

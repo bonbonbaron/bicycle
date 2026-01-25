@@ -83,6 +83,7 @@ using Quirks = std::map< std::string, Quirk >;
 class Personality  {
   public:
     Personality() = default;
+    auto hasTrigger( const std::string& key ) -> bool;
     void trigger( const std::string& rootKey );
     void cancel();
     void distributeBlackboard( std::shared_ptr<Blackboard> bb );
