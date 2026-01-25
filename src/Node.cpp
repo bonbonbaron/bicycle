@@ -6,6 +6,10 @@ void Node::setName( const std::string& name ) {
   _name = name;
 }
 
+auto Node::getName() const -> const std::string& {
+  return _name;
+}
+
 void Node::setDesc( const std::string& desc ) {
   _desc = desc;
 }
@@ -22,11 +26,11 @@ auto Node::getEntities() const -> const std::vector<Entity>& {
   return _entities;
 }
 
-auto Node::setEntities( const std::vector& entities ) {
+auto Node::setEntities( const std::vector<Entity>& entities ) {
   _entities = entities;
 }
 
-auto Node::setEntities( const std::vector&& entities ) {
+auto Node::setEntities( const std::vector<Entity>&& entities ) {
   _entities = entities;
 }
 

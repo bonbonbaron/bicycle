@@ -17,9 +17,14 @@ namespace bicycle {  // prevent clash with YAML::Node
   class Node : public std::enable_shared_from_this<Node> {
     public:
       void setName( const std::string& );
+      auto getName() const -> const std::string&;
       void setDesc( const std::string& );
       void setEdges( const std::map<std::string, Edge>& edges );
       auto getEdges() const -> const std::map<std::string, Edge>&;
+      auto getEntities() const -> const std::vector<Entity>&;
+      auto setEntities( const std::vector<Entity>& entities );
+      auto setEntities( const std::vector<Entity>&& entities );
+
       void run();
       void onInput( const int input );
       void onTimer( const std::string timerName );
@@ -56,8 +61,14 @@ struct YAML::convert<bicycle::Node> {
       if ( !e.IsMap() ) {  
         throw std::runtime_error( "Node " + rhs.getName() + " has an entity that's not a map." );
       }
-
-      
+      auto entityName = e.first.as<std::string>();
+      if ( e.second.IsSequence() ) {
+        std::cout << entityName << "'s pos is a sequence\n";
+      }
+      else if (e.second.IsScalar() ) {
+        std::cout << entityName << "'s pos is a scalar\n";
+      }
+    }
 
     return true;
   }
