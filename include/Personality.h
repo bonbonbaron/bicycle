@@ -11,7 +11,8 @@
 #include <vector>
 #include <yaml-cpp/yaml.h>
 
-#include "ActionRegistry.h"
+#include "Action.h"
+#include "Timer.h"
 
 class Tree;
 
@@ -36,6 +37,7 @@ class ActionNode {
     //virtual static auto getPortSet() const -> PortSet;
   private:
     std::shared_ptr<Action> _action{};  // TODO initialize with key in constructor
+    std::shared_ptr<ActionNode> _child{};  // TODO initialize with key in constructor
     ActionState _state{ ActionState::READY };
     ActArg _arg;  // BB + PortSet
 };
@@ -65,8 +67,8 @@ class FallbackNode : public SequenceNode {
 class Tree {
   public:
     void setRoot( const std::shared_ptr<ActionNode> action );
-    auto getRoot() ->  const std::shared_ptr<ActionNode>;
     void run();
+    auto getRoot() ->  const std::shared_ptr<ActionNode>;
   private:
     std::shared_ptr<ActionNode> _root{};
 };
@@ -74,16 +76,22 @@ class Tree {
 struct Quirk {
   Tree tree{};
   int priority{};  // higher values take precedence
+  unsigned freq{};  // freq at quirk-level gives entities more ownership over their own rates
 };
 
-#if 1
-using Personality = std::map< std::string, Quirk >;
-#else
-struct Personality : public std::map< std::string, Quirk > {
-  Personality() = default;
-  void distributeBlackboard( std::shared_ptr<Blackboard> bb );
+using Quirks = std::map< std::string, Quirk >;
+class Personality  {
+  public:
+    Personality() = default;
+    void trigger( const std::string& rootKey );
+    void cancel();
+    void distributeBlackboard( std::shared_ptr<Blackboard> bb );
+    void setQuirks( const Quirks& quirks );
+  private:
+    Quirks _quirks{};
+    int _activePriority{ -1 };
+    std::shared_ptr<Timer> _timer{};  // for looping at a given frequency OR delays 
 };
-#endif
 
 // =======================================================
 // ********************** YAML ***************************
@@ -161,7 +169,8 @@ struct YAML::convert<Tree> {
       }
       // You can reuse the same file as either a sequence or fallback/selector.
       auto actionNode = ActionNode::extractNode( node );
-      rhs.setRoot( std::make_shared<ActionNode>( node.as<ActionNode>() ) );
+      rhs.setRoot( actionNode );
+      // rhs.setRoot( std::make_shared<ActionNode>( node.as<ActionNode>() ) );
       return true;
     }
     catch ( const YAML::TypedBadConversion<Tree>& e ) {
@@ -201,10 +210,27 @@ struct YAML::convert<Quirk> {
       std::cerr << "Miscellaneous error:\n";
       bicycle::die( e.what() );
     }
-    rhs.priority = node["priority"].as<int>();
+    rhs.priority = node["priority"].as<decltype(Quirk::priority)>();
+    if ( auto freq = node["freq"] ) {
+      rhs.freq = freq.as<decltype(Quirk::freq)>();
+    }
     return true;
   }
 };   // Quirk YML conversion
+
+// Provide yaml-cpp library with template candidate for Quirk's specific struct
+template<>
+struct YAML::convert<Personality> {
+  static YAML::Node encode(const std::string& rhs) { return YAML::Node(rhs); }
+  static bool decode(const YAML::Node& node, Personality& rhs) {
+    if (!node.IsMap()) {
+      return false;
+    }
+    // You can reuse the same file as either a sequence or fallback/selector.
+    rhs.setQuirks( node.as<Quirks>() );
+    return true;
+  }
+};   // Personality YML conversion
 
 // Although ROS provides far more (and too many in my opinion) node types than I do,
 // I think simplicity brings speed with it. For instance, conditions belong in if-

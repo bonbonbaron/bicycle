@@ -44,13 +44,9 @@ class ActArg {
       return std::any_cast<T&>( _bb->at( key ) );
     }
     // BB is fed by ActionNode.
-    void setBlackboard( std::shared_ptr<Blackboard> bb ) {
-      _bb = bb;
-    }
+    void setBlackboard( std::shared_ptr<Blackboard> bb );
     // PS is fed by Action.
-    void setPortSet( std::shared_ptr<PortSet> ps ) {
-      _ps = ps;
-    }
+    void setPortSet( std::shared_ptr<PortSet> ps );
   private:
     std::shared_ptr<Blackboard> _bb;
     std::shared_ptr<PortSet> _ps;
@@ -59,39 +55,17 @@ class ActArg {
 using ActFunc = std::function<ActionState(ActArg&)>;
 
 class Action;
-#if 0
-using ActionPtr = Action*;  // TODO Figure out how to make this a smart pointer due to circular dependency.
-#else
 using ActionPtr = std::shared_ptr<Action>;
-#endif
 
 class ActionRegistry : public std::map<std::string, ActionPtr> {
   public:
     // Allows you to more easily make an event mapping
-    static auto get( const std::string& name ) -> ActionPtr {
-      auto& reg = getInstance();
-      try {
-        return reg.at( name );
-      }
-      catch ( const std::out_of_range& e ) {
-        bicycle::die( "Action Registry hasn't mapped anything yet to key " + name + "." );
-      }
-      return nullptr;
-    }
+    static auto get( const std::string& name ) -> ActionPtr;
     // Allows you to more easily make an event mapping
-    static void add( const std::string& name, const ActionPtr& action ) {
-      if ( action == nullptr ) {
-        bicycle::die( "ActionRegistry::set(): ActionPtr " + name + " is null!" );
-      }
-      auto& reg = getInstance();
-      reg.insert( std::pair( name, action ) );
-    }
+    static void add( const std::string& name, const ActionPtr& action );
 
   private:
-    static auto getInstance() -> ActionRegistry& {
-      static ActionRegistry registry;
-      return registry;
-    }
+    static auto getInstance() -> ActionRegistry&;
     ActionRegistry() = default;
     ActionRegistry( const ActionRegistry& rhs ) = delete;
     ActionRegistry& operator=( const ActionRegistry& ) = delete;
@@ -108,19 +82,10 @@ class ActionRegistry : public std::map<std::string, ActionPtr> {
 
 class PortTypeRegistry : public std::map< const std::string, std::type_index > {
   public:
-    static void add( const std::string&& key, const std::type_index& val ) {
-      auto& reg = getInstance();
-      reg.insert( std::pair( key, val ) );
-    }
-    static auto get( const std::string& key ) -> const std::type_index& {
-      auto& reg = getInstance();
-      return reg.at( key );
-    }
+    static void add( const std::string&& key, const std::type_index& val );
+    static auto get( const std::string& key ) -> const std::type_index&;
   private:
-    static auto getInstance() -> PortTypeRegistry& {
-      static PortTypeRegistry ps;
-      return ps;
-    }
+    static auto getInstance() -> PortTypeRegistry&;
     PortTypeRegistry() = default;
     PortTypeRegistry( const PortTypeRegistry& ) = delete;
     PortTypeRegistry operator=( const PortTypeRegistry& ) = delete;
@@ -128,22 +93,8 @@ class PortTypeRegistry : public std::map< const std::string, std::type_index > {
 
 class Action {
   public:
-    Action( const std::string& name, ActFunc f, std::vector<BbKey>&& ports = {} ) : f(f) {
-      /* Register input and output ports */
-      for ( const auto& portName : ports ) {
-        try {
-          _portSet->insert( std::make_pair( portName, PortTypeRegistry::get( portName ) ) );
-        }
-        catch ( const std::out_of_range& e ) {
-          std::cerr << "PortTypeRegistry has no definition for " << portName << " yet.\n";
-          bicycle::die( e.what() );
-        }
-      }
-      // Don't forget to register this Action if you want to use it.
-    }
-    auto getPortSet() -> std::shared_ptr<PortSet> {
-      return _portSet;
-    }
+    Action( const std::string& name, ActFunc f, std::vector<BbKey>&& ports = {} );
+    auto getPortSet() -> std::shared_ptr<PortSet>;
     ActFunc f;
   protected:
     std::shared_ptr<PortSet> _portSet{ std::make_shared<PortSet>() };  // universal for all entities

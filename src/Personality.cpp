@@ -44,22 +44,6 @@ void ActionNode::setBlackboard ( const std::shared_ptr<Blackboard> bb ) {
   _arg.setBlackboard( bb );
 }
 
-void FallbackNode::run() {
-  ActionState state{ActionState::SUCCESS};  // in case there's nothing in _actions
-  for ( auto& e : _actions ) {
-    // Skip already-completed events.
-    if ( e->getState() == ActionState::SUCCESS ) {
-      continue;
-    }
-    e->run();
-    // Stop on the first event that succeeds.
-    if ( e->getState() == ActionState::SUCCESS ) {
-      break;
-    }
-  }
-  setState(state);
-}
-
 void SequenceNode::run() {
   ActionState state{ActionState::SUCCESS};  // in case there's nothing in _actions
   for ( auto& e : _actions ) {
@@ -94,6 +78,21 @@ void SequenceNode::reset() {
   }
   setState( ActionState::READY );
 }
+void FallbackNode::run() {
+  ActionState state{ActionState::SUCCESS};  // init'd in case there's nothing in _actions
+  for ( auto& e : _actions ) {
+    // Skip already-completed events.
+    if ( e->getState() == ActionState::SUCCESS ) {
+      continue;
+    }
+    e->run();
+    // Stop on the first event that succeeds.
+    if ( e->getState() == ActionState::SUCCESS ) {
+      break;
+    }
+  }
+  setState(state);
+}
 
 auto Tree::getRoot() ->  const std::shared_ptr<ActionNode> {
   return _root;
@@ -114,8 +113,49 @@ void Tree::setRoot( const std::shared_ptr<ActionNode> actionNode ) {
   _root = actionNode;
 }
 
-void Tree::run() {
+void Personality::setQuirks( const Quirks& quirks ) {
+  _quirks = quirks;
+}
 
+void Personality::trigger( const std::string& rootKey ) {
+  try {
+    auto& quirk = _quirks.at( rootKey );
+    if ( quirk.priority > _activePriority ) {
+      _activePriority = quirk.priority;
+      cancel();  // stop the current action
+      // Start a looping timer if this is a recurring behavior.
+      if ( quirk.freq ) {
+        _timer = std::make_shared<Timer>( [&quirk](){ quirk.tree.run(); }, std::chrono::milliseconds( quirk.freq ), true );
+      }
+      // Otherwise, run this behavior once.
+      else {
+        _timer = nullptr;
+        quirk.tree.run();
+      }
+    }  // if this quirk takes priority over the active one
+  }
+  catch ( const std::out_of_range& e ) {
+    std::cerr << "No quirk exists for key \'" << rootKey << "\' in ";
+    bicycle::die( e.what() );
+  }
+}
+
+void Personality::cancel() {
+  if ( _timer != nullptr ) {
+    _timer->stop();
+  }
+}
+
+
+void Personality::distributeBlackboard( std::shared_ptr<Blackboard> bb ) {
+  for ( auto& [ key, quirk ] : _quirks ) {
+    quirk.tree.getRoot()->setBlackboard( bb );
+  }
+}
+
+void Tree::run() {
+  auto root = getRoot();
+  root->run();
 }
 
 

@@ -1,15 +1,11 @@
-\graft trees onto each other
-\propagate blackboard shared pointers throughout tree
-\input and output port specifications (why the distinction though?)
-make it easy to stick that STATICALLY into the class def - but how?
-make set() and get() pass through the spec gates
-test tree through quirk
-figure out how trees retrigger or loop themselves. Rerun? How frequently? New attribute for frequency? "freq"? Without freq, we can assume it's a one-shot. Assume in units of ms. If 0, loop naturally.
-any way to get bb.get() to return a reference?
-test personality
-make ONLY three triggers for trees: onTimer, onInput, onCall
-make onTimer() easy
-make onInput() easy
+blackboards: design & dev workflow
+test personalities with blackboard gets & sets
+bodies
+entities
+nodes
+  - map onstart (i think) for all entities having that upon node construction
+  - if there are any other signals to broadcast, map those too
+figure out a way to broadcast a pause, resume, start, and stop message to personalities. Several should have onStart, onStop, etc.
 -----
 Make Windows extend Body
 remake Battle to test feasibility and refine it

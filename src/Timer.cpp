@@ -1,6 +1,6 @@
 #include "Timer.h"
 
-Timer::Timer(const Callback& callback, const Duration interval, const bool repeat ) :
+Timer::Timer( Callback&& callback, const Duration interval, const bool repeat ) :
   _repeat( repeat ),
   _interval( interval ),
   _callback( callback ) 
@@ -9,11 +9,9 @@ Timer::Timer(const Callback& callback, const Duration interval, const bool repea
       auto next = Clock::now() + _interval;
 
       while( _running ) {
-        std::this_thread::sleep_until( next );
         if ( !_running ) {
           break;
         }
-
         try {
           _callback();
         }
@@ -27,6 +25,7 @@ Timer::Timer(const Callback& callback, const Duration interval, const bool repea
         if ( ! _repeat ) {
           break;
         }
+        std::this_thread::sleep_until( next );
         next += _interval;
       }
     }

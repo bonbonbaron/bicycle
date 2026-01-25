@@ -11,8 +11,8 @@ using Callback = std::function<void()>;
 
 class Timer {
   public:
-
-    Timer(const Callback& callback, const Duration interval = std::chrono::milliseconds(0), const bool repeat = false );
+    Timer() = default;
+    Timer( Callback&& callback, const Duration interval = std::chrono::milliseconds(0), const bool repeat = false );
     ~Timer();
 
     void stop();

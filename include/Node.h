@@ -5,11 +5,11 @@
 #include <memory>
 #include <mutex>
 #include <functional>
-// TODO #include <vector>
+#include <vector>
 
 #include "Edge.h"
 #include <yaml-cpp/node/convert.h>
-// TODO #include "Entity.h"
+#include "Entity.h"
       
 static std::mutex _nodeMut{};  // There'll only ever be one node active.
 
@@ -29,6 +29,7 @@ namespace bicycle {  // prevent clash with YAML::Node
       std::map<std::string, Edge> _edges{};
       std::map<unsigned char, std::function<void()>> _onInputTriggers{};
       std::map<std::string, std::function<void()>> _onTimerTriggers{};
+      std::vector<Entity> _entities;
   };  // class Node
 }  // namespace bicycle
 
