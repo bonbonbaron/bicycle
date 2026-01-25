@@ -1,6 +1,7 @@
 #pragma once
 #include <string>
 #include "ColorPalette.h"
+#include "Config.h"
 #include <yaml-cpp/node/convert.h>
 struct Position {
   int x{};
@@ -14,11 +15,13 @@ class Body {
   public:
     auto getPosition() const -> const Position&;
     void setPosition( const int x, const int y );
+
     auto getColor() const -> Color;
     void setColor( const std::string& color );
+
     auto getSymbol() const -> const Image&;
-    void setSymbol( const Image& str );
-    void setSymbol( const Image&& str );
+    void setSymbol( const Image& sym );
+    void setSymbol( const Image&& sym );
   private:
     Image _sym;  
     Position _pos{};
@@ -34,9 +37,9 @@ struct YAML::convert<Body> {
     if (!node.IsMap()) {
       return false;
     }
-    // We don't set pos here. Why would a body have a permanent position? :)
+    // We don't set pos here. Why would a body have a permanent position? :) We'll make that easy later.
     try {
-      rhs.setSymbol( node["symbol"].as<Image>() );
+      rhs.setSymbol( node["sym"].as<Image>() );
       rhs.setColor( node["color"].as<std::string>() );
     }
     catch ( const std::invalid_argument &e ) {

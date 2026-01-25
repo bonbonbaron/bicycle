@@ -12,12 +12,10 @@
 #include <yaml-cpp/yaml.h>
 
 #include "Action.h"
+#include "Config.h"
 #include "Timer.h"
 
 class Tree;
-
-/* ROS' creators claimed ports' existence were a contract,
- * but bb->get<Type>() would've sufficed. Bicycle simplifies life.  */
 
 // Inheritors of ActionNode will implement their ports.
 class ActionNode {
@@ -51,7 +49,7 @@ class SequenceNode : public ActionNode {
     void reset() override;
     void setBlackboard ( const std::shared_ptr<Blackboard> bb ) override;
     void addActionNode( const std::shared_ptr<ActionNode>& actions );
-    void fillSequenceWithActionPtrs( const YAML::Node& rhs );
+    void fill( const YAML::Node& rhs );
   protected:
     std::vector<std::shared_ptr<ActionNode>> _actions{};
 };
@@ -141,7 +139,7 @@ struct YAML::convert<SequenceNode> {
     if (!node.IsSequence()) {
       return false;
     }
-    rhs.fillSequenceWithActionPtrs( node );
+    rhs.fill( node );
     return true;
   }
 };  // SequenceNode YML conversion
@@ -154,7 +152,7 @@ struct YAML::convert<FallbackNode> {
     if (!node.IsSequence()) {
       return false;
     }
-    rhs.fillSequenceWithActionPtrs( node );
+    rhs.fill( node );
     return true;
   }
 };   // FallbackNode YML conversion
@@ -186,8 +184,6 @@ struct YAML::convert<Tree> {
   }
 };   // Tree YML conversion
 
-constexpr std::string_view TREE_DIR{ "/home/bonbonbaron/hack/bicycle-rpg/config/personality/tree/" };  
-
 // Provide yaml-cpp library with template candidate for Quirk's specific struct
 template<>
 struct YAML::convert<Quirk> {
@@ -198,7 +194,7 @@ struct YAML::convert<Quirk> {
     }
     // You can reuse the same file as either a sequence or fallback/selector.
     auto treeName = node["tree"].as<std::string>();
-    const std::string FILENAME =  TREE_DIR.data() + treeName + ".yml";
+    const std::string FILENAME =  TREE_DIR + treeName + SUFFIX.data();
     try {
       auto treeNode = YAML::LoadFile(FILENAME);
       rhs.tree = treeNode.as<Tree>();

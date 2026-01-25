@@ -18,6 +18,18 @@ auto Node::getEdges() const -> const std::map<std::string, Edge>& {
   return _edges;
 }
 
+auto Node::getEntities() const -> const std::vector<Entity>& {
+  return _entities;
+}
+
+auto Node::setEntities( const std::vector& entities ) {
+  _entities = entities;
+}
+
+auto Node::setEntities( const std::vector&& entities ) {
+  _entities = entities;
+}
+
 constexpr std::string_view ON_START{ "onStart" };
 void Node::run() {
   for ( auto& e : _entities ) {

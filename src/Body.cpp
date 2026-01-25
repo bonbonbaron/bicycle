@@ -33,6 +33,10 @@ void Body::setSymbol( const Image& sym ) {
   _sym = sym;
 }
 
+void Body::setSymbol( const Image&& sym ) {
+  _sym = sym;
+}
+
 auto Body::getPosition() const -> const Position& {
   return _pos;
 }

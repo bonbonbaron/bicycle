@@ -46,6 +46,19 @@ struct YAML::convert<bicycle::Node> {
       rhs.setDesc( desc.as<std::string>() );
     }
     rhs.setEdges( node["edges"].as<std::map<std::string, Edge>>() );
+    auto entities = node["entities"];
+    if ( !entities.IsSequence() ) {
+      throw std::runtime_error( "Node " + rhs.getName() + "'s entities node needs to be a list." );
+    }
+
+    // For each entity, the key is the entity name, val is position.
+    for ( const auto& e : entities ) {
+      if ( !e.IsMap() ) {  
+        throw std::runtime_error( "Node " + rhs.getName() + " has an entity that's not a map." );
+      }
+
+      
+
     return true;
   }
 };

@@ -13,7 +13,7 @@ auto ActionNode::extractNode( const YAML::Node& node ) -> std::shared_ptr<Action
       actionNode = makeShared<FallbackNode>( fall );
     }
     else if ( auto treeName = node["tree"] ) {  // graft on another tree as a sub-tree
-      auto treeNode = YAML::LoadFile( TREE_DIR.data() + treeName.as<std::string>() + ".yml" );
+      auto treeNode = YAML::LoadFile( TREE_DIR + treeName.as<std::string>() + ".yml" );
       actionNode = treeNode.as<Tree>().getRoot();
     }
     // Otherwise, extract the node recursively.
@@ -102,7 +102,7 @@ void SequenceNode::addActionNode( const std::shared_ptr<ActionNode>& actionNode 
   _actions.push_back( actionNode );
 }
 
-void SequenceNode::fillSequenceWithActionPtrs( const YAML::Node& node ) {
+void SequenceNode::fill( const YAML::Node& node ) {
   for ( const auto& n : node ) {
     auto actionNode = ActionNode::extractNode( n );
     addActionNode( actionNode );

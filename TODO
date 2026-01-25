@@ -1,14 +1,5 @@
 blackboards: design & dev workflow
-test personalities with blackboard gets & sets
-bodies
-entities
-  - perhaps a list of timers, or even just one, ought to be owned by each person so they can stop it at will
-  - if there are any other signals to broadcast, map those too
-\  - map onstart (i think) for all entities having that upon node construction
-nodes
+nodes with entities
 -----
 Make Windows extend Body
-remake Battle to test feasibility and refine it
------
-wrap up Body and Personality into Entity
------
+remake Battle to test and refine engine
