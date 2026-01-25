@@ -10,7 +10,7 @@ void Edge::setEndpoint( const std::string& endpoint ) {
   _endpointFilename = endpoint;
 }
 
-void Edge::setCondition( const std::function<bool()>& func ) {
+void Edge::setCondition( const std::shared_ptr<Condition>& func ) {
   _condition = func;
 }
 
@@ -25,7 +25,7 @@ auto Edge::getEndpoint() const -> const std::string& {
 void Edge::loadEndpoint() const {
   constexpr std::string_view NODE_DIR{ "config/node/" };
   constexpr std::string_view SUFFIX { ".yml" };
-  if ( ! _condition.has_value() || (*_condition)() ) {
+  if ( ! _condition.has_value() || (**_condition)() ) {
     auto cfg = YAML::LoadFile( NODE_DIR.data() + _endpointFilename + SUFFIX.data() );
     auto ctlr = cfg.as<bicycle::Node>();
     std::cout << "loaded " << _endpointFilename << "\n";
@@ -58,12 +58,8 @@ auto Node::getEntities() const -> const std::vector<Entity>& {
   return _entities;
 }
 
-auto Node::setEntities( const std::vector<Entity>& entities ) {
-  _entities = entities;
-}
-
-auto Node::setEntities( const std::vector<Entity>&& entities ) {
-  _entities = entities;
+void Node::addEntity( const Entity& entity ) {
+  _entities.push_back( entity );
 }
 
 constexpr std::string_view ON_START{ "onStart" };

@@ -3,9 +3,9 @@
 
 // Setters
 
-void Body::setPosition( const int x, const int y ) {
-  _pos.x = x;
-  _pos.y = y;
+void Body::setPosition( const Position& pos ) {
+  _pos.x = pos.x;
+  _pos.y = pos.y;
 }
 
 void Body::setColor( const std::string& s ) {

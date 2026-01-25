@@ -14,7 +14,7 @@ using Image = std::string;
 class Body {
   public:
     auto getPosition() const -> const Position&;
-    void setPosition( const int x, const int y );
+    void setPosition( const Position& pos );
 
     auto getColor() const -> Color;
     void setColor( const std::string& color );
@@ -28,6 +28,10 @@ class Body {
     Color _color{};
 };
 
+
+// ******************************
+// YAML Conversions
+// ******************************
 
 // Provide yaml-cpp library with template candidate for Quirk's specific struct
 template<>
@@ -52,4 +56,24 @@ struct YAML::convert<Body> {
   }
 };   // Body YML conversion
 
-//TODO yaml
+template<>
+struct YAML::convert<Position> {
+  static YAML::Node encode(const std::string& rhs) { return YAML::Node(rhs); }
+  static bool decode(const YAML::Node& node, Position& rhs) {
+    if (!node.IsSequence()) {
+      return false;
+    }
+
+    // Ensure it's a sequence of 2 elements.
+    if ( node.size() != 2 ) {
+      return false;
+    }
+
+    // Ensure they're both integers.
+    rhs.x = node[0].as<int>();
+    rhs.y = node[1].as<int>();
+
+    return true;
+  }
+};
+

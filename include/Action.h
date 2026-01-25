@@ -71,15 +71,6 @@ class ActionRegistry : public std::map<std::string, ActionPtr> {
     ActionRegistry& operator=( const ActionRegistry& ) = delete;
 };
 
-/* Although ActionFunc and ActionNode may seem already sufficient for behavior trees,
- * the Action class exists as a practical necessity: parameter-less action funcs can't
- * know about blackboards unless they're declared within the scope of a class/struct. 
- * And ActionNodes are read from YAMLs; we're not going to define a different YAML type
- * for every Action, so it's more feasible to separate the two. */
-
-/* Since we can't make static member functions virtual, we'll enforce a concept on 
- * on Action's derived children. */
-
 class PortTypeRegistry : public std::map< const std::string, std::type_index > {
   public:
     static void add( const std::string&& key, const std::type_index& val );
@@ -108,7 +99,7 @@ class Action {
  
 #define ACT( _funcName_, ... ) \
   auto _funcName_##Ptr = std::make_shared<Action>( std::string(#_funcName_), _funcName_ __VA_OPT__(, std::vector<BbKey>{) __VA_ARGS__ __VA_OPT__(}) );\
-  ActionRegistry::add( #_funcName_, _funcName_##Ptr );  // Call this in the context of a registration function so you only have to get the instance once.
+  ActionRegistry::add( #_funcName_, _funcName_##Ptr );
 
 #define PORT( _portName_, _type_ )\
   PortTypeRegistry::add( string(#_portName_), std::type_index( typeid( _type_ ) ) );

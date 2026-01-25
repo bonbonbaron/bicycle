@@ -14,7 +14,6 @@
       
 static std::mutex _nodeMut{};  // There'll only ever be one node active.
 
-
 // Edges are mapped by name, so there's no need for a name field.
 class Edge {
   public:
@@ -24,34 +23,11 @@ class Edge {
     void setEndpoint( const std::string& endpoint );
     auto getEndpoint() const -> const std::string&;
     void loadEndpoint() const;
-    void setCondition( const std::function<bool()>& func );
+    void setCondition( const std::shared_ptr<Condition>& func );
   private:
     int _weight{};                  // e.g. Number of random battles may be proportional to travel distance.
     std::string _endpointFilename;  // Endpoint file's basename (no path or extension)
-    std::optional<std::function<bool()>> _condition{};  // e.g. "do you have at least one key?"
-};
-
-// Provide yaml-cpp library with template candidate for Edge's specific struct
-template<>
-struct YAML::convert<Edge> {
-  static YAML::Node encode(const std::string& rhs) { return YAML::Node(rhs); }
-  static bool decode(const YAML::Node& node, Edge& rhs) {
-    if (!node.IsMap()) {
-      return false;
-    }
-    if ( auto weight = node["weight"] ) {
-      rhs.setWeight( weight.as<int>() );
-    }
-    rhs.setEndpoint( node["endpointFilename"].as<std::string>() );
-    // If this edge is conditional
-    if ( auto conditionName = node["condition"] ) {
-      
-      auto& reg = ConditionRegistry::get();
-      auto& it = reg.at( conditionName.as<std::string>() );
-      rhs.setCondition( it );
-    }  // if this edge is conditional
-    return true;
-  }
+    std::optional<std::shared_ptr<Condition>> _condition{};  // e.g. "do you have at least one key?"
 };
 
 namespace bicycle {  // prevent clash with YAML::Node
@@ -63,8 +39,7 @@ namespace bicycle {  // prevent clash with YAML::Node
       void setEdges( const std::map<std::string, Edge>& edges );
       auto getEdges() const -> const std::map<std::string, Edge>&;
       auto getEntities() const -> const std::vector<Entity>&;
-      auto setEntities( const std::vector<Entity>& entities );
-      auto setEntities( const std::vector<Entity>&& entities );
+      void addEntity( const Entity& entity );
 
       void run();
       void onInput( const int input );
@@ -79,6 +54,46 @@ namespace bicycle {  // prevent clash with YAML::Node
   };  // class Node
 }  // namespace bicycle
 
+
+// ******************************
+// YAML Conversions
+// ******************************
+
+// Provide yaml-cpp library with template candidate for Edge's specific struct
+template<>
+struct YAML::convert<Edge> {
+  static YAML::Node encode(const std::string& rhs) { return YAML::Node(rhs); }
+  static bool decode(const YAML::Node& node, Edge& rhs) {
+    if (!node.IsMap()) {
+      return false;
+    }
+    if ( auto weight = node["weight"] ) {
+      rhs.setWeight( weight.as<int>() );
+    }
+    rhs.setEndpoint( node["endpointFilename"].as<std::string>() );
+    // If this edge is conditional
+    if ( auto condNode = node["condition"] ) {
+      auto& reg = ConditionRegistry::getInstance();
+      try {
+        auto conditionName = condNode.as<std::string>();
+        try {
+          auto& it = reg.at( conditionName );
+          rhs.setCondition( it );
+        }
+        catch ( const std::out_of_range& e ) {
+          std::cerr << "Couldn't find condition " << conditionName << " in ConditionRegistry.\n";
+          throw e;
+        }
+      }
+      catch ( const YAML::Exception& e ) {
+        std::cerr << "Error converting condition node to a string\n";
+        throw e;
+      }
+    }  // if this edge is conditional
+    return true;
+  }
+};
+
 // Provide yaml-cpp library with template candidate for Node's specific struct
 template<>
 struct YAML::convert<bicycle::Node> {
@@ -87,27 +102,62 @@ struct YAML::convert<bicycle::Node> {
     if (!node.IsMap()) {
       return false;
     }
-    rhs.setName( node["name"].as<std::string>() );
+    auto nodeName = node["name"].as<std::string>();
+    rhs.setName( nodeName );
     if ( auto desc = node["desc"] ) {
       rhs.setDesc( desc.as<std::string>() );
     }
-    rhs.setEdges( node["edges"].as<std::map<std::string, Edge>>() );
+    try {
+      rhs.setEdges( node["edges"].as<std::map<std::string, Edge>>() );
+    }
+    catch ( const YAML::Exception& e ) {
+      std::cerr << "Error processing YAML for node " << nodeName << "\n";
+      bicycle::die( e.what() );
+    }
+    catch ( const std::out_of_range& e ) {
+      bicycle::die( "Error processing YAML for node " + nodeName );
+    }
+
     auto entities = node["entities"];
-    if ( !entities.IsSequence() ) {
-      throw std::runtime_error( "Node " + rhs.getName() + "'s entities node needs to be a list." );
+    if ( !entities.IsMap() ) {
+      bicycle::die( "Node " + rhs.getName() + "'s entities node needs to be a map." );
     }
 
     // For each entity, the key is the entity name, val is position.
     for ( const auto& e : entities ) {
-      if ( !e.IsMap() ) {  
-        throw std::runtime_error( "Node " + rhs.getName() + " has an entity that's not a map." );
-      }
       auto entityName = e.first.as<std::string>();
-      if ( e.second.IsSequence() ) {
-        std::cout << entityName << "'s pos is a sequence\n";
+      YAML::Node entityNode;
+      try {
+        entityNode = YAML::LoadFile( ENTITY_DIR + entityName + SUFFIX.data() );
       }
-      else if (e.second.IsScalar() ) {
-        std::cout << entityName << "'s pos is a scalar\n";
+      catch ( const YAML::BadFile& e ) {
+        bicycle::die( "In node " + nodeName + ": for entity " + entityName + ": We couldn't find " + ENTITY_DIR + entityName + SUFFIX.data() + "." );
+      }
+      auto entity = entityNode.as<Entity>();
+      if ( ! e.second.IsSequence() ) {
+        bicycle::die( "In node " + nodeName + ": for entity " + entityName + ": pos node needs to be a sequence.\n" );
+      }
+      // Sequence of 2 integers = one instance's position
+      Entity entityCopy;
+      if ( e.second[0].IsScalar() && e.second.size() == 2 ) {
+        auto position = e.second.as<Position>();
+        entityCopy = entity;
+        entityCopy.body.setPosition( position );
+        rhs.addEntity( entityCopy );
+      }
+      // Sequence of at least 1 position
+      else if ( e.second.IsSequence() ) {
+        try {
+          auto positions = e.second.as<std::vector<Position>>();
+          for ( auto& pos : positions ) {
+            entityCopy = entity;
+            entityCopy.body.setPosition( pos );
+            rhs.addEntity( entityCopy );
+          }
+        }
+        catch ( const YAML::Exception& e ) {
+          bicycle::die( "In node " + nodeName + ": for entity " + entityName + ": pos error: " + e.what() );
+        }
       }
     }
 
