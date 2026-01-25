@@ -1,5 +1,7 @@
 #pragma once
 #include <ncurses.h>
+#include <map>
+#include <string>
 
 enum Color : short {
   BLACK	  = COLOR_BLACK,
@@ -11,6 +13,19 @@ enum Color : short {
   CYAN	  = COLOR_CYAN,
   WHITE   = COLOR_WHITE,
 };
+
+const std::map<std::string, Color> strToColor {
+  {"BLACK",	 BLACK	  },
+  {"RED",	   RED	    },
+  {"GREEN",	 GREEN	  },
+  {"YELLOW", YELLOW  },
+  {"BLUE",	 BLUE	  },
+  {"MAGENTA", MAGENTA },
+  {"CYAN",	 CYAN	  },
+  {"WHITE", WHITE   },
+};
+
+
 
 enum ColorPair : short {
   WINDOW_ = 0,

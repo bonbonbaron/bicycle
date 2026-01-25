@@ -1,7 +1,7 @@
+figure out a way to broadcast a pause, resume, start, and stop message to personalities. Several should have onStart, onStop, etc.
 #pragma once
 #include <string>
 #include "ColorPalette.h"
-#include <yaml-cpp/node/convert.h>
 struct Position {
   int x{};
   int y{};
@@ -12,15 +12,15 @@ using Image = std::string;
 // Body is the visual representation of an entity.
 class Body {
   public:
-    auto getPosition() const -> const Position&;
+    auto getPosition() const -> Position&;
     void setPosition( const int x, const int y );
     auto getColor() const -> Color;
-    void setColor( const std::string& color );
+    void setColor( const Color color );
     auto getSymbol() const -> const Image&;
     void setSymbol( const Image& str );
     void setSymbol( const Image&& str );
   private:
-    Image _sym;  
+    Image symbol;  
     Position _pos{};
     Color _color{};
 };
@@ -37,14 +37,12 @@ struct YAML::convert<Body> {
     // We don't set pos here. Why would a body have a permanent position? :)
     try {
       rhs.setSymbol( node["symbol"].as<Image>() );
-      rhs.setColor( node["color"].as<std::string>() );
     }
-    catch ( const std::invalid_argument &e ) {
-      throw e;  // All this throwing just makes a big baseball game at this point.
-    }
-    catch ( const YAML::Exception& e ) {
+    catch ( const YAML::exception& e ) {
       throw e;
     }
+    auto& color = strToColor.find( 
+    rhs.setColor( 
     return true;
   }
 };   // Body YML conversion

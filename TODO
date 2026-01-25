@@ -2,10 +2,10 @@ blackboards: design & dev workflow
 test personalities with blackboard gets & sets
 bodies
 entities
-nodes
-  - map onstart (i think) for all entities having that upon node construction
+  - perhaps a list of timers, or even just one, ought to be owned by each person so they can stop it at will
   - if there are any other signals to broadcast, map those too
-figure out a way to broadcast a pause, resume, start, and stop message to personalities. Several should have onStart, onStop, etc.
+\  - map onstart (i think) for all entities having that upon node construction
+nodes
 -----
 Make Windows extend Body
 remake Battle to test feasibility and refine it
