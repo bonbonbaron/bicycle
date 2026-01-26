@@ -1,5 +1,4 @@
 #include "Graph.h"
-
 using namespace bicycle;
 
 void Edge::setWeight( const int weight ) {
@@ -28,7 +27,6 @@ void Edge::loadEndpoint() const {
   if ( ! _condition.has_value() || (**_condition)() ) {
     auto cfg = YAML::LoadFile( NODE_DIR.data() + _endpointFilename + SUFFIX.data() );
     auto ctlr = cfg.as<bicycle::Node>();
-    std::cout << "loaded " << _endpointFilename << "\n";
     ctlr.run();
   }
 }

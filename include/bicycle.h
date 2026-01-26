@@ -1,6 +1,8 @@
 #pragma once
 #include <string>
 #include <cassert>
+#include <mutex>
+
 #include "WindowManager.h"
 
 namespace bicycle {
@@ -11,6 +13,8 @@ namespace bicycle {
   void push( std::shared_ptr<Window> shared );
   void pop();
   int run();
+
+  static std::mutex bike_mtx;
 
   template<typename T, typename... Args>
     void push( Args&&... args ) {

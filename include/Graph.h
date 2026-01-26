@@ -138,21 +138,18 @@ struct YAML::convert<bicycle::Node> {
         bicycle::die( "In node " + nodeName + ": for entity " + entityName + ": pos node needs to be a sequence.\n" );
       }
       // Sequence of 2 integers = one instance's position
-      Entity entityCopy;
       if ( e.second[0].IsScalar() && e.second.size() == 2 ) {
         auto position = e.second.as<Position>();
-        entityCopy = entity;
-        entityCopy.body.setPosition( position );
-        rhs.addEntity( entityCopy );
+        entity.body.setPosition( position );
+        rhs.addEntity( entity );
       }
       // Sequence of at least 1 position
       else if ( e.second.IsSequence() ) {
         try {
           auto positions = e.second.as<std::vector<Position>>();
           for ( auto& pos : positions ) {
-            entityCopy = entity;
-            entityCopy.body.setPosition( pos );
-            rhs.addEntity( entityCopy );
+            entity.body.setPosition( pos );
+            rhs.addEntity( entity );
           }
         }
         catch ( const YAML::Exception& e ) {

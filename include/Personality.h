@@ -13,34 +13,33 @@
 #include <yaml-cpp/yaml.h>
 
 #include "bicycle.h"
+#include "Blackboard.h"
 #include "Config.h"
 #include "Timer.h"
 
 enum class ActionState { READY, FAILED, IN_PROGRESS, SUCCESS };
 
-using BbKey = std::string;
 using PortSet = std::map<BbKey, std::type_index>;;
 
-using Blackboard = std::map<BbKey, std::any>;
 
 class ActArg {
   public:
     template<typename T>
     auto get( const BbKey key ) -> T& {
-      try {
-        auto& type = _ps->at( key );
-        if ( type.name() != typeid(T).name() ) {
-          int i;
-          auto actual = __cxxabiv1::__cxa_demangle( type.name(), nullptr, 0, &i );
-          auto expect = __cxxabiv1::__cxa_demangle( typeid(T).name(), nullptr, 0, &i );
-          bicycle::die( std::string("Your call to get<") + expect + ">( \"" + key + "\" ) should be get<" + actual + ">( \"" + key + "\" ).\n" );
-        }
-        return std::any_cast<T&>( _bb->at( key ) );
+      if ( !_ps->contains( key ) ) {
+        throw std::runtime_error( "portset has no key named \'" + key + "\'." );
       }
-      // Catch blackboard missing a key.
-      catch ( const std::out_of_range& e ) {
-        bicycle::die( "blackboard hasn't mapped for key " + key + " yet." );
+      auto& type = _ps->at( key );
+      if ( type.name() != typeid(T).name() ) {
+        int i;
+        auto actual = __cxxabiv1::__cxa_demangle( type.name(), nullptr, 0, &i );
+        auto expect = __cxxabiv1::__cxa_demangle( typeid(T).name(), nullptr, 0, &i );
+        bicycle::die( std::string("Your call to get<") + expect + ">( \"" + key + "\" ) should be get<" + actual + ">( \"" + key + "\" ).\n" );
       }
+      if ( !_bb->contains( key ) ) {
+        throw std::runtime_error( "blackbaord has no key named \'" + key + "\'." );
+      }
+      return std::any_cast<T&>( _bb->at( key ) );
     }
     template<typename T>
     void set( const BbKey key, const T& val ) {
@@ -174,6 +173,7 @@ struct Quirk {
 };
 
 using Quirks = std::map< std::string, Quirk >;
+
 class Personality  {
   public:
     Personality() = default;

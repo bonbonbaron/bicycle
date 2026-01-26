@@ -1,4 +1,7 @@
 blackboards: design & dev workflow
+  bbs will be hard-coded due to ease
+  but they must be registered
+  entities shall contain them too
 Make all Windows extend Body (effectively making built-in entities)
 -----
 remake Battle to test and refine engine

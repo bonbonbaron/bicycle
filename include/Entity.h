@@ -1,10 +1,14 @@
 #pragma once
 #include "Body.h"
 #include "Personality.h"
+#include "Blackboard.h"
 
 struct Entity {
-  Body body;
-  Personality personality;
+  Entity() = default;
+  Entity( const Entity& ) = default;
+  Body body{};
+  Personality personality{};
+  std::shared_ptr<Blackboard> bb{};  // this is shared with action nodes
 };
 
 
@@ -13,6 +17,8 @@ template<>
 struct YAML::convert<Entity> {
   static YAML::Node encode(const Image& rhs) { return YAML::Node(rhs); }
   static bool decode(const YAML::Node& node, Entity& rhs) {
+    std::string bbName;
+
     if (!node.IsMap()) {
       return false;
     }
@@ -20,10 +26,24 @@ struct YAML::convert<Entity> {
     try {
       auto bodyName = node["body"].as<std::string>();
       auto persName = node["personality"].as<std::string>();
+
       auto bodyRootNode = YAML::LoadFile( BODY_DIR.data() + bodyName + SUFFIX.data() );
       auto persRootNode = YAML::LoadFile( PERS_DIR.data() + persName + SUFFIX.data() );
+
       rhs.body = bodyRootNode.as<Body>();
       rhs.personality = persRootNode.as<Personality>();
+
+      // Blackboards are optional for stateless entities.
+      if ( auto& bbNode = node["bb"] ) {
+        bbName = bbNode.as<std::string>();
+        auto& reg = BlackboardRegistry::getInstance();
+        rhs.bb = reg.at( bbName );
+        rhs.personality.distributeBlackboard( rhs.bb );
+      }
+    }
+    catch ( const std::out_of_range &e ) {
+      std::cerr << "Couldn't find a blackboard by the name of '" << bbName << "\'.\n";
+      throw e;  // All this throwing just makes a big baseball game at this point.
     }
     catch ( const std::invalid_argument &e ) {
       throw e;  // All this throwing just makes a big baseball game at this point.

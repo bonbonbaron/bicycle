@@ -4,6 +4,7 @@ namespace bicycle {
   static bool _initState{};
 
   void die( const std::string&& s ) {
+    std::unique_lock<std::mutex> l( bike_mtx );
     std::cerr << "\e[91m" << s << "\e[0m\n";
     endwin();
     exit(1);
