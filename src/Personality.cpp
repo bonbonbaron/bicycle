@@ -8,6 +8,14 @@ void ActArg::setPortSet( std::shared_ptr<PortSet> ps ) {
   _ps = ps;
 }
 
+auto ActArg::getBlackboard() -> const std::shared_ptr<Blackboard>& {
+  return _bb;
+}
+
+auto ActArg::getPortSet() -> const std::shared_ptr<PortSet>& {
+  return _ps;
+}
+
 auto ActionRegistry::get( const std::string& name ) -> ActionPtr {
   auto& reg = getInstance();
   try {
@@ -109,6 +117,42 @@ void ActionNode::setBlackboard ( const std::shared_ptr<Blackboard> bb ) {
   _arg.setBlackboard( bb );
 }
 
+void ActionNode::validateBlackboard() {
+  auto& ps = _arg.getPortSet();
+  auto& bb = _arg.getBlackboard();
+
+  // If only one of the two pointers is null, throw error.
+  if ( ( ps != nullptr ) != ( bb != nullptr ) ) {
+    if ( ps == nullptr ) {
+      throw std::runtime_error( "Port set is null." );
+    }
+    else {
+      throw std::runtime_error( "Blackboard pointer is null." );
+    }
+  }
+  // If both are null, ignore.
+  else if ( ps == nullptr  && bb == nullptr ) {
+    // Innocuous nullptrs when function's not supposed to access anything.
+    return;
+  }
+
+  // Ensure blackboard has both the current required key and the correct type of value.
+  for ( const auto& [k, v] : *ps ) {
+    // Ensure blackboard has the current key.
+    if ( !bb->contains( k ) ) {
+      throw std::runtime_error( "blackboard has no key named \'" + k + "\'." );
+    }
+    // Ensure blackboards value for that key is the type required by the port's rule.
+    auto bbVal = bb->at( k );
+    if ( v.name() != bbVal.type().name() ) {
+      int i;
+      auto actual = __cxxabiv1::__cxa_demangle( v.name(), nullptr, 0, &i );
+      auto expect = __cxxabiv1::__cxa_demangle( bbVal.type().name(), nullptr, 0, &i );
+      throw std::runtime_error( std::string("Your call to get<") + expect + ">( \"" + k + "\" ) should be get<" + actual + ">( \"" + k + "\" )." );
+    }
+  }
+}  // ActionNode::validateBlackboard()
+
 void SequenceNode::run() {
   ActionState state{ActionState::SUCCESS};  // in case there's nothing in _actions
   for ( auto& e : _actions ) {
@@ -128,6 +172,12 @@ void SequenceNode::run() {
 void SequenceNode::setBlackboard ( const std::shared_ptr<Blackboard> bb ) {
   for ( auto& a : _actions ) {
     a->setBlackboard( bb );
+  }
+}
+
+void SequenceNode::validateBlackboard() {
+  for ( auto& a : _actions ) {
+    a->validateBlackboard();
   }
 }
 
@@ -220,6 +270,13 @@ void Personality::distributeBlackboard( std::shared_ptr<Blackboard> bb ) {
 
 auto Personality::hasTrigger( const std::string& key ) -> bool {
   return _quirks.find( key ) != _quirks.end();
+}
+
+void Personality::validate() {
+  for ( const auto& q : _quirks ) {
+    auto& root = q.tree.getRoot();
+    root.validateBlackboard();
+  }
 }
 
 void Tree::run() {

@@ -26,6 +26,9 @@ class ActArg {
   public:
     template<typename T>
     auto get( const BbKey key ) -> T& {
+      if ( _ps == nullptr || _bb == nullptr ) {
+        throw std::runtime_error( "You tried accessing either a null port set or blackboard." );
+      }
       if ( !_ps->contains( key ) ) {
         throw std::runtime_error( "portset has no key named \'" + key + "\'." );
       }
@@ -53,6 +56,8 @@ class ActArg {
     void setBlackboard( std::shared_ptr<Blackboard> bb );
     // PS is fed by Action.
     void setPortSet( std::shared_ptr<PortSet> ps );
+    auto getBlackboard() -> const std::shared_ptr<Blackboard>&;
+    auto getPortSet() -> const std::shared_ptr<PortSet>&;
   private:
     std::shared_ptr<Blackboard> _bb;
     std::shared_ptr<PortSet> _ps;
@@ -123,6 +128,7 @@ class ActionNode {
     void setAction( const ActionPtr& action );
     auto getState() const -> ActionState;
     virtual void setBlackboard ( const std::shared_ptr<Blackboard> bb );
+    virtual void validateBlackboard();
     virtual void run();  // runs only if READY or ONGOING; returns state otherwise.
     virtual void reset();
   protected:
@@ -143,6 +149,7 @@ class SequenceNode : public ActionNode {
     void run() override;
     void reset() override;
     void setBlackboard ( const std::shared_ptr<Blackboard> bb ) override;
+    void validateBlackboard() override;
     void addActionNode( const std::shared_ptr<ActionNode>& actions );
     void fill( const YAML::Node& rhs );
   protected:
@@ -182,6 +189,7 @@ class Personality  {
     void cancel();
     void distributeBlackboard( std::shared_ptr<Blackboard> bb );
     void setQuirks( const Quirks& quirks );
+    void validate();
   private:
     Quirks _quirks{};
     int _activePriority{ -1 };

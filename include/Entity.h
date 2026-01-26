@@ -4,11 +4,11 @@
 #include "Blackboard.h"
 
 struct Entity {
-  Entity() = default;
-  Entity( const Entity& ) = default;
   Body body{};
   Personality personality{};
   std::shared_ptr<Blackboard> bb{};  // this is shared with action nodes
+
+  void validate();
 };
 
 
