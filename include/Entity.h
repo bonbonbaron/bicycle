@@ -39,6 +39,13 @@ struct YAML::convert<Entity> {
         auto& reg = BlackboardRegistry::getInstance();
         rhs.bb = reg.at( bbName );
         rhs.personality.distributeBlackboard( rhs.bb );
+        try {
+          rhs.personality.validate();
+        }
+        catch ( const std::runtime_error& e ) {
+          std::cerr << "Error validating blackboard \'" << bbName << "\' against port set\n";
+          throw e;
+        }
       }
     }
     catch ( const std::out_of_range &e ) {

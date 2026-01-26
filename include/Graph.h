@@ -133,7 +133,14 @@ struct YAML::convert<bicycle::Node> {
       catch ( const YAML::BadFile& e ) {
         bicycle::die( "In node " + nodeName + ": for entity " + entityName + ": We couldn't find " + ENTITY_DIR + entityName + SUFFIX.data() + "." );
       }
-      auto entity = entityNode.as<Entity>();
+      Entity entity;
+      try {
+        entity = entityNode.as<Entity>();
+      } 
+      catch ( const std::runtime_error& e ) {
+        std::cerr << "Error for entity \'" << entityName << "\':\n";
+        bicycle::die( e.what() );
+      }
       if ( ! e.second.IsSequence() ) {
         bicycle::die( "In node " + nodeName + ": for entity " + entityName + ": pos node needs to be a sequence.\n" );
       }

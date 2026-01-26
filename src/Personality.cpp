@@ -273,9 +273,9 @@ auto Personality::hasTrigger( const std::string& key ) -> bool {
 }
 
 void Personality::validate() {
-  for ( const auto& q : _quirks ) {
-    auto& root = q.tree.getRoot();
-    root.validateBlackboard();
+  for ( auto& [ key, quirk ] : _quirks ) {
+    auto& root = quirk.tree.getRoot();
+    root->validateBlackboard();
   }
 }
 
