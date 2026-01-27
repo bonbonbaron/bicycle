@@ -49,6 +49,7 @@ namespace bicycle {
     do {
       wm.react( i );
       wm.render();
+      napms( 30 );  // delay to prevent flickering
     } while ( wm.size() > 0 && ( i = getch() ) != 'q' );
 
     return endwin();

@@ -37,7 +37,8 @@ class Window {
 
     void setBorder( const bool showBorder );
     auto isBorderShowing() const -> bool;
-    void mvprint( const std::string&, const int x, const int y ) const;
+    void mvprint( const int y, const int x, const std::string& s ) const;
+    void addmvch( const int y, const int x, char c ) const;  // mvaddch() might be a macro, blows compilation
     void putc( const char c ) const;
     void print( const std::string& s ) const;
   private:

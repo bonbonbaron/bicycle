@@ -74,8 +74,12 @@ void Window::repaint() {
   wnoutrefresh( _win );
 }
 
-void Window::mvprint( const std::string& s, const int x, const int y ) const {
+void Window::mvprint( const int y, const int x, const std::string& s ) const {
   mvwprintw( _win, y, x, "%s", s.c_str() );
+}
+
+void Window::addmvch( const int y, const int x, char c ) const {
+  mvwaddch( _win, y, x, c );
 }
 
 void Window::putc( const char c ) const {

@@ -1,13 +1,14 @@
 #include "Grid.h"
-
-constexpr std::string_view GRID_DIR{ "./config/grid/" };
-constexpr std::string_view GRID_EXT{ ".yml" };
-constexpr std::string_view BG_DIR{ "./config/grid/bg/" };
+#include <algorithm>
 
 Grid::Grid( const std::string& gridName ) {
-  auto yamlFilename = GRID_DIR.data() + gridName + GRID_EXT.data();
+  auto yamlFilename = GRID_DIR + gridName + SUFFIX.data();
   try {
     auto root = YAML::LoadFile( yamlFilename );
+
+    /*****************
+     * Background
+     * ***************/
     auto bgFilename = root["bg"].as<std::string>();
 
     // Create window
@@ -24,7 +25,7 @@ Grid::Grid( const std::string& gridName ) {
     create();
 
     // Open background file
-    auto BG_FP = BG_DIR.data() + bgFilename;
+    auto BG_FP = BG_DIR + bgFilename;
     auto bgFile = std::ifstream( BG_FP, std::ios::ate );
     if ( !bgFile ) {
       throw std::runtime_error( "error processing Grid " + BG_FP );
@@ -43,7 +44,8 @@ Grid::Grid( const std::string& gridName ) {
       _bg = str;
     }
 
-    // Get background dimensions
+    // Get background dimensions before pruning newlines.
+    // TODO does line.length() include new lines?
     bgFile.seekg(0);
     std::string line;
     while ( std::getline( bgFile, line ) ) {
@@ -52,12 +54,83 @@ Grid::Grid( const std::string& gridName ) {
         _bgDims.w = line.length();
       }
     }
-  }
+
+    // Prune newlines out. They'd mess up drawing.
+    auto idx = _bg.find_first_of( '\n' );
+    while ( idx != std::string::npos ) {
+      _bg.erase( idx, 1 );
+      idx = _bg.find_first_of( '\n' );
+    }
+
+    /*****************
+     * Foreground
+     * ***************/
+    auto entities = root["entities"];
+    if ( !entities.IsMap() ) {
+      bicycle::die( "Grid " + bgFilename + "'s entities node needs to be a map." );
+    }
+
+    // For each entity, the key is the entity name, val is position.
+    for ( const auto& e : entities ) {
+      auto entityName = e.first.as<std::string>();
+      YAML::Node entityNode;
+      try {
+        entityNode = YAML::LoadFile( ENTITY_DIR + entityName + SUFFIX.data() );
+      }
+      catch ( const YAML::BadFile& e ) {
+        bicycle::die( "In grid " + gridName + ": for entity " + entityName + ": We couldn't find " + ENTITY_DIR + entityName + SUFFIX.data() + "." );
+      }
+      Entity entity;
+      try {
+        entity = entityNode.as<Entity>();
+      } 
+      catch ( const std::runtime_error& e ) {
+        std::cerr << "Error for entity \'" << entityName << "\':\n";
+        bicycle::die( e.what() );
+      }
+      if ( ! e.second.IsSequence() ) {
+        bicycle::die( "In grid " + gridName + ": for entity " + entityName + ": pos node needs to be a sequence.\n" );
+      }
+      // Sequence of 2 integers = one instance's position
+      if ( e.second[0].IsScalar() && e.second.size() == 2 ) {
+        auto position = e.second.as<Position>();
+        entity.body.setPosition( position );
+        // Copy the entity into a shared pointer object
+        auto entityPtr = std::make_shared<Entity>( entity );
+        addEntity( entityName, entityPtr );
+      }
+      // Sequence of at least 1 position
+      else if ( e.second.IsSequence() ) {
+        try {
+          auto positions = e.second.as<std::vector<Position>>();
+          for ( auto& pos : positions ) {
+            entity.body.setPosition( pos );
+            // Copy the entity into a shared pointer object
+            auto entityPtr = std::make_shared<Entity>( entity );
+            addEntity( entityName, entityPtr );
+          }
+        }
+        catch ( const YAML::Exception& e ) {
+          bicycle::die( "In grid " + gridName + ": for entity " + entityName + ": pos error: " + e.what() );
+        }
+      }
+    }  // for each entity in grid's entites list
+  }  // try-block
   catch ( const YAML::Exception& e ) {
     std::stringstream ss;
     ss << "Error reading from file " << yamlFilename << ":\n" << e.what();
     bicycle::die( ss.str() );
   }
+}
+
+
+void Grid::addEntity( const std::string& name, const std::shared_ptr<Entity>& entity ) {
+  int attempt{};
+  std::string attemptedName = name;
+  while ( _fg.contains( attemptedName ) ) {
+    attemptedName = name + " " + std::to_string( ++attempt );
+  }
+  _fg[ attemptedName ] = entity;
 }
 
 
@@ -73,32 +146,59 @@ void Grid::focusOn( const std::string& entityName ) {
   }
 }
 
+// TODO this assumes single-character symbols. Handle multi-char later.
+auto Grid::isOnscreen( const std::shared_ptr<Entity>& entity ) -> bool {
+  auto pos = entity->body.getPosition();
+  return 
+    pos.x >= _camera.x && 
+    pos.x < _camera.x + getWidth() - WINDOW_PADDING &&
+    pos.y >= _camera.y && 
+    pos.y < _camera.y + getHeight() - WINDOW_PADDING;
+}
+
 void Grid::render() {
   // optimize this later if it's too slow
-  for ( size_t row = 0; row < getHeight(); ++row ) {
-    move( row + 1, 1 );
+  // Background
+  for ( size_t row = 0; row < getHeight() - WINDOW_PADDING; ++row ) {
     auto rowStr = std::string( 
         _bg, 
         ( ( _camera.y + row ) * _bgDims.w + _camera.x ), 
         static_cast<size_t>(getWidth() - WINDOW_PADDING ));
-    print( rowStr );
+    mvprint( static_cast<int>(row) + 1, 1, rowStr );
   }
+
+  // Foreground
+  for ( const auto& [ name, entity ] : _fg ) {
+    if ( isOnscreen( entity ) ) {
+      auto pos = entity->body.getPosition();
+      auto x = pos.x - _camera.x;
+      auto y = pos.y - _camera.y;
+      mvprint( y, x, entity->body.getSymbol() );
+    }
+  }
+}
+
+void Grid::pan( const int dx, const int dy ) {
+  _camera.x += dx;
+  _camera.y += dy;
+  _camera.x = std::clamp<int>( _camera.x, 0, _bgDims.w - getWidth() + WINDOW_PADDING );
+  _camera.y = std::clamp<int>( _camera.y, 0, _bgDims.h - getHeight() + WINDOW_PADDING );
 }
 
 void Grid::react( const int input ) {
   // TODO delete first if statement
   switch( input ) {
     case 'h':
-      --_camera.x;
+      pan( -1, 0);
       break;
     case 'l':
-      ++_camera.x;
+      pan( 1, 0);
       break;
     case 'j':
-      ++_camera.y;
+      pan( 0, 1);
       break;
     case 'k':
-      --_camera.y;
+      pan( 0, -1);
       break;
     default:
       break;

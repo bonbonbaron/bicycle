@@ -37,6 +37,9 @@ class Grid : public Window {
     void react( const int input ) override;
     void render();
     void focusOn( const std::string& entityName );
+    auto isOnscreen( const std::shared_ptr<Entity>& entity ) -> bool;
+    void pan( const int dx, const int dy );
+    void addEntity( const std::string& name, const std::shared_ptr<Entity>& entity );
 
   private:
     // Camera can be moved in update().
