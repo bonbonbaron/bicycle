@@ -77,6 +77,6 @@ void Dialogue::delimitLines() {
 void Dialogue::update() {
   int windowRow{1};
   for ( int i = initLineNum; i < getHeight() && i < lineLimits.size(); ++i ) {
-    mvprint( 1, windowRow++, std::string( _content, lineLimits.at(i).start, lineLimits.at(i).len ) );
+    mvprint( windowRow++, 1, std::string( _content, lineLimits.at(i).start, lineLimits.at(i).len ) );
   }
 }

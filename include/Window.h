@@ -44,7 +44,7 @@ class Window {
   private:
     WINDOW* _win;
     chtype _colorPair;
-    bool _showBorder{};
+    bool _showBorder{true};
     std::string name;
     int _w{};
     int _h{};

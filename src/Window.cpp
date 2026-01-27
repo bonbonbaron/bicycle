@@ -31,7 +31,7 @@ void Window::hide(){
 }
 
 void Window::clear() {
-  wclear( _win );
+  werase( _win );
 }
 
 void Window::react( const int input ) {
@@ -70,7 +70,9 @@ auto Window::isBorderShowing() const -> bool {
 }
 
 void Window::repaint() {
-  box( _win, 0, 0 );
+  if ( isBorderShowing() ) {
+    box( _win, 0, 0 );
+  }
   wnoutrefresh( _win );
 }
 

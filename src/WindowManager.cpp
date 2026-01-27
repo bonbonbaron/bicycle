@@ -9,6 +9,7 @@ auto WindowManager::back() const -> const std::shared_ptr<Window> {
 
 void WindowManager::push( const std::shared_ptr<Window> win ) {
   std::unique_lock<std::mutex> l( _mut );  // This lets both timers and the controller trigger rendering.
+  win->setBorder(true);
   if ( _population < _windows.size() ) {
     _windows.at(_population++) = win;
   }
@@ -17,21 +18,21 @@ void WindowManager::push( const std::shared_ptr<Window> win ) {
 void WindowManager::pop() {
   std::unique_lock<std::mutex> l( _mut );  // This lets both timers and the controller trigger rendering.
   if ( _population > 0 ) {
+    back()->clear();
+    back()->setBorder(false);
+    back()->repaint();
     _windows.at(--_population) = nullptr;
   }
 }
 
 void WindowManager::refreshAll() {
   for (int i = 0; i < _population; ++i ) {
-    _windows.at(i)->clear();  // is this necessary after bicycle::run()'s erase()?
-    // If you add a window from within this function, the iterator's not smart enough to know to stop.
-    _windows.at(i)->update();
-    // If update() didn't pop this window, repaint it.
     if ( _windows.at(i) != nullptr ) {
+      _windows.at(i)->clear();
+      _windows.at(i)->update();
       _windows.at(i)->repaint();
     }
   }
-  // Deferred adds are handled here.
 }
 
 auto WindowManager::size() const -> int {
@@ -39,7 +40,7 @@ auto WindowManager::size() const -> int {
 }
 
 void WindowManager::react( const int input ) {
-  std::unique_lock<std::mutex> l( _mut );  // This lets both timers and the controller trigger rendering.
+  // std::unique_lock<std::mutex> l( _mut );  // This lets both timers and the controller trigger rendering.
   if ( auto w = back() ) {
     w->react( input );  // Let the topmost window alone receive key-presses.
   }
@@ -47,8 +48,6 @@ void WindowManager::react( const int input ) {
 
 void WindowManager::render() {
   std::unique_lock<std::mutex> l( _mut );  // This lets both timers and the controller trigger rendering.
-  erase();
-  refresh();  // erase() interferes with consequent rendering if it isn't triggered here.
   refreshAll();  // clears, updates, and repaints each window prior to displaying
   doupdate();  // displays results of the above window-painting
 }

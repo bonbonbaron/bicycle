@@ -53,8 +53,8 @@ void Menu::update() {
   const int LAST_DISP_IDX = std::min<int>( _firstDispIdx + getHeight() - WINDOW_PADDING, _items.size() );
   for ( int currRow = 1, dispIdx = _firstDispIdx; dispIdx < LAST_DISP_IDX; ++dispIdx ) {
     // CURSOR_WIDTH leaves room for cursor to the left of this menu item
-    mvprint( CURSOR_WIDTH, currRow++, _items.at( dispIdx ).name );  
+    mvprint( currRow++, CURSOR_WIDTH, _items.at( dispIdx ).name );  
   }
-  mvprint( WINDOW_PADDING / 2, _currMenuItemIdx - _firstDispIdx + WINDOW_PADDING / 2, CURSOR  );
+  mvprint( _currMenuItemIdx - _firstDispIdx + WINDOW_PADDING / 2, WINDOW_PADDING / 2, CURSOR  );
 }
 
