@@ -113,7 +113,7 @@ class Action {
   ActionRegistry::add( #_funcName_, _funcName_##Ptr );
 
 #define PORT( _portName_, _type_ )\
-  PortTypeRegistry::add( string(#_portName_), std::type_index( typeid( _type_ ) ) );
+  PortTypeRegistry::add( std::string(#_portName_), std::type_index( typeid( _type_ ) ) );
 
 class Tree;
 

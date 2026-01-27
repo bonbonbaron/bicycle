@@ -65,9 +65,9 @@ Grid::Grid( const std::string& gridName ) {
     /*****************
      * Foreground
      * ***************/
-    auto entities = root["entities"];
+    auto entities = root["fg"];
     if ( !entities.IsMap() ) {
-      bicycle::die( "Grid " + bgFilename + "'s entities node needs to be a map." );
+      bicycle::die( "Grid " + gridName + "'s entities node needs to be a map." );
     }
 
     // For each entity, the key is the entity name, val is position.
