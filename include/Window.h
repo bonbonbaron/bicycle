@@ -1,17 +1,17 @@
 #pragma once
 #include <string>
 #include "ColorPalette.h"
-#include "Entity.h"
 
 static constexpr int WINDOW_PADDING{2};
 
-class Window : Entity {
+class Window {
   public:
     // i know this doesn't align with ncurses' paramter order, but I like my order better :)
-    Window();
+    Window() = default;
     Window( const int w, const int h );
     Window( const int x, const int y, const int w, const int h );
     ~Window();
+    void create();
     void show();
     void hide();
     void clear();
@@ -44,8 +44,8 @@ class Window : Entity {
     chtype _colorPair;
     bool _showBorder{};
     std::string name;
-    int _w;
-    int _h;
-    int _x;
-    int _y;
+    int _w{};
+    int _h{};
+    int _x{};
+    int _y{};
 };

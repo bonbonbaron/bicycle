@@ -1,8 +1,6 @@
 #include "Window.h"
 #include "bicycle.h"
 #include <cassert>
-#include <iostream>
-#include <iomanip>
 
 Window::Window( const int w, const int h ) : _win( newwin( h, w, LINES / 2 - h/2 - 2, COLS / 2 - w / 2 ) ), _w(w), _h(h) {
   assert( LINES / 2 - h/2 - 2 > 0 );
@@ -18,6 +16,10 @@ Window::Window( const int x, const int y, const int w, const int h ) : _win( new
 
 Window::~Window(){
   delwin( _win );
+}
+
+void Window::create() {
+  _win = newwin( _h, _w, _y, _x );
 }
 
 void Window::show(){

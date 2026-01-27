@@ -5,14 +5,15 @@ namespace bicycle {
 
   void die( const std::string&& s ) {
     std::unique_lock<std::mutex> l( bike_mtx );
-    std::cerr << "\e[91m" << s << "\e[0m\n";
     endwin();
+    std::cerr << "\e[91m" << s << "\e[0m\n";
     exit(1);
   }
 
   void die( const std::string& s ) {
-    std::cerr << "\e[91m" << s << "\e[0m\n";
+    std::unique_lock<std::mutex> l( bike_mtx );
     endwin();
+    std::cerr << "\e[91m" << s << "\e[0m\n";
     exit(1);
   }
 
@@ -46,8 +47,8 @@ namespace bicycle {
     auto& wm = WindowManager::getInstance();
 
     do {
-      wm.render();
       wm.react( i );
+      wm.render();
     } while ( wm.size() > 0 && ( i = getch() ) != 'q' );
 
     return endwin();

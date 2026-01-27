@@ -1,8 +1,10 @@
 #pragma once
+#include <fstream>
 #include <string>
 #include <vector>
 #include <curses.h>
 #include <functional>
+
 #include "Window.h"
 #include "Entity.h"
 #include "ColorPalette.h"
@@ -28,6 +30,7 @@ struct Tile {
 
 class Grid : public Window {
   public:
+    Grid( const std::string& yamlFilename );
     Grid( const int x, const int y, const int w, const int h );
 
     void update() override;
@@ -42,10 +45,28 @@ class Grid : public Window {
       int y{};
     };
 
-    std::vector<Tile> _bg;
+    Dimensions _bgDims;
+
+    std::string _bg;
     std::map<std::string, std::shared_ptr<Entity>> _fg;
     std::shared_ptr<Entity> _focus{};  // input is forwarded to this guy
 
     Camera _camera;
 };
+
+
+
+// Provide yaml-cpp library with template candidate for Quirk's specific struct
+template<>
+struct YAML::convert<Grid> {
+  static YAML::Node encode(const std::string& rhs) { return YAML::Node(rhs); }
+  static bool decode(const YAML::Node& node, Grid& rhs) {
+    if (!node.IsMap()) {
+      return false;
+    }
+
+
+    return true;
+  }
+};   // Grid YML conversion
 
