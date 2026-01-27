@@ -16,6 +16,7 @@ class WindowManager {
     }
 
     void render();
+    void react( const int i );
     auto size() const -> int;
     auto back() const -> const std::shared_ptr<Window>;
     void push( const std::shared_ptr<Window> win );
@@ -33,3 +34,4 @@ class WindowManager {
     int _population{};
     std::mutex _mut{};
 };
+

@@ -2,7 +2,7 @@ DBG=-g
 STD=-std=c++20
 
 BICREPO := $(shell git rev-parse --show-toplevel)
-BICSRCS := bicycle  Bar Blackboard Body ColorPalette  ConditionRegistry Dialogue  Dice  Menu  MidiPlayer  Graph Grid Window  WindowManager Timer Personality 
+BICSRCS := bicycle  Bar Blackboard Body ColorPalette  ConditionRegistry Dialogue  Dice  Entity Menu  MidiPlayer  Graph Grid Window  WindowManager Timer Personality 
 BICINCS := bicycle ColorPalette Dialogue Menu Constellation MidiPlayer Window WindowManager
 BICINCS := $(BICINCS:%=$(BICREPO)/include/%.h)
 

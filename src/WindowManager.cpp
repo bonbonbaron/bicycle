@@ -38,11 +38,17 @@ auto WindowManager::size() const -> int {
   return _population;
 }
 
+void WindowManager::react( const int input ) {
+  std::unique_lock<std::mutex> l( _mut );  // This lets both timers and the controller trigger rendering.
+  if ( auto w = back() ) {
+    w->react( input );  // Let the topmost window alone receive key-presses.
+  }
+}
+
 void WindowManager::render() {
   std::unique_lock<std::mutex> l( _mut );  // This lets both timers and the controller trigger rendering.
   erase();
   refresh();  // erase() interferes with consequent rendering if it isn't triggered here.
-  _windows.back()->react( i );  // Let the topmost window alone receive key-presses.
   refreshAll();  // clears, updates, and repaints each window prior to displaying
   doupdate();  // displays results of the above window-painting
 }

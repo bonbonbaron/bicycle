@@ -31,6 +31,31 @@ void Dialogue::init() {
   delimitLines();
 }
 
+void Dialogue::react( const int input ) {
+  auto& wm = WindowManager::getInstance();
+  switch( input ) {
+    case 'j':
+      initLineNum = std::clamp<int>( ++initLineNum, 0, lineLimits.size()  - 4 );
+      break;
+    case 'k':
+      initLineNum = std::clamp<int>( --initLineNum, 0, lineLimits.size() );
+      break;
+    case 'f':
+      initLineNum = std::clamp<int>( initLineNum + getHeight() - WINDOW_PADDING, 0, lineLimits.size() - 1 );
+      break;
+    case 'b':
+      initLineNum = std::clamp<int>( initLineNum - getHeight() + WINDOW_PADDING, 0, lineLimits.size() - 1 );
+      break;
+    case ' ':
+      wm.pop();
+      return;
+      break;
+    default:
+      Window::react( input );
+  }
+  update();
+}
+
 void Dialogue::delimitLines() {
   constexpr int NUM_INSTANCES_TO_FIND{1};
   const int WIDTH = getWidth() - WINDOW_PADDING;

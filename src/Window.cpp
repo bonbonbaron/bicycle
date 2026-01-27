@@ -1,4 +1,5 @@
 #include "Window.h"
+#include "bicycle.h"
 #include <cassert>
 #include <iostream>
 #include <iomanip>
@@ -30,6 +31,9 @@ void Window::hide(){
 void Window::clear() {
   wclear( _win );
 }
+
+void Window::react( const int input ) {
+  }
 
 auto Window::getX() const -> int{
   return getbegx( _win );
@@ -72,7 +76,36 @@ void Window::mvprint( const std::string& s, const int x, const int y ) const {
   mvwprintw( _win, y, x, "%s", s.c_str() );
 }
 
+void Window::putc( const char c ) const {
+  int error = waddch( _win, c );
+  if ( error ) {
+    bicycle::die( "error calling addch() in Grid::render()" );
+  }
+}
+
 // Shall we assume it's always from the beginning?
 void Window::print( const std::string& s ) const {
   wprintw( _win, "%s", s.c_str() );
 }
+
+
+void Window::setX( const int x ) {
+  _x = x;
+  mvwin( _win, _x, _y );
+}
+
+void Window::setY( const int y ) {
+  _y = y;
+  mvwin( _win, _x, _y );
+}
+
+void Window::setWidth( const int w ) {
+  _w = w;
+  wresize( _win, _h, _w );
+}
+
+void Window::setHeight( const int h ) {
+  _h = h;
+  wresize( _win, _h, _w );
+}
+

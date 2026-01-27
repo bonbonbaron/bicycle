@@ -28,25 +28,24 @@ struct Tile {
 
 class Grid : public Window {
   public:
-    Grid();  //  this is what the thing wants
     Grid( const int x, const int y, const int w, const int h );
 
     void update() override;
-    void update() override;
-  private:
-    std::vector<Tile> bg;
-    std::vector<Entity> fg;
+    void react( const int input ) override;
+    void render();
+    void focusOn( const std::string& entityName );
 
+  private:
     // Camera can be moved in update().
     struct Camera {
       int x{};
       int y{};
-      Entity target{};
-      void render( Window* window );
     };
 
+    std::vector<Tile> _bg;
+    std::map<std::string, std::shared_ptr<Entity>> _fg;
+    std::shared_ptr<Entity> _focus{};  // input is forwarded to this guy
+
     Camera _camera;
-
 };
-
 

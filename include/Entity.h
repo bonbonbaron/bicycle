@@ -9,6 +9,11 @@ struct Entity {
   std::shared_ptr<Blackboard> bb{};  // this is shared with action nodes
 
   void validate();
+
+  // The three primary reactions. Otherwise, there's no way to initiate action in an Entity except manually.
+  void onInput( const int input );
+  void onTimer( const std::string& timerId );
+  void onCollision( const int collisionType );
 };
 
 

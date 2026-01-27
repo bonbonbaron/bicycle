@@ -47,6 +47,7 @@ namespace bicycle {
 
     do {
       wm.render();
+      wm.react( i );
     } while ( wm.size() > 0 && ( i = getch() ) != 'q' );
 
     return endwin();
