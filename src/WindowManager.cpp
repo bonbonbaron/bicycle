@@ -42,8 +42,7 @@ void WindowManager::render() {
   std::unique_lock<std::mutex> l( _mut );  // This lets both timers and the controller trigger rendering.
   erase();
   refresh();  // erase() interferes with consequent rendering if it isn't triggered here.
-  // TODO separate behavior from presentation; move this react() function to the new Personality paradigm and place separate from render().
-  // _windows.back()->react( i );  // Let the topmost window alone receive key-presses.
+  _windows.back()->react( i );  // Let the topmost window alone receive key-presses.
   refreshAll();  // clears, updates, and repaints each window prior to displaying
   doupdate();  // displays results of the above window-painting
 }

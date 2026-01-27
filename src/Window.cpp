@@ -68,6 +68,11 @@ void Window::repaint() {
   wnoutrefresh( _win );
 }
 
-void Window::print( const std::string& s, const int x, const int y ) const {
+void Window::mvprint( const std::string& s, const int x, const int y ) const {
   mvwprintw( _win, y, x, "%s", s.c_str() );
+}
+
+// Shall we assume it's always from the beginning?
+void Window::print( const std::string& s ) const {
+  wprintw( _win, "%s", s.c_str() );
 }

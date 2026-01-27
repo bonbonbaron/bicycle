@@ -16,6 +16,7 @@ class Window : Body {
     void hide();
     void clear();
     virtual void update() = 0;
+    virtual void react() = 0;
     void repaint();
     const char* getCurrItemName() const;
     const char* getCurrItemDesc() const;
@@ -27,7 +28,8 @@ class Window : Body {
     auto getColorPair() const -> chtype;
     void setBorder( const bool showBorder );
     auto isBorderShowing() const -> bool;
-    void print( const std::string&, const int x, const int y ) const;
+    void mvprint( const std::string&, const int x, const int y ) const;
+    void print( const std::string& s ) const;
   private:
     WINDOW* _win;
     chtype _colorPair;
