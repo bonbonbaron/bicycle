@@ -76,11 +76,12 @@ void Grid::focusOn( const std::string& entityName ) {
 void Grid::render() {
   // optimize this later if it's too slow
   for ( size_t row = 0; row < getHeight(); ++row ) {
+    move( row + 1, 1 );
     auto rowStr = std::string( 
         _bg, 
         ( ( _camera.y + row ) * _bgDims.w + _camera.x ), 
         static_cast<size_t>(getWidth() - WINDOW_PADDING ));
-    mvprint( rowStr, 1, row );
+    print( rowStr );
   }
 }
 

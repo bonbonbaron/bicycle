@@ -85,6 +85,10 @@ void Window::putc( const char c ) const {
   }
 }
 
+void Window::move( int y, int x ) {
+  wmove( _win, y, x );
+}
+
 // Shall we assume it's always from the beginning?
 void Window::print( const std::string& s ) const {
   wprintw( _win, "%s", s.c_str() );

@@ -15,6 +15,7 @@ class Window {
     void show();
     void hide();
     void clear();
+    void move( int y, int x );
     virtual void update() = 0;
     virtual void react( const int input ) = 0;
     void repaint();
