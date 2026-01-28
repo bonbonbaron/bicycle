@@ -28,6 +28,7 @@ namespace bicycle {
     cbreak();  // reads each character as they're typed instead of waiting for newline
     noecho();  // doesn't echo user's input back to them
     curs_set(0);
+    ColorPalette::init();
     _initState = true;
   }
 

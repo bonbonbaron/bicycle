@@ -11,7 +11,6 @@ Window::Window( const int w, const int h ) : _win( newwin( h, w, LINES / 2 - h/2
 Window::Window( const int x, const int y, const int w, const int h ) : _win( newwin( h, w, y, x ) ), _w(w), _h(h) {
   assert( _win );
   const auto& cp = ColorPalette::getInstance();
-  _colorPair = cp.getColorPair( WINDOW_ );
 }
 
 Window::~Window(){
@@ -51,14 +50,6 @@ auto Window::getWidth() const -> int{
 
 auto Window::getHeight() const -> int{
   return _h;
-}
-
-void Window::setColorPair( const ColorPair cp ) {
-  _colorPair = COLOR_PAIR( cp );
-}
-
-auto Window::getColorPair() const -> chtype {
-  return _colorPair;
 }
 
 void Window::setBorder( const bool showBorder ) {

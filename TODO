@@ -1,4 +1,4 @@
-make colors happen
+make colors happen ( make a new function for color pairs, and init color pairs in bicycle::init() or in an auto'd static array somewhere )
 fix the rendering boundaries of grid
 make collisions happen-- only process for moving entities though, so... how?
 make timers happen (including a special tiemr for "onStart")

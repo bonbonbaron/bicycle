@@ -3,26 +3,26 @@
 #include <map>
 #include <string>
 
-enum Color : short {
-  BLACK	  = COLOR_BLACK,
-  RED	    = COLOR_RED,
-  GREEN	  = COLOR_GREEN,
-  YELLOW  = COLOR_YELLOW,
-  BLUE	  = COLOR_BLUE,
-  MAGENTA = COLOR_MAGENTA,
-  CYAN	  = COLOR_CYAN,
-  WHITE   = COLOR_WHITE,
+enum Color {
+  BLACK	  ,
+  RED	    ,
+  GREEN	  ,
+  YELLOW  ,
+  BLUE	  ,
+  MAGENTA ,
+  CYAN	  ,
+  WHITE   ,
 };
 
 const std::map<std::string, Color> strToColor {
   {"BLACK",	 BLACK	  },
-  {"RED",	   RED	    },
-  {"GREEN",	 GREEN	  },
-  {"YELLOW", YELLOW  },
-  {"BLUE",	 BLUE	  },
-  {"MAGENTA", MAGENTA },
-  {"CYAN",	 CYAN	  },
-  {"WHITE", WHITE   },
+    {"RED",	   RED	    },
+    {"GREEN",	 GREEN	  },
+    {"YELLOW", YELLOW  },
+    {"BLUE",	 BLUE	  },
+    {"MAGENTA", MAGENTA },
+    {"CYAN",	 CYAN	  },
+    {"WHITE", WHITE   },
 };
 
 
@@ -38,7 +38,7 @@ enum ColorPair : short {
 
 class ColorPalette {
   private:
-    ColorPalette();
+    ColorPalette() = default;
     ColorPalette( const ColorPalette& ) = delete;
     auto operator=( const ColorPalette& ) -> ColorPalette& = delete;
   public:
@@ -46,7 +46,6 @@ class ColorPalette {
       const static ColorPalette cp;
       return cp;
     }
-    [[nodiscard]] auto getColorPair( const ColorPair ) const -> int;
-    void set( const ColorPair cp ) const;
+    static void init();
 };
 

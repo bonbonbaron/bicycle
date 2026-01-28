@@ -98,7 +98,6 @@ Grid::Grid( const std::string& gridName ) : Window() {
         // Copy the entity into a shared pointer object
         auto entityPtr = std::make_shared<Entity>( entity );
         (*entityPtr->bb)["pos"] = std::make_any<std::shared_ptr<Position>>( posPtr );  // share pos with bb
-        // TODO ? are they all sharing the same blackboard?
         addEntity( entityName, entityPtr );
       }
       // Sequence of at least 1 position
@@ -212,9 +211,9 @@ void Grid::render() {
       auto pos = entity->body.getPosition();
       auto x = pos->x - _camera.x;
       auto y = pos->y - _camera.y;
-      setAttr ( entity->body.getColor() );
+      setAttr ( COLOR_PAIR(entity->body.getColor()) );
       mvprint( y, x, entity->body.getSymbol() );
-      unsetAttr ( entity->body.getColor() );
+      unsetAttr ( COLOR_PAIR(entity->body.getColor()) );
     }
   }
 }
@@ -237,22 +236,3 @@ void Grid::react( const int input ) {
   }
 }
 
-
-/* 
- * How do I make a Grid?
- * It needs:
- *    bg ( raw txt file )
- *    fg ( inserted from node's entities list )
- * How does Node know? Why does an entity's body have position in the first place,
- * 
- * And how do I easily develop fg? I don't want to have to query the position every t
- * time i want to place somebody/something down. It would be better to have "layers"
- * in a text file so i can control it.
- *
- * I can have a special prefix to indicate I'm placing a fg object down, like @.
- *
- * I can't make a YAML decoder for Grid since it default-constructs it. 
- *
- * Oh yes I can. 
- * In what context would I use the grid keyword?
- */

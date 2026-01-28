@@ -14,17 +14,9 @@ struct Dimensions {
   unsigned w{};
 };
 
-struct Tile {
-  unsigned char type;  // to instruct what to do on collision
-  unsigned char image;
-  Color color;
-};
-
 /* TODO
  * detect collisions
- * forward inputs to whomever has the focus
  * receive  bg from file
- * overlay fg on bg
  * color units based on color map
  */
 

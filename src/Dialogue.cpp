@@ -27,7 +27,6 @@ Dialogue::Dialogue( const std::string&& s, const int x, const int y, const int w
 
 void Dialogue::init() {
   const auto& cp = ColorPalette::getInstance();
-  setColorPair( DIALOGUE );
   delimitLines();
 }
 

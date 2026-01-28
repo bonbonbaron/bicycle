@@ -35,9 +35,6 @@ class Window {
     void setWidth( const int w );
     void setHeight( const int h );
 
-    void setColorPair( const ColorPair );
-    auto getColorPair() const -> chtype;
-
     void setBorder( const bool showBorder );
     auto isBorderShowing() const -> bool;
     void mvprint( const int y, const int x, const std::string& s ) const;
