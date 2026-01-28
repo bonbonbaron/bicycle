@@ -20,4 +20,4 @@ class BlackboardRegistry : public std::map<std::string, std::shared_ptr<Blackboa
 // no matching function for call to ‘make_shared<Blackboard>(<brace-enclosed initializer list>)’
 #define BB( _bbName_, ... ) \
   auto _bbName_##Ptr = std::make_shared<Blackboard>( Blackboard { __VA_ARGS__ } );\
-  BlackboardRegistry::add( #_bbName_, _bbName_##Ptr );  
+  BlackboardRegistry::add( #_bbName_, _bbName_##Ptr );

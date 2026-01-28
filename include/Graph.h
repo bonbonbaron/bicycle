@@ -147,7 +147,8 @@ struct YAML::convert<bicycle::Node> {
       // Sequence of 2 integers = one instance's position
       if ( e.second[0].IsScalar() && e.second.size() == 2 ) {
         auto position = e.second.as<Position>();
-        entity.body.setPosition( position );
+        auto posPtr = std::make_shared<Position>( position );
+        entity.body.setPosition( posPtr );
         rhs.addEntity( entity );
       }
       // Sequence of at least 1 position
@@ -155,7 +156,8 @@ struct YAML::convert<bicycle::Node> {
         try {
           auto positions = e.second.as<std::vector<Position>>();
           for ( auto& pos : positions ) {
-            entity.body.setPosition( pos );
+            auto posPtr = std::make_shared<Position>( pos );
+            entity.body.setPosition( posPtr );
             rhs.addEntity( entity );
           }
         }

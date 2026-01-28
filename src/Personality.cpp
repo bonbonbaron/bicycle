@@ -234,7 +234,7 @@ void Personality::setQuirks( const Quirks& quirks ) {
 void Personality::trigger( const std::string& rootKey ) {
   try {
     auto& quirk = _quirks.at( rootKey );
-    if ( quirk.priority > _activePriority ) {
+    if ( quirk.priority >= _activePriority ) {
       _activePriority = quirk.priority;
       cancel();  // stop the current action
       // Start a looping timer if this is a recurring behavior.

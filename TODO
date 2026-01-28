@@ -1,7 +1,9 @@
-test/dev camera following a mobile entity
-make menu iterate through entities, not items
+make colors happen
+fix the rendering boundaries of grid
+make collisions happen-- only process for moving entities though, so... how?
+make timers happen (including a special tiemr for "onStart")
 test autonomous entities while you're moving your own around
-make node init everything properly on its own
-call it a wrap, baby
+make node include entities and call onStart on them. One of them should be what triggers windows and/or kicks off a song.
+call it a wrap for v1.0, baby
 -----
 remake Battle to test and refine engine

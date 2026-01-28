@@ -46,6 +46,7 @@ class Grid : public Window {
     struct Camera {
       int x{};
       int y{};
+      int margin{3};
     };
 
     Dimensions _bgDims;
@@ -54,7 +55,7 @@ class Grid : public Window {
     std::map<std::string, std::shared_ptr<Entity>> _fg;
     std::shared_ptr<Entity> _focus{};  // input is forwarded to this guy
 
-    Camera _camera;
+    Camera _camera{};
 };
 
 

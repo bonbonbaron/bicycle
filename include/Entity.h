@@ -48,7 +48,10 @@ struct YAML::convert<Entity> {
       if ( auto& bbNode = node["bb"] ) {
         bbName = bbNode.as<std::string>();
         auto& reg = BlackboardRegistry::getInstance();
-        rhs.bb = reg.at( bbName );
+        auto bbOriginal = reg.at( bbName );
+        auto bbClone = std::make_shared<Blackboard>();
+        *bbClone = *bbOriginal;
+        rhs.bb = bbClone;
         rhs.personality.distributeBlackboard( rhs.bb );
         try {
           rhs.personality.validate();

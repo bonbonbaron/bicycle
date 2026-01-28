@@ -4,6 +4,9 @@
 #include "Config.h"
 #include <yaml-cpp/node/convert.h>
 struct Position {
+  Position() = default;
+  Position( const Position& ) = default;
+  Position& operator=( const Position& ) = default;
   int x{};
   int y{};
 };
@@ -13,8 +16,8 @@ using Image = std::string;
 // Body is the visual representation of an entity.
 class Body {
   public:
-    auto getPosition() const -> const Position&;
-    void setPosition( const Position& pos );
+    auto getPosition() const -> const std::shared_ptr<Position>&;
+    void setPosition( const std::shared_ptr<Position>& pos );
 
     auto getColor() const -> Color;
     void setColor( const std::string& color );
@@ -24,7 +27,7 @@ class Body {
     void setSymbol( const Image&& sym );
   private:
     Image _sym;  
-    Position _pos{};
+    std::shared_ptr<Position> _pos{};  // shared with blackboards 
     Color _color{};
 };
 

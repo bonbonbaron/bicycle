@@ -3,9 +3,8 @@
 
 // Setters
 
-void Body::setPosition( const Position& pos ) {
-  _pos.x = pos.x;
-  _pos.y = pos.y;
+void Body::setPosition( const std::shared_ptr<Position>& pos ) {
+  _pos = pos;
 }
 
 void Body::setColor( const std::string& s ) {
@@ -37,6 +36,6 @@ void Body::setSymbol( const Image&& sym ) {
   _sym = sym;
 }
 
-auto Body::getPosition() const -> const Position& {
+auto Body::getPosition() const -> const std::shared_ptr<Position>& {
   return _pos;
 }

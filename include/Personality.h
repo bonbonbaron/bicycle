@@ -267,14 +267,19 @@ struct YAML::convert<Tree> {
   static YAML::Node encode(const std::string& rhs) { return YAML::Node(rhs); }
   static bool decode(const YAML::Node& node, Tree& rhs) {
     try {
-      if (!node.IsMap()) {
-        return false;
+      std::shared_ptr<ActionNode> actionNode;
+      if ( node.IsScalar() ) {
+        actionNode = ActionNode::extractNode( node );
+        rhs.setRoot( actionNode );
+        return true;
       }
-      // You can reuse the same file as either a sequence or fallback/selector.
-      auto actionNode = ActionNode::extractNode( node );
-      rhs.setRoot( actionNode );
-      // rhs.setRoot( std::make_shared<ActionNode>( node.as<ActionNode>() ) );
-      return true;
+      else if (node.IsMap()) {
+        // You can reuse the same file as either a sequence or fallback/selector.
+        actionNode = ActionNode::extractNode( node );
+        rhs.setRoot( actionNode );
+        return true;
+      }
+      return false;
     }
     catch ( const YAML::TypedBadConversion<Tree>& e ) {
       throw e;
@@ -303,7 +308,7 @@ struct YAML::convert<Quirk> {
       auto treeNode = YAML::LoadFile(FILENAME);
       rhs.tree = treeNode.as<Tree>();
     }
-    catch ( const YAML::Exception e ) {
+    catch ( const YAML::Exception& e ) {
       std::cerr << "Error processing " << FILENAME << ":\n";
       bicycle::die( e.what() );
     }

@@ -5,7 +5,7 @@ void Entity::validate() {
 }
 
 void Entity::onInput( const int input ) {
-  (*bb)["input"] = input;
+  (*bb)["input"] = std::make_any<char>( input );
   personality.trigger( "onInput" );
 }
 
