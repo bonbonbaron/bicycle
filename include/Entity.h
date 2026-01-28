@@ -3,10 +3,16 @@
 #include "Personality.h"
 #include "Blackboard.h"
 
+enum class EntityStatus {
+  HIGHLIGHTED,
+  SELECTED,
+};
+
 struct Entity {
   Body body{};
   Personality personality{};
   std::shared_ptr<Blackboard> bb{};  // this is shared with action nodes
+  unsigned int flags;
 
   void validate();
 

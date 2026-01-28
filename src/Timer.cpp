@@ -1,4 +1,7 @@
 #include "Timer.h"
+#include "bicycle.h"
+
+#include <string>
 
 Timer::Timer( Callback&& callback, const Duration interval, const bool repeat ) :
   _repeat( repeat ),
@@ -16,10 +19,10 @@ Timer::Timer( Callback&& callback, const Duration interval, const bool repeat ) 
           _callback();
         }
         catch ( const std::exception& e ) {
-          std::cerr << "Timer " << _id << " callback exception: " << e.what() << "\n";
+          bicycle::die( "Timer " + std::to_string(_id) + " callback exception: " + e.what() );
         }
         catch ( ... ) {
-          std::cerr << "Timer callback had an unknown exception.\n";
+          bicycle::die( "Timer callback had an unknown exception." );
         }
 
         if ( ! _repeat ) {

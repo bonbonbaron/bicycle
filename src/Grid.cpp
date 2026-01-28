@@ -1,7 +1,7 @@
 #include "Grid.h"
 #include <algorithm>
 
-Grid::Grid( const std::string& gridName ) {
+Grid::Grid( const std::string& gridName ) : Window() {
   auto yamlFilename = GRID_DIR + gridName + SUFFIX.data();
   try {
     auto root = YAML::LoadFile( yamlFilename );
@@ -85,8 +85,7 @@ Grid::Grid( const std::string& gridName ) {
         entity = entityNode.as<Entity>();
       } 
       catch ( const std::runtime_error& e ) {
-        std::cerr << "Error for entity \'" << entityName << "\':\n";
-        bicycle::die( e.what() );
+        bicycle::die( "Error for entity \'" + entityName + "\':\n" + e.what() );
       }
       if ( ! e.second.IsSequence() ) {
         bicycle::die( "In grid " + gridName + ": for entity " + entityName + ": pos node needs to be a sequence.\n" );
@@ -173,7 +172,9 @@ void Grid::render() {
       auto pos = entity->body.getPosition();
       auto x = pos.x - _camera.x;
       auto y = pos.y - _camera.y;
+      setAttr ( entity->body.getColor() );
       mvprint( y, x, entity->body.getSymbol() );
+      unsetAttr ( entity->body.getColor() );
     }
   }
 }

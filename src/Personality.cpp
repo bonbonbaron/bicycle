@@ -62,8 +62,7 @@ Action::Action( const std::string& name, ActFunc f, std::vector<BbKey>&& ports )
       _portSet->insert( std::make_pair( portName, PortTypeRegistry::get( portName ) ) );
     }
     catch ( const std::out_of_range& e ) {
-      std::cerr << "PortTypeRegistry has no definition for " << portName << " yet.\n";
-      bicycle::die( e.what() );
+      bicycle::die( "PortTypeRegistry has no definition for " + portName + " yet.\n" + e.what() );
     }
   }
   // Don't forget to register this Action if you want to use it.
@@ -250,8 +249,7 @@ void Personality::trigger( const std::string& rootKey ) {
     }  // if this quirk takes priority over the active one
   }
   catch ( const std::out_of_range& e ) {
-    std::cerr << "No quirk exists for key \'" << rootKey << "\' in ";
-    bicycle::die( e.what() );
+    throw e;
   }
 }
 

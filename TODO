@@ -1,3 +1,7 @@
-only refresh dirty windows
+test/dev camera following a mobile entity
+make menu iterate through entities, not items
+test autonomous entities while you're moving your own around
+make node init everything properly on its own
+call it a wrap, baby
 -----
 remake Battle to test and refine engine

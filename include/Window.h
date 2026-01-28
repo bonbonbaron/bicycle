@@ -27,6 +27,9 @@ class Window {
     auto getWidth() const -> int;
     auto getHeight() const -> int;
 
+    void setAttr( const int attr );
+    void unsetAttr( const int attr );
+
     void setX( const int x );
     void setY( const int y );
     void setWidth( const int w );
