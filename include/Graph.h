@@ -124,6 +124,7 @@ struct YAML::convert<bicycle::Node> {
     }
 
     // For each entity, the key is the entity name, val is position.
+    // TODO delete the position portion as it no longer makes any sense in the context of Node.
     for ( const auto& e : entities ) {
       auto entityName = e.first.as<std::string>();
       YAML::Node entityNode;
