@@ -14,12 +14,6 @@ struct Dimensions {
   unsigned w{};
 };
 
-/* TODO
- * detect collisions
- * receive  bg from file
- * color units based on color map
- */
-
 class Grid : public Window {
   public:
     Grid( const std::string& yamlFilename );

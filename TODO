@@ -1,9 +1,9 @@
-make colors happen ( make a new function for color pairs, and init color pairs in bicycle::init() or in an auto'd static array somewhere )
 fix the rendering boundaries of grid
 make collisions happen-- only process for moving entities though, so... how?
 make timers happen (including a special tiemr for "onStart")
 test autonomous entities while you're moving your own around
 make node include entities and call onStart on them. One of them should be what triggers windows and/or kicks off a song.
+fix first frame blinking to invisibility
 call it a wrap for v1.0, baby
 -----
 remake Battle to test and refine engine

@@ -170,9 +170,9 @@ auto Grid::isOnscreen( const std::shared_ptr<Entity>& entity ) -> bool {
   auto pos = entity->body.getPosition();
   return 
     pos->x >= _camera.x && 
-    pos->x < _camera.x + getWidth() - WINDOW_PADDING &&
+    pos->x <= _camera.x + getWidth() - WINDOW_PADDING &&
     pos->y >= _camera.y && 
-    pos->y < _camera.y + getHeight() - WINDOW_PADDING;
+    pos->y <= _camera.y + getHeight() - WINDOW_PADDING;
 }
 
 void Grid::render() {
