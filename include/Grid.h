@@ -14,6 +14,42 @@ struct Dimensions {
   unsigned w{};
 };
 
+// Camera can be moved in update().
+class Camera {
+  public:
+    Camera() = default;
+    Camera( const int x, const int y, const int margin );
+    void pan( const int dx, const int dy );
+    auto canSee( const std::shared_ptr<Entity>& entity ) const -> bool;
+    void focusOn( const std::shared_ptr<Entity> entity );
+    auto getFocus() const -> std::shared_ptr<Entity>;
+    void setDims( const int h, const int w);
+    void setLims( const int y, const int x);
+    auto getX() const -> int;
+    auto getY() const -> int;
+    auto getLxMargin() const -> int;  // low x margin
+    auto getLyMargin() const -> int;  // low y margin
+    auto getHxMargin() const -> int;  // high x margin
+    auto getHyMargin() const -> int;  // high y margin
+  private:
+    int _x{};
+    int _maxX{};
+    int _y{};
+    int _maxY{};
+    int _w{};
+    int _h{};
+    int _margin{};
+    std::shared_ptr<Entity> _focus{};  // input is forwarded to this guy
+};
+
+struct Environment {
+  std::string bg;
+  Dimensions bgDims{};
+  std::map<std::string, std::shared_ptr<Entity>> fg{};
+  Camera camera{ 0, 0, 3 };
+  // TBD: it may be desirable to keep a list of on-screen entities. Feature it later.
+};
+
 class Grid : public Window {
   public:
     Grid( const std::string& yamlFilename );
@@ -21,27 +57,10 @@ class Grid : public Window {
 
     void update() override;
     void react( const int input ) override;
-    void render();
-    void focusOn( const std::string& entityName );
-    auto isOnscreen( const std::shared_ptr<Entity>& entity ) -> bool;
-    void pan( const int dx, const int dy );
     void addEntity( const std::string& name, const std::shared_ptr<Entity>& entity );
 
   private:
-    // Camera can be moved in update().
-    struct Camera {
-      int x{};
-      int y{};
-      int margin{3};
-    };
-
-    Dimensions _bgDims;
-
-    std::string _bg;
-    std::map<std::string, std::shared_ptr<Entity>> _fg;
-    std::shared_ptr<Entity> _focus{};  // input is forwarded to this guy
-
-    Camera _camera{};
+    std::shared_ptr<Environment> _env{};
 };
 
 

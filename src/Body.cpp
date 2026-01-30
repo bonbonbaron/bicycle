@@ -18,6 +18,10 @@ void Body::setColor( const std::string& s ) {
   }
 }
 
+void Body::setColor( const Color& color ) {
+  _color = color;
+}
+
 auto Body::getColor() const -> Color {
   return _color;
 }

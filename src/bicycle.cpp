@@ -30,6 +30,8 @@ namespace bicycle {
     curs_set(0);
     ColorPalette::init();
     _initState = true;
+    clear();
+    refresh();
   }
 
   void push( std::shared_ptr<Window> shared ) {

@@ -26,12 +26,15 @@ class ActArg {
   public:
     template<typename T>
     auto get( const BbKey key ) -> T& {
+      // Make sure we have a blackboard and port set.
       if ( _ps == nullptr || _bb == nullptr ) {
         throw std::runtime_error( "You tried accessing either a null port set or blackboard." );
       }
+      // Verify the key is allowed by the port set.
       if ( !_ps->contains( key ) ) {
         throw std::runtime_error( "portset has no key named \'" + key + "\'." );
       }
+      // Validate the value's type by the port set.
       auto& type = _ps->at( key );
       if ( type.name() != typeid(T).name() ) {
         int i;
@@ -39,18 +42,33 @@ class ActArg {
         auto expect = __cxxabiv1::__cxa_demangle( typeid(T).name(), nullptr, 0, &i );
         bicycle::die( std::string("Your call to get<") + expect + ">( \"" + key + "\" ) should be get<" + actual + ">( \"" + key + "\" ).\n" );
       }
+      // Make sure the blackboard even has a value for the key.
       if ( !_bb->contains( key ) ) {
         throw std::runtime_error( "blackbaord has no key named \'" + key + "\'." );
       }
+      // Return the value... FINALLY.
       return std::any_cast<T&>( _bb->at( key ) );
     }
     template<typename T>
     void set( const BbKey key, const T& val ) {
+      // Make sure we have a blackboard and port set.
+      if ( _ps == nullptr || _bb == nullptr ) {
+        throw std::runtime_error( "You tried accessing either a null port set or blackboard." );
+      }
+      // Verify the key is allowed by the port set.
+      if ( !_ps->contains( key ) ) {
+        throw std::runtime_error( "portset has no key named \'" + key + "\'." );
+      }
+      // Validate the value's type by the port set.
       auto& type = _ps->at( key );
       if ( type.name() != typeid(T).name() ) {
-        bicycle::die( "bad arg" );  // IDGAF right now, jsut make it work
+        int i;
+        auto actual = __cxxabiv1::__cxa_demangle( type.name(), nullptr, 0, &i );
+        auto expect = __cxxabiv1::__cxa_demangle( typeid(T).name(), nullptr, 0, &i );
+        bicycle::die( std::string("Your call to get<") + expect + ">( \"" + key + "\" ) should be get<" + actual + ">( \"" + key + "\" ).\n" );
       }
-      return std::any_cast<T&>( _bb->at( key ) );
+      // Finally, if the type is correct, set it.
+      (*_bb)[key] = std::make_any<T>( val );
     }
     // BB is fed by ActionNode.
     void setBlackboard( std::shared_ptr<Blackboard> bb );

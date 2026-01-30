@@ -33,6 +33,7 @@ void WindowManager::refreshAll() {
       _windows.at(i)->repaint();
     }
   }
+  doupdate();  // displays results of the above window-painting
 }
 
 auto WindowManager::size() const -> int {
@@ -49,6 +50,5 @@ void WindowManager::react( const int input ) {
 void WindowManager::render() {
   std::unique_lock<std::mutex> l( _mut );  // This lets both timers and the controller trigger rendering.
   refreshAll();  // clears, updates, and repaints each window prior to displaying
-  doupdate();  // displays results of the above window-painting
 }
 

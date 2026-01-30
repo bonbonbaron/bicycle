@@ -6,9 +6,23 @@
 struct Position {
   Position() = default;
   Position( const Position& ) = default;
+  Position( Position&& ) = default;
   Position& operator=( const Position& ) = default;
+  Position& operator=( Position&& ) = default;
   int x{};
   int y{};
+
+  void operator+=( const Position& rhs ) {
+    x += rhs.x;
+    y += rhs.y;
+  }
+
+  auto operator+( const Position& rhs ) -> Position {
+    Position pos;
+    pos.x = x + rhs.x;
+    pos.y = y + rhs.y;
+    return pos;
+  }
 };
 
 using Image = std::string;
@@ -21,10 +35,12 @@ class Body {
 
     auto getColor() const -> Color;
     void setColor( const std::string& color );
+    void setColor( const Color& color );
 
     auto getSymbol() const -> const Image&;
     void setSymbol( const Image& sym );
     void setSymbol( const Image&& sym );
+
   private:
     Image _sym;  
     std::shared_ptr<Position> _pos{};  // shared with blackboards 

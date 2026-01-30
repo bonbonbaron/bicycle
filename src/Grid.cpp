@@ -1,7 +1,79 @@
 #include "Grid.h"
 #include <algorithm>
 
+//************************
+//   Camera
+//************************
+
+Camera::Camera( const int x, const int y, const int margin ) : _x(x), _y(y), _margin(margin) {}
+
+void Camera::pan( const int dy, const int dx ) {
+  _x += dx;
+  _y += dy;
+  _x = std::clamp<int>( _x, 0, _maxX );
+  _y = std::clamp<int>( _y, 0, _maxY );
+}
+
+// TODO this assumes single-character symbols. Handle multi-char later.
+auto Camera::canSee( const std::shared_ptr<Entity>& entity ) const -> bool {
+  auto pos = entity->body.getPosition();
+  return 
+    pos->x >= _x && 
+    pos->x <= _x + _w &&
+    pos->y >= _y && 
+    pos->y <= _y + _h;
+}
+
+void Camera::focusOn( const std::shared_ptr<Entity> entity ) {
+  _focus = entity;
+}
+
+auto Camera::getFocus() const -> std::shared_ptr<Entity> {
+  return _focus;
+}
+
+void Camera::setDims( const int h, const int w) {
+  _h = h;
+  _w = w;
+}
+
+void Camera::setLims( const int y, const int x) {
+  _maxY = y;
+  _maxX = x;
+}
+
+auto Camera::getX() const -> int {
+  return _x;
+}
+
+auto Camera::getY() const -> int {
+  return _y;
+}
+
+auto Camera::getLxMargin() const -> int {
+  return _x + _margin;
+}
+
+auto Camera::getHxMargin() const -> int {
+  return _x + _w - _margin + (WINDOW_PADDING/2);
+}
+
+auto Camera::getLyMargin() const -> int {
+  return _y + _margin;
+}
+
+auto Camera::getHyMargin() const -> int {
+  return _y + _h - _margin + (WINDOW_PADDING/2);
+}
+
+
+
+//************************
+//   Grid
+//************************
+
 Grid::Grid( const std::string& gridName ) : Window() {
+  _env = std::make_shared<Environment>();
   auto yamlFilename = GRID_DIR + gridName + SUFFIX.data();
   try {
     auto root = YAML::LoadFile( yamlFilename );
@@ -41,7 +113,7 @@ Grid::Grid( const std::string& gridName ) : Window() {
     std::string str(size, '\0'); // construct string to stream size
     bgFile.seekg(0);
     if(bgFile.read(&str[0], size)) {
-      _bg = str;
+      _env->bg = str;
     }
 
     // Get background dimensions before pruning newlines.
@@ -49,17 +121,17 @@ Grid::Grid( const std::string& gridName ) : Window() {
     bgFile.seekg(0);
     std::string line;
     while ( std::getline( bgFile, line ) ) {
-      ++_bgDims.h;
-      if ( line.length() > _bgDims.w ) {
-        _bgDims.w = line.length();
+      ++_env->bgDims.h;
+      if ( line.length() > _env->bgDims.w ) {
+        _env->bgDims.w = line.length();
       }
     }
 
     // Prune newlines out. They'd mess up drawing.
-    auto idx = _bg.find_first_of( '\n' );
+    auto idx = _env->bg.find_first_of( '\n' );
     while ( idx != std::string::npos ) {
-      _bg.erase( idx, 1 );
-      idx = _bg.find_first_of( '\n' );
+      _env->bg.erase( idx, 1 );
+      idx = _env->bg.find_first_of( '\n' );
     }
 
     /*****************
@@ -81,23 +153,25 @@ Grid::Grid( const std::string& gridName ) : Window() {
         bicycle::die( "In grid " + gridName + ": for entity " + entityName + ": We couldn't find " + ENTITY_DIR + entityName + SUFFIX.data() + "." );
       }
       Entity entity;
-      try {
-        entity = entityNode.as<Entity>();
-      } 
-      catch ( const std::runtime_error& e ) {
-        bicycle::die( "Error for entity \'" + entityName + "\':\n" + e.what() );
-      }
-      if ( ! e.second.IsSequence() ) {
-        bicycle::die( "In grid " + gridName + ": for entity " + entityName + ": pos node needs to be a sequence.\n" );
-      }
       // Sequence of 2 integers = one instance's position
       if ( e.second[0].IsScalar() && e.second.size() == 2 ) {
+        try {
+          entity = entityNode.as<Entity>();
+        } 
+        catch ( const std::runtime_error& e ) {
+          bicycle::die( "Error for entity \'" + entityName + "\':\n" + e.what() );
+        }
+        if ( ! e.second.IsSequence() ) {
+          bicycle::die( "In grid " + gridName + ": for entity " + entityName + ": pos node needs to be a sequence.\n" );
+        }
         auto position = e.second.as<Position>();
         auto posPtr = std::make_shared<Position>( position );
         entity.body.setPosition( posPtr );
         // Copy the entity into a shared pointer object
         auto entityPtr = std::make_shared<Entity>( entity );
         (*entityPtr->bb)["pos"] = std::make_any<std::shared_ptr<Position>>( posPtr );  // share pos with bb
+        (*entityPtr->bb)["env"] = _env;  // share environment to open the world up to each entity
+        entityPtr->personality.distributeBlackboard( entityPtr->bb );
         addEntity( entityName, entityPtr );
       }
       // Sequence of at least 1 position
@@ -105,11 +179,21 @@ Grid::Grid( const std::string& gridName ) : Window() {
         try {
           auto positions = e.second.as<std::vector<Position>>();
           for ( auto& pos : positions ) {
+            try {
+              entity = entityNode.as<Entity>();
+            } 
+            catch ( const std::runtime_error& e ) {
+              bicycle::die( "Error for entity \'" + entityName + "\':\n" + e.what() );
+            }
+            if ( ! e.second.IsSequence() ) {
+              bicycle::die( "In grid " + gridName + ": for entity " + entityName + ": pos node needs to be a sequence.\n" );
+            }
             auto posPtr = std::make_shared<Position>( pos );
             entity.body.setPosition( posPtr );
-            (*entity.bb)["pos"] = std::make_any<std::shared_ptr<Position>>( posPtr );  // share pos with bb
-            // Copy the entity into a shared pointer object
             auto entityPtr = std::make_shared<Entity>( entity );
+            (*entityPtr->bb)["pos"] = std::make_any<std::shared_ptr<Position>>( posPtr );  // share pos with bb
+            (*entityPtr->bb)["env"] = _env;  // share environment to open the world up to each entity
+            entityPtr->personality.distributeBlackboard( entityPtr->bb );
             addEntity( entityName, entityPtr );
           }
         }
@@ -123,16 +207,25 @@ Grid::Grid( const std::string& gridName ) : Window() {
      *   FOCUS
      *****************/
 
+    // Camera
+    _env->camera.setDims( getHeight() - WINDOW_PADDING, getWidth() - WINDOW_PADDING );
+    _env->camera.setLims( _env->bgDims.h - getHeight() + WINDOW_PADDING , _env->bgDims.w - getWidth() + WINDOW_PADDING );
+
     std::string focus;
     try {
       focus = root[ "focus" ].as<std::string>();
-      focusOn( focus );
+      _env->camera.focusOn( _env->fg.at( focus ) );
     }
     catch ( const YAML::Exception& e ) {
       bicycle::die( GRID_DIR + gridName + ".yml is missing a 'focus' attribute." );
     }
     catch ( const std::out_of_range& e ) {
       bicycle::die( gridName + " tried to focus on an entity it doesn't have: " + focus );
+    }
+
+    // Kick off.
+    for ( auto& [ name, entity ] : _env->fg ) {
+      entity->personality.trigger( "onStart" );
     }
   }  // try-block
   catch ( const YAML::Exception& e ) {
@@ -146,71 +239,49 @@ Grid::Grid( const std::string& gridName ) : Window() {
 void Grid::addEntity( const std::string& name, const std::shared_ptr<Entity>& entity ) {
   int attempt{};
   std::string attemptedName = name;
-  while ( _fg.contains( attemptedName ) ) {
+  while ( _env->fg.contains( attemptedName ) ) {
     attemptedName = name + " " + std::to_string( ++attempt );
   }
-  _fg[ attemptedName ] = entity;
+  _env->fg[ attemptedName ] = entity;
 }
 
 
 Grid::Grid( const int x, const int y, const int w, const int h ) : Window(x, y, w, h) {}
 
 void Grid::update() {
-  render();
-}
-
-void Grid::focusOn( const std::string& entityName ) {
-  if ( _fg.contains( entityName ) ) {
-    _focus = _fg.at( entityName );
-  }
-}
-
-// TODO this assumes single-character symbols. Handle multi-char later.
-auto Grid::isOnscreen( const std::shared_ptr<Entity>& entity ) -> bool {
-  auto pos = entity->body.getPosition();
-  return 
-    pos->x >= _camera.x && 
-    pos->x <= _camera.x + getWidth() - WINDOW_PADDING &&
-    pos->y >= _camera.y && 
-    pos->y <= _camera.y + getHeight() - WINDOW_PADDING;
-}
-
-void Grid::render() {
-  // First, pan the camera if necessary.
-  auto fpos = _focus->body.getPosition();
-  auto lx = _camera.x + _camera.margin;
-  auto hx = _camera.x + getWidth() - WINDOW_PADDING - _camera.margin;
-  auto ly = _camera.y + _camera.margin;
-  auto hy = _camera.y + getHeight() -WINDOW_PADDING - _camera.margin;
-
+  // First, pan the camera if necessary. (TODO this should be outsourced to the controller side to make this a pure "view" layer of MVC.)
+  auto fpos = _env->camera.getFocus()->body.getPosition();
+  auto lx = _env->camera.getLxMargin();
+  auto hx = _env->camera.getHxMargin();
+  auto ly = _env->camera.getLyMargin();
+  auto hy = _env->camera.getHyMargin();
   if ( fpos->x <= lx ) {
-    pan( 0, fpos->x - lx );
+    _env->camera.pan( 0, fpos->x - lx );
   }
   else if ( fpos->x >= hx ) {
-    pan( 0, fpos->x - hx );
+    _env->camera.pan( 0, fpos->x - hx );
   }
   if ( fpos->y <= ly ) {
-    pan( fpos->y - ly, 0 );
+    _env->camera.pan( fpos->y - ly, 0 );
   }
   else if ( fpos->y >= hy ) {
-    pan( fpos->y - hy, 0 );
+    _env->camera.pan( fpos->y - hy, 0 );
   }
 
   // Background
-  for ( size_t row = 0; row < getHeight() - WINDOW_PADDING; ++row ) {
-    auto rowStr = std::string( 
-        _bg, 
-        ( ( _camera.y + row ) * _bgDims.w + _camera.x ), 
-        static_cast<size_t>(getWidth() - WINDOW_PADDING ));
-    mvprint( static_cast<int>(row) + 1, 1, rowStr );
+  for ( int row = 0; row < getHeight() - WINDOW_PADDING; ++row ) {
+    int startPos =  ( _env->camera.getY() + row ) * _env->bgDims.w + _env->camera.getX();
+    int stringLength =  getWidth() - WINDOW_PADDING;
+    auto rowStr = std::string( _env->bg, startPos, stringLength );
+    mvprint( row + 1, 1, rowStr );  // row + 1 to skip the stop border 
   }
 
   // Foreground
-  for ( const auto& [ name, entity ] : _fg ) {
-    if ( isOnscreen( entity ) ) {
+  for ( const auto& [ name, entity ] : _env->fg ) {
+    if ( _env->camera.canSee( entity ) ) {
       auto pos = entity->body.getPosition();
-      auto x = pos->x - _camera.x;
-      auto y = pos->y - _camera.y;
+      auto x = pos->x - _env->camera.getX();
+      auto y = pos->y - _env->camera.getY();
       setAttr ( COLOR_PAIR(entity->body.getColor()) );
       mvprint( y, x, entity->body.getSymbol() );
       unsetAttr ( COLOR_PAIR(entity->body.getColor()) );
@@ -218,21 +289,10 @@ void Grid::render() {
   }
 }
 
-void Grid::pan( const int dy, const int dx ) {
-  _camera.x += dx;
-  _camera.y += dy;
-  _camera.x = std::clamp<int>( _camera.x, 0, _bgDims.w - getWidth() + WINDOW_PADDING );
-  _camera.y = std::clamp<int>( _camera.y, 0, _bgDims.h - getHeight() + WINDOW_PADDING );
-}
-
 void Grid::react( const int input ) {
-  if ( _focus != nullptr && _focus->bb != nullptr ) {
-    try {
-      _focus->onInput( input );
-    }
-    catch ( const std::out_of_range& e ) {
-      bicycle::die( "Grid's focus, " + _focus->body.getSymbol() + ", doesn't have an \"onInput\" trigger." );
-    }
+  auto focus = _env->camera.getFocus();
+  if ( focus != nullptr && focus->bb != nullptr ) {
+    focus->onInput( input );
   }
 }
 

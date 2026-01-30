@@ -5,8 +5,13 @@ void Entity::validate() {
 }
 
 void Entity::onInput( const int input ) {
-  (*bb)["input"] = std::make_any<char>( input );
-  personality.trigger( "onInput" );
+  try {
+    (*bb)["input"] = std::make_any<char>( input );
+    personality.trigger( "onInput" );
+  }
+  catch ( const std::out_of_range& e ) {
+    bicycle::die( "Entity with symbol \"" + body.getSymbol() + "\" doesn't have an \"onInput\" trigger." );
+  }
 }
 
 void Entity::onTimer( const std::string& timerId ) {

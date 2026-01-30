@@ -7,6 +7,8 @@
 using BbKey = std::string;
 using Blackboard = std::map<BbKey, std::any>;
 
+auto deepCopy( const Blackboard& rhs );
+
 class BlackboardRegistry : public std::map<std::string, std::shared_ptr<Blackboard>> {
   public:
     static auto getInstance() -> BlackboardRegistry&;

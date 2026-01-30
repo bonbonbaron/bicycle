@@ -3,6 +3,8 @@
 #include "Personality.h"
 #include "Blackboard.h"
 
+#include <memory>
+
 enum class EntityStatus {
   HIGHLIGHTED,
   SELECTED,
