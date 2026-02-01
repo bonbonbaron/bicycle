@@ -12,7 +12,7 @@ using Callback = std::function<void()>;
 class Timer {
   public:
     Timer() = default;
-    Timer( Callback&& callback, const Duration interval = std::chrono::milliseconds(0), const bool repeat = false );
+    Timer( Callback&& callback, const Duration interval = std::chrono::milliseconds(0), const bool repeat = false, const int reps = -1 );
     ~Timer();
 
     void stop();
@@ -22,6 +22,7 @@ class Timer {
 
   private:
     Duration _interval{};
+    int _reps{-1};
     std::atomic<bool> _running{true};
     Callback _callback{};
     int _id{};

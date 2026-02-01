@@ -153,11 +153,11 @@ void ActionNode::validateBlackboard() {
 }  // ActionNode::validateBlackboard()
 
 void SequenceNode::run() {
-  ActionState state{ActionState::SUCCESS};  // in case there's nothing in _actions
+  ActionState state{ActionState::COMPLETE};  // in case there's nothing in _actions
   for ( auto& e : _actions ) {
     // Skip already-completed events.
     // There needs to be an easy way to repeat though without resetting.
-    //if ( e->getState() == ActionState::SUCCESS ) {
+    //if ( e->getState() == ActionState::COMPLETE ) {
       //continue;
     //}
     e->run();
@@ -194,15 +194,15 @@ void SequenceNode::reset() {
   setState( ActionState::READY );
 }
 void FallbackNode::run() {
-  ActionState state{ActionState::SUCCESS};  // init'd in case there's nothing in _actions
+  ActionState state{ActionState::COMPLETE};  // init'd in case there's nothing in _actions
   for ( auto& e : _actions ) {
     // Skip already-completed events.
-    //if ( e->getState() == ActionState::SUCCESS ) {
+    //if ( e->getState() == ActionState::COMPLETE ) {
       //continue;
     //}
     e->run();
     // Stop on the first event that succeeds.
-    if ( e->getState() == ActionState::SUCCESS ) {
+    if ( e->getState() == ActionState::COMPLETE ) {
       break;
     }
   }

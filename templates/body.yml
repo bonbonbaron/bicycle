@@ -1,0 +1,11 @@
+# BODY
+# ----
+# Each entity needs something to display on the presentation layer. In terminal-based games, this means ASCII character(s). Later, in GUI-based games, it'll take on a more complex form of images with optional animations.
+#
+# Available nodes:
+#    - sym: ASCII character(s) representing this entity
+#    - color: BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE 
+
+sym: "some symbol"
+color: GREEN 
+

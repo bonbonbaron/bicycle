@@ -1,0 +1,41 @@
+# PERSONALITY
+# -----------
+#
+# Personality is a map of quirks
+# A quirk is a pairing between a trigger (string) and a set of behavior attributes:
+#   1. tree: the behavior tree (without directory or suffix)
+#   2. priority (optional)
+# custom, nested quirks
+Trigger1:
+  tree: test-tree
+  priority: 5
+  freq: 1000 # (ms) optional
+  reps: 5# optional
+Trigger2:
+  tree: test-tree
+  priority: 5
+  freq: 1000 # (ms) optional
+  reps: 5# optional
+
+# Entity's entrypoint quirks
+onStart:  # optional
+  tree: tt2
+  priority: 7
+  freq: 1000 # (ms) optional
+  reps: 5# optional
+onInput:  # optional
+  tree: onInput
+  priority: 100
+  freq: 1000 # (ms) optional
+  reps: 5# optional
+onTimer:  # optional
+  tree: onInput
+  priority: 100
+  freq: 1000 # (ms) optional
+  reps: 5# optional
+onCollision: # optional
+  tree: onInput
+  priority: 100
+  freq: 1000 # (ms) optional
+  reps: 5# optional
+

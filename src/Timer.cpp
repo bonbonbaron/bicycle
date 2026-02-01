@@ -3,10 +3,15 @@
 
 #include <string>
 
-Timer::Timer( Callback&& callback, const Duration interval, const bool repeat ) :
+/* -1 reps = infinite 
+ * 0 reps = only run once
+ * etc. = specific number of reps
+ */
+Timer::Timer( Callback&& callback, const Duration interval, const bool repeat, const int reps ) :
   _repeat( repeat ),
   _interval( interval ),
-  _callback( callback ) 
+  _callback( callback ),
+  _reps( reps )
 {
   _thread = std::jthread{ [this] {
       auto next = Clock::now() + _interval;
@@ -28,6 +33,13 @@ Timer::Timer( Callback&& callback, const Duration interval, const bool repeat ) 
         if ( ! _repeat ) {
           break;
         }
+        // < 0 means infinite repetitions.
+        if ( _reps > 0 ) {
+          if ( --_reps == 0 ) {
+            break;
+          }
+        }
+
         std::this_thread::sleep_until( next );
         next += _interval;
       }

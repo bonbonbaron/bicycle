@@ -17,7 +17,7 @@
 #include "Config.h"
 #include "Timer.h"
 
-enum class ActionState { READY, FAILED, IN_PROGRESS, SUCCESS };
+enum class ActionState { READY, FAILED, IN_PROGRESS, COMPLETE };
 
 using PortSet = std::map<BbKey, std::type_index>;;
 
@@ -195,6 +195,7 @@ struct Quirk {
   Tree tree{};
   int priority{};  // higher values take precedence
   unsigned freq{};  // freq at quirk-level gives entities more ownership over their own rates
+  unsigned reps{};  // freq at quirk-level gives entities more ownership over their own rates
 };
 
 using Quirks = std::map< std::string, Quirk >;
@@ -211,6 +212,7 @@ class Personality  {
   private:
     Quirks _quirks{};
     int _activePriority{ -1 };
+    int _remainingReps{ -1 };
     std::shared_ptr<Timer> _timer{};  // for looping at a given frequency OR delays 
 };
 
@@ -337,6 +339,9 @@ struct YAML::convert<Quirk> {
     rhs.priority = node["priority"].as<decltype(Quirk::priority)>();
     if ( auto freq = node["freq"] ) {
       rhs.freq = freq.as<decltype(Quirk::freq)>();
+    }
+    if ( auto freq = node["reps"] ) {
+      rhs.freq = freq.as<decltype(Quirk::reps)>();
     }
     return true;
   }
