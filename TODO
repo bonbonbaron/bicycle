@@ -4,7 +4,7 @@ call it a wrap for v1.0, baby
 -----
 features to add for v2.0:
   scripting automation:
-    - config file tree generation
+    \- config file tree generation
     - provide find, create, edit, delete, and list functions with tab-completion for the following,
       including templates and auto-registry when necessary:
         - custom types
