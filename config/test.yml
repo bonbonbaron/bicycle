@@ -1,7 +1,0 @@
-- Trigger1:
-    tree: test-tree
-    priority: 5
-- Trigger2:
-    tree: tt2
-    priority: 7
-

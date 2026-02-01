@@ -1,0 +1,5 @@
+#!/bin/bash
+
+function gen-dir-tree() {
+  mkdir -p config/node/{dialogue,menu,grid/bg,entity/{body,personality/tree}}
+}

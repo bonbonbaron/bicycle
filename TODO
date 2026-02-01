@@ -1,6 +1,33 @@
-fix two brains controlling one body
-make node include entities and call onStart on them. One of them should be what triggers windows and/or kicks off a song.
-fix first frame blinking to invisibility
+make node include entities and call onStart on them. 
+  - One of them should be what triggers windows and/or kicks off a song.
 call it a wrap for v1.0, baby
 -----
-remake Battle to test and refine engine
+features to add for v2.0:
+  scripting automation:
+    - config file tree generation
+    - provide find, create, edit, delete, and list functions with tab-completion for the following,
+      including templates and auto-registry when necessary:
+        - custom types
+        - port set keys and types
+        - conditions
+        - node
+          - entity
+            - body
+            - personality
+              - tree
+                - functions
+            - bb
+        - dialogue
+        - menu
+        - grid
+    - making Makefile (and later, CMakeLists) automate port set generation from function definitions. Should bomb on clash.
+
+testing:
+  remake Battle to test and refine engine
+  go to Battle node on contact with enemy; return when done with enemy disappearing
+  go from one room to the other
+
+
+WONDERING:
+----------
+i wonder if some parts of bicycle-rpg are fit for integration into bicycle? The registry function seems pretty useful. main() standard too. scripts and template folders.

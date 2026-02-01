@@ -1,7 +1,0 @@
-fall:
-- sayHo
-- sayHe
-- seq:
-  - chooseTgt
-  - eatTgt
-
