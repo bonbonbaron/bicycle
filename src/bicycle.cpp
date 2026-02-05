@@ -1,4 +1,5 @@
 #include "bicycle.h"
+#include "Config.h"
 
 namespace bicycle {
   static bool _initState{};
@@ -29,6 +30,10 @@ namespace bicycle {
     noecho();  // doesn't echo user's input back to them
     curs_set(0);
     ColorPalette::init();
+
+    // Configure 
+    config();
+
     _initState = true;
     clear();
     refresh();

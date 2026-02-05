@@ -4,6 +4,8 @@ void Entity::validate() {
   personality.validate();
 }
 
+// HYPOTHESIS: Entities have only three ways of being activated: input, timers, and collisions.
+
 void Entity::onInput( const int input ) {
   try {
     (*bb)["input"] = std::make_any<char>( input );

@@ -12,7 +12,9 @@
 #include "Entity.h"
 #include "ConditionRegistry.h"
       
-static std::mutex _nodeMut{};  // There'll only ever be one node active.
+static std::mutex _nodeMut{};  // YAML-copying structures prevents uncopyable mutexes from being class members
+
+// Classes 
 
 // Edges are mapped by name, so there's no need for a name field.
 class Edge {
@@ -22,7 +24,7 @@ class Edge {
     auto getWeight() const -> int;
     void setEndpoint( const std::string& endpoint );
     auto getEndpoint() const -> const std::string&;
-    void loadEndpoint() const;
+    void loadEndpoint();
     void setCondition( const std::shared_ptr<Condition>& func );
   private:
     int _weight{};                  // e.g. Number of random battles may be proportional to travel distance.
@@ -36,21 +38,17 @@ namespace bicycle {  // prevent clash with YAML::Node
       void setName( const std::string& );
       auto getName() const -> const std::string&;
       void setDesc( const std::string& );
+      auto getDesc() const -> const std::string&;
       void setEdges( const std::map<std::string, Edge>& edges );
       auto getEdges() const -> const std::map<std::string, Edge>&;
       auto getEntities() const -> const std::vector<Entity>&;
       void addEntity( const Entity& entity );
-
       void run();
-      void onInput( const int input );
-      void onTimer( const std::string timerName );
     private:
       std::string _name;
       std::string _desc;
       std::map<std::string, Edge> _edges{};
-      std::map<unsigned char, std::function<void()>> _onInputTriggers{};
-      std::map<std::string, std::function<void()>> _onTimerTriggers{};
-      std::vector<Entity> _entities;
+      Entity _rootEntity;  // this entity usually encapsulates other entities; think of it as a scene
   };  // class Node
 }  // namespace bicycle
 
@@ -64,14 +62,17 @@ template<>
 struct YAML::convert<Edge> {
   static YAML::Node encode(const std::string& rhs) { return YAML::Node(rhs); }
   static bool decode(const YAML::Node& node, Edge& rhs) {
+    // Edge YAML structure should be map.
     if (!node.IsMap()) {
       return false;
     }
+    // Weight (optional)
     if ( auto weight = node["weight"] ) {
       rhs.setWeight( weight.as<int>() );
     }
+    // Endpoint
     rhs.setEndpoint( node["endpointFilename"].as<std::string>() );
-    // If this edge is conditional
+    // Conditional (optional)
     if ( auto condNode = node["condition"] ) {
       auto& reg = ConditionRegistry::getInstance();
       try {

@@ -11,6 +11,8 @@ enum class EntityStatus {
 };
 
 struct Entity {
+  std::string name;
+
   Body body{};
   Personality personality{};
   std::shared_ptr<Blackboard> bb{};  // this is shared with action nodes
