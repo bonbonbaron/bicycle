@@ -2,18 +2,21 @@ DBG=-g
 STD=-std=c++20
 
 BICREPO := $(shell git rev-parse --show-toplevel)
-BICSRCS := bicycle  Bar Blackboard Body ColorPalette  ConditionRegistry Dialogue  Dice  Entity Menu  MidiPlayer  Graph Grid Window  WindowManager Timer Personality 
-BICINCS := bicycle ColorPalette Dialogue Menu Constellation MidiPlayer Window WindowManager
+BICSRCS := main bicycle Bar Blackboard Body ColorPalette ConditionRegistry Config Dialogue Dice Entity Menu MidiPlayer Graph Grid Timer Personality Window WindowManager 
+BICINCS := bicycle ColorPalette Dialogue Menu Constellation MidiPlayer Window WindowManager  # TODO fix this
 BICINCS := $(BICINCS:%=$(BICREPO)/include/%.h)
 
 BICOBJS := $(BICSRCS:%=$(BICREPO)/build/%.o)
-BICTGT := $(BICREPO)/build/libbicycle.a
+BICTGT := o  # for now
 all: $(BICTGT)
 
 $(BICTGT): $(BICOBJS)
-	ar rcs $@ $(BICOBJS) 
+	g++ $(DBG) $(STD) $(BICOBJS) $(shell ncursesw6-config --libs) -lfluidsynth -lyaml-cpp -o $@
 
 $(BICREPO)/build/%.o: $(BICREPO)/src/%.cpp $(BICREPO)/include/%.h 
+	g++ $(DBG) $(STD) -c $< -I$(BICREPO)/include $(shell ncursesw6-config --cflags ) -o $@
+
+$(BICREPO)/build/%.o: $(BICREPO)/src/%.cpp 
 	g++ $(DBG) $(STD) -c $< -I$(BICREPO)/include $(shell ncursesw6-config --cflags ) -o $@
 
 $(BICREPO)/build/:

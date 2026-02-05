@@ -7,7 +7,7 @@
 
 namespace bicycle {
   auto isInit() -> bool;
-  void init();
+  void init( const std::string& gameName );
   void die( const std::string& s );
 
   void push( std::shared_ptr<Window> shared );

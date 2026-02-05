@@ -56,6 +56,10 @@ auto Node::getEdges() const -> const std::map<std::string, Edge>& {
   return _edges;
 }
 
+void Node::setRootEntity( const Entity& entity ) { 
+  _rootEntity = entity;
+}
+
 constexpr std::string_view ON_START{ "onStart" };
 void Node::run() {
   if ( _rootEntity.personality.hasTrigger( ON_START.data() ) ) {

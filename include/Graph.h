@@ -41,8 +41,7 @@ namespace bicycle {  // prevent clash with YAML::Node
       auto getDesc() const -> const std::string&;
       void setEdges( const std::map<std::string, Edge>& edges );
       auto getEdges() const -> const std::map<std::string, Edge>&;
-      auto getEntities() const -> const std::vector<Entity>&;
-      void addEntity( const Entity& entity );
+      void setRootEntity( const Entity& entity );
       void run();
     private:
       std::string _name;
@@ -119,54 +118,22 @@ struct YAML::convert<bicycle::Node> {
       bicycle::die( "Error processing YAML for node " + nodeName );
     }
 
-    auto entities = node["entities"];
-    if ( !entities.IsMap() ) {
-      bicycle::die( "Node " + rhs.getName() + "'s entities node needs to be a map." );
-    }
+    auto entityName = node["entity"].as<std::string>();
 
-    // For each entity, the key is the entity name, val is position.
-    // TODO delete the position portion as it no longer makes any sense in the context of Node.
-    for ( const auto& e : entities ) {
-      auto entityName = e.first.as<std::string>();
-      YAML::Node entityNode;
-      try {
-        entityNode = YAML::LoadFile( ENTITY_DIR + entityName + SUFFIX.data() );
-      }
-      catch ( const YAML::BadFile& e ) {
-        bicycle::die( "In node " + nodeName + ": for entity " + entityName + ": We couldn't find " + ENTITY_DIR + entityName + SUFFIX.data() + "." );
-      }
-      Entity entity;
-      try {
-        entity = entityNode.as<Entity>();
-      } 
-      catch ( const std::runtime_error& e ) {
-        std::cerr << "Error for entity \'" << entityName << "\':\n";
-        bicycle::die( e.what() );
-      }
-      if ( ! e.second.IsSequence() ) {
-        bicycle::die( "In node " + nodeName + ": for entity " + entityName + ": pos node needs to be a sequence.\n" );
-      }
-      // Sequence of 2 integers = one instance's position
-      if ( e.second[0].IsScalar() && e.second.size() == 2 ) {
-        auto position = e.second.as<Position>();
-        auto posPtr = std::make_shared<Position>( position );
-        entity.body.setPosition( posPtr );
-        rhs.addEntity( entity );
-      }
-      // Sequence of at least 1 position
-      else if ( e.second.IsSequence() ) {
-        try {
-          auto positions = e.second.as<std::vector<Position>>();
-          for ( auto& pos : positions ) {
-            auto posPtr = std::make_shared<Position>( pos );
-            entity.body.setPosition( posPtr );
-            rhs.addEntity( entity );
-          }
-        }
-        catch ( const YAML::Exception& e ) {
-          bicycle::die( "In node " + nodeName + ": for entity " + entityName + ": pos error: " + e.what() );
-        }
-      }
+    YAML::Node entityNode;
+    try {
+      entityNode = YAML::LoadFile( ENTITY_DIR + entityName + SUFFIX.data() );
+    }
+    catch ( const YAML::BadFile& e ) {
+      bicycle::die( "In node " + nodeName + ": for entity " + entityName + ": We couldn't find " + ENTITY_DIR + entityName + SUFFIX.data() + "." );
+    }
+    try {
+      Entity entity = entityNode.as<Entity>();
+      rhs.setRootEntity( entity );
+    } 
+    catch ( const std::runtime_error& e ) {
+      std::cerr << "Error for entity \'" << entityName << "\':\n";
+      bicycle::die( e.what() );
     }
 
     return true;

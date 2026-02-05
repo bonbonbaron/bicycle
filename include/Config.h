@@ -1,1 +1,1 @@
-void config();
+void config( const std::string& gameName );

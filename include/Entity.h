@@ -43,7 +43,7 @@ struct YAML::convert<Entity> {
       auto persName = node["personality"].as<std::string>();
 
       auto bodyRootNode = YAML::LoadFile( BODY_DIR.data() + bodyName + SUFFIX.data() );
-      auto persRootNode = YAML::LoadFile( PERS_DIR.data() + persName + SUFFIX.data() );
+      auto persRootNode = YAML::LoadFile( PERSONALITY_DIR.data() + persName + SUFFIX.data() );
 
       rhs.body = bodyRootNode.as<Body>();
       rhs.personality = persRootNode.as<Personality>();

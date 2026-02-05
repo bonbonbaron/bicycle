@@ -22,7 +22,7 @@ namespace bicycle {
     return _initState;
   }
 
-  void init() {
+  void init( const std::string& gameName ) {
     setlocale(LC_ALL, "");
     initscr();
     start_color();
@@ -32,7 +32,7 @@ namespace bicycle {
     ColorPalette::init();
 
     // Configure 
-    config();
+    config( gameName );
 
     _initState = true;
     clear();
