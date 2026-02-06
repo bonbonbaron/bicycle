@@ -9,7 +9,7 @@
 #include "Personality.h"
 
 static void registerPortTypes( void* handle, const std::string& GAME_FP ) {
-  PortTypeRegistry::value_type* ports = extGrab<PortTypeRegistry::value_type>( handle, "ports", " Couldn't find a ports array in " + GAME_FP + ". Should have a \"const PortTypeRegistry::value_type ports[]\" somewhere wrapped in \'extern \"C\" { ... }\'." );
+  PortTypeRegistry::value_type* ports = extGrab<PortTypeRegistry::value_type>( handle, "ports", " Couldn't find a ports array in " + GAME_FP + ".\nShould have a \"const PortTypeRegistry::value_type ports[]\" somewhere wrapped in \'extern \"C\" { ... }\'." );
   int* numPorts = extGrab<int>( handle, "numPorts", " Couldn't find numPorts in " + GAME_FP + ". Should have a \"const int numPorts{ sizeof( ports ) / sizeof( ports[0] ) };\" somewhere wrapped in \'extern \"C\" { ... }\'." );
 
   for (int i = 0; i < *numPorts; ++i ) {
