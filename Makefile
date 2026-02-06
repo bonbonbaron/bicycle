@@ -22,11 +22,11 @@ $(BICREPO)/build/%.o: $(BICREPO)/src/%.cpp
 $(BICREPO)/build/:
 	mkdir -p $(BICREPO)/build
 
-install: build/libbicycle.a
+install: $(BICTGT)
 	sudo rm -rf /usr/local/include/bicycle
 	sudo mkdir -p /usr/local/include/bicycle
 	sudo cp include/*.h /usr/local/include/bicycle
-	sudo cp build/libbicycle.a /usr/local/lib
+	sudo cp $(BICTGT) /usr/local/bin
 
 
 .PHONY: clean

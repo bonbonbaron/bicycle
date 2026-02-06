@@ -103,7 +103,7 @@ class ActionRegistry : public std::map<std::string, ActionPtr> {
 
 class PortTypeRegistry : public std::map< const std::string, std::type_index > {
   public:
-    static void add( const std::string&& key, const std::type_index& val );
+    static void add( const PortTypeRegistry::value_type& val );
     static auto get( const std::string& key ) -> const std::type_index&;
   private:
     static auto getInstance() -> PortTypeRegistry&;
@@ -131,8 +131,10 @@ class Action {
   auto _funcName_##Ptr = std::make_shared<Action>( std::string(#_funcName_), _funcName_ __VA_OPT__(, std::vector<BbKey>{) __VA_ARGS__ __VA_OPT__(}) );\
   ActionRegistry::add( #_funcName_, _funcName_##Ptr );
 
+
+
 #define PORT( _portName_, _type_ )\
-  PortTypeRegistry::add( std::string(#_portName_), std::type_index( typeid( _type_ ) ) );
+  PortTypeRegistry::value_type{ std::string(#_portName_), std::type_index( typeid( _type_ ) ) }
 
 class Tree;
 

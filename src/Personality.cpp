@@ -40,9 +40,9 @@ auto ActionRegistry::getInstance() -> ActionRegistry& {
   return registry;
 }
 
-void PortTypeRegistry::add( const std::string&& key, const std::type_index& val ) {
+void PortTypeRegistry::add( const PortTypeRegistry::value_type& val ) {
   auto& reg = getInstance();
-  reg.insert( std::pair( key, val ) );
+  reg.insert( val );
 }
 
 auto PortTypeRegistry::get( const std::string& key ) -> const std::type_index& {
