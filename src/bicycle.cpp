@@ -23,6 +23,10 @@ namespace bicycle {
   }
 
   void init( const std::string& gameName ) {
+    // Configure game
+    config( gameName );
+
+    // Init ncurses
     setlocale(LC_ALL, "");
     initscr();
     start_color();
@@ -30,9 +34,6 @@ namespace bicycle {
     noecho();  // doesn't echo user's input back to them
     curs_set(0);
     ColorPalette::init();
-
-    // Configure 
-    config( gameName );
 
     _initState = true;
     clear();

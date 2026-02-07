@@ -92,7 +92,7 @@ class ActionRegistry : public std::map<std::string, ActionPtr> {
     // Allows you to more easily make an event mapping
     static auto get( const std::string& name ) -> ActionPtr;
     // Allows you to more easily make an event mapping
-    static void add( const std::string& name, const ActionPtr& action );
+    static void add( const ActionRegistry::value_type& val );
 
   private:
     static auto getInstance() -> ActionRegistry&;
@@ -114,22 +114,26 @@ class PortTypeRegistry : public std::map< const std::string, std::type_index > {
 
 class Action {
   public:
-    Action( const std::string& name, ActFunc f, std::vector<BbKey>&& ports = {} );
+    Action( ActFunc f, std::vector<BbKey>& ports );
     auto getPortSet() -> std::shared_ptr<PortSet>;
     ActFunc f;
   protected:
     std::shared_ptr<PortSet> _portSet{ std::make_shared<PortSet>() };  // universal for all entities
 };  // Action
 
-// TODO see if there's some clever way you can auto-call ACTION macro after function definition.
-#define F_( _funcName_, ... ) \
-  static auto _funcName_( ActArg& arg ) -> ActionState {\
-    __VA_ARGS__\
-  }
+#define F(_fname_) ActionState _fname_ ( ActArg& arg )
+
+struct ActPkg {
+  std::string name;
+  ActFunc func;
+  std::string ports;
+};
  
+//  ACT macro whitespace-delimits its port set as a compromise between keeping things neat
+//  and dlsym() not letting us move vectors easily. I don't want devs to trip over miscounting
+//  elements for arrays either.
 #define ACT( _funcName_, ... ) \
-  auto _funcName_##Ptr = std::make_shared<Action>( std::string(#_funcName_), _funcName_ __VA_OPT__(, std::vector<BbKey>{) __VA_ARGS__ __VA_OPT__(}) );\
-  ActionRegistry::add( #_funcName_, _funcName_##Ptr );
+  ActPkg{ std::string(#_funcName_), _funcName_, std::string(#__VA_ARGS__) }
 
 
 

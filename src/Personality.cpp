@@ -27,12 +27,12 @@ auto ActionRegistry::get( const std::string& name ) -> ActionPtr {
   return nullptr;
 }
 // Allows you to more easily make an event mapping
-void ActionRegistry::add( const std::string& name, const ActionPtr& action ) {
-  if ( action == nullptr ) {
-    bicycle::die( "ActionRegistry::set(): ActionPtr " + name + " is null!" );
+void ActionRegistry::add( const ActionRegistry::value_type& val ) {
+  if ( val.second == nullptr ) {
+    bicycle::die( "ActionRegistry::add(): key \'" + val.first + "\' is paired with a nullptr value." );
   }
   auto& reg = getInstance();
-  reg.insert( std::pair( name, action ) );
+  reg.insert( val );
 }
 
 auto ActionRegistry::getInstance() -> ActionRegistry& {
@@ -55,7 +55,8 @@ auto PortTypeRegistry::getInstance() -> PortTypeRegistry& {
   return ps;
 }
 
-Action::Action( const std::string& name, ActFunc f, std::vector<BbKey>&& ports ) : f(f) {
+// So i can do a flexibe array of strings at the end of my struct, but i need a way to count them. I could be dumb and manually count them. But I don't want to do that. 
+Action::Action( ActFunc f, std::vector<BbKey>& ports ) : f(f) {
   /* Register input and output ports */
   for ( const auto& portName : ports ) {
     try {

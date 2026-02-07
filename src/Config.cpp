@@ -9,15 +9,50 @@
 #include "Personality.h"
 
 static void registerPortTypes( void* handle, const std::string& GAME_FP ) {
-  PortTypeRegistry::value_type* ports = extGrab<PortTypeRegistry::value_type>( handle, "ports", " Couldn't find a ports array in " + GAME_FP + ".\nShould have a \"const PortTypeRegistry::value_type ports[]\" somewhere wrapped in \'extern \"C\" { PORT( <some name>, <some type> ), ... }\'." );
-  int* numPorts = extGrab<int>( handle, "numPorts", " Couldn't find numPorts in " + GAME_FP + ".\nShould have a \"const int numPorts{ sizeof( ports ) / sizeof( ports[0] ) };\" somewhere wrapped in \'extern \"C\" { ... }\'." );
+  PortTypeRegistry::value_type* ports = extGrab<PortTypeRegistry::value_type>( handle, "ports" );
+  int* numPorts = extGrab<int>( handle, "numPorts" );
 
   for (int i = 0; i < *numPorts; ++i ) {
+    std::cout << "adding port " << ports[i].first << '\n';
     PortTypeRegistry::add( ports[i] );
   }
 }
 
-static void registerActions() {
+static void registerActions( void* handle, const std::string& GAME_FP ) {
+  ActPkg* actions = extGrab<ActPkg>( handle, "actions" );
+  const int* numActions = extGrab<int>( handle, "numActions" );
+
+  // Allow devs some room for ignorance of macros unfortunate inclusion of undesirable characters.
+  const std::string ILLEGAL_CHARS{ "\", " };
+
+  for ( int i = 0 ; i < *numActions; ++i ) { 
+    std::vector<BbKey> dstPorts;
+    std::string& srcPorts = actions[i].ports;
+    // Kind of like null-terminated strings, but it's an empty-string-terminated array.
+    size_t start = srcPorts.find_first_not_of( ILLEGAL_CHARS );
+    if ( start != std::string::npos ) {
+      size_t end   = srcPorts.find_first_of( ILLEGAL_CHARS, start );
+      for ( ;; ) {
+        if ( end == std::string::npos ) {
+          dstPorts.emplace_back( srcPorts, start );
+          break;
+        }
+        assert( end > start );
+        dstPorts.emplace_back( srcPorts, start, end - start );
+        if ( start == std::string::npos ) {
+          break;
+        }
+        start = srcPorts.find_first_not_of( ILLEGAL_CHARS, end );
+        if ( start == std::string::npos ) {
+          break;
+        }
+        end   = srcPorts.find_first_of( ILLEGAL_CHARS, start );
+      } 
+    }
+    auto action = std::make_shared<Action>( actions[i].func, dstPorts );
+    std::pair< std::string, ActionPtr > pair{ actions[i].name, action };
+    ActionRegistry::add( pair );
+  }
 }
 
 static void registerConditions() {
@@ -30,26 +65,20 @@ void config( const std::string& gameName ) {
   // TODO make sure this'll work
   constexpr std::string_view GAME_DIR{ "/usr/local/games/" };
   const std::string GAME_FP = GAME_DIR.data() + gameName + ".so";
-  void* handle = dlopen( GAME_FP.c_str(), RTLD_LAZY );
+  void* handle = dlopen( GAME_FP.c_str(), RTLD_LAZY | RTLD_GLOBAL );
   if ( handle == nullptr ) {
     bicycle::die( "Couldn't find shared library " + GAME_FP + '\n' );
   }
-  // TODO #2:  get array of actions
-  // TODO #3:  get array of conditions
-  // TODO #4:  get array of blackboards
-  
+
   registerPortTypes( handle, GAME_FP );
-  registerActions();
+  // TODO #2:  get array of actions
+  registerActions( handle, GAME_FP );
+  // TODO #3:  get array of conditions
+  std::cout << "Trying to register conditions
   registerConditions();
+  // TODO #4:  get array of blackboards
   registerBlackboards();
+
+  dlclose( handle );
 }
 
-/* It'll be imPORTant to specify a type for each port.
- * But how will bicycle know about custom types?
- * Do those need to be registered from the SO? No, be-
- * cause they give type_indexes, not raw rypes. BOOM!
- */
-
-/* So what does the port process look like?
- *  1. Store an array of std::pairs. Map 
- */
