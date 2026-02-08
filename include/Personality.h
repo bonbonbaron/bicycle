@@ -25,6 +25,7 @@ using PortSet = std::map<BbKey, std::type_index>;;
 
 class ActArg {
   public:
+
     template<typename T>
     auto get( const BbKey key ) -> T& {
       // Make sure we have a blackboard and port set.
@@ -50,6 +51,7 @@ class ActArg {
       // Return the value... FINALLY.
       return std::any_cast<T&>( _bb->at( key ) );
     }
+
     template<typename T>
     void set( const BbKey key, const T& val ) {
       // Make sure we have a blackboard and port set.
@@ -71,8 +73,10 @@ class ActArg {
       // Finally, if the type is correct, set it.
       (*_bb)[key] = std::make_any<T>( val );
     }
+
     // BB is fed by ActionNode.
     void setBlackboard( std::shared_ptr<Blackboard> bb );
+
     // PS is fed by Action.
     void setPortSet( std::shared_ptr<PortSet> ps );
     auto getBlackboard() -> const std::shared_ptr<Blackboard>&;

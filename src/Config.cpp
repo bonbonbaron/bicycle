@@ -13,7 +13,6 @@ static void registerPortTypes( void* handle, const std::string& GAME_FP ) {
   int* numPorts = extGrab<int>( handle, "numPorts" );
 
   for (int i = 0; i < *numPorts; ++i ) {
-    std::cout << "adding port " << ports[i].first << '\n';
     PortTypeRegistry::add( ports[i] );
   }
 }
@@ -65,19 +64,15 @@ void config( const std::string& gameName ) {
   // TODO make sure this'll work
   constexpr std::string_view GAME_DIR{ "/usr/local/games/" };
   const std::string GAME_FP = GAME_DIR.data() + gameName + ".so";
-  void* handle = dlopen( GAME_FP.c_str(), RTLD_LAZY | RTLD_GLOBAL );
+  void* handle = dlopen( GAME_FP.c_str(), RTLD_LAZY | RTLD_GLOBAL | RTLD_NODELETE );
   if ( handle == nullptr ) {
     bicycle::die( "Couldn't find shared library " + GAME_FP + '\n' );
   }
 
   registerPortTypes( handle, GAME_FP );
-  // TODO #2:  get array of actions
   registerActions( handle, GAME_FP );
-  // TODO #3:  get array of conditions
-  std::cout << "Trying to register conditions
-  registerConditions();
-  // TODO #4:  get array of blackboards
-  registerBlackboards();
+  registerConditions();  // TODO #3:  get array of conditions
+  registerBlackboards(); // TODO #4:  get array of blackboards
 
   dlclose( handle );
 }

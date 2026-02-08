@@ -2,7 +2,6 @@
 #include "Config.h"
 
 namespace bicycle {
-  static bool _initState{};
 
   void die( const std::string&& s ) {
     std::unique_lock<std::mutex> l( bike_mtx );
@@ -18,10 +17,6 @@ namespace bicycle {
     exit(1);
   }
 
-  auto isInit() -> bool {
-    return _initState;
-  }
-
   void init( const std::string& gameName ) {
     // Configure game
     config( gameName );
@@ -35,7 +30,6 @@ namespace bicycle {
     curs_set(0);
     ColorPalette::init();
 
-    _initState = true;
     clear();
     refresh();
   }
@@ -50,8 +44,8 @@ namespace bicycle {
     wm.pop();
   }
 
-  int run() {
-    assert( _initState == true );
+  int run( const std::string& gameName ) {
+    init( gameName );
     int i{};
     auto& wm = WindowManager::getInstance();
 

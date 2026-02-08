@@ -3,10 +3,8 @@
 
 int main( int argc, char** argv ) {
   if ( argc != 2 ) {
-    std::cerr << "Expected use\n\t./o <game-name>\n";
+    std::cerr << "Expected use:\n\t./o <game-name>\nIf you're including the directory or extension of your game's name, don't.";
     exit(1);
   }
-  std::string gameName = argv[1];
-  bicycle::init( gameName );
-  return bicycle::run();
+  return bicycle::run( argv[1] );
 }
