@@ -54,9 +54,6 @@ static void registerActions( void* handle, const std::string& GAME_FP ) {
   }
 }
 
-static void registerConditions() {
-}
-
 static void registerBlackboards() {
 }
 
@@ -71,7 +68,6 @@ void config( const std::string& gameName ) {
 
   registerPortTypes( handle, GAME_FP );
   registerActions( handle, GAME_FP );
-  registerConditions();  // TODO #3:  get array of conditions
   registerBlackboards(); // TODO #4:  get array of blackboards
 
   dlclose( handle );

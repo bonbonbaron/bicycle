@@ -9,10 +9,6 @@ void Edge::setEndpoint( const std::string& endpoint ) {
   _endpointFilename = endpoint;
 }
 
-void Edge::setCondition( const std::shared_ptr<Condition>& func ) {
-  _condition = func;
-}
-
 auto Edge::getWeight() const -> int {
   return _weight;
 }
@@ -24,12 +20,10 @@ auto Edge::getEndpoint() const -> const std::string& {
 void Edge::loadEndpoint() {
   constexpr std::string_view NODE_DIR{ "config/node/" };
   constexpr std::string_view SUFFIX { ".yml" };
-  if ( ! _condition.has_value() || (**_condition)() ) {
-    std::unique_lock<std::mutex> l(_nodeMut);
-    auto nodeCfg = YAML::LoadFile( NODE_DIR.data() + _endpointFilename + SUFFIX.data() );
-    auto node = nodeCfg.as<bicycle::Node>();
-    node.run();
-  }
+  std::unique_lock<std::mutex> l(_nodeMut);
+  auto nodeCfg = YAML::LoadFile( NODE_DIR.data() + _endpointFilename + SUFFIX.data() );
+  auto node = nodeCfg.as<bicycle::Node>();
+  node.run();
 }
 
 void Node::setName( const std::string& name ) {

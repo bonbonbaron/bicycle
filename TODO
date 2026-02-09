@@ -33,7 +33,3 @@ testing:
   go to Battle node on contact with enemy; return when done with enemy disappearing
   go from one room to the other
 
-
-WONDERING:
-----------
-i wonder if some parts of bicycle-rpg are fit for integration into bicycle? The registry function seems pretty useful. main() standard too. scripts and template folders.

@@ -10,7 +10,6 @@
 
 #include <yaml-cpp/node/convert.h>
 #include "Entity.h"
-#include "ConditionRegistry.h"
       
 static std::mutex _nodeMut{};  // YAML-copying structures prevents uncopyable mutexes from being class members
 
@@ -25,11 +24,9 @@ class Edge {
     void setEndpoint( const std::string& endpoint );
     auto getEndpoint() const -> const std::string&;
     void loadEndpoint();
-    void setCondition( const std::shared_ptr<Condition>& func );
   private:
     int _weight{};                  // e.g. Number of random battles may be proportional to travel distance.
     std::string _endpointFilename;  // Endpoint file's basename (no path or extension)
-    std::optional<std::shared_ptr<Condition>> _condition{};  // e.g. "do you have at least one key?"
 };
 
 namespace bicycle {  // prevent clash with YAML::Node
@@ -71,25 +68,6 @@ struct YAML::convert<Edge> {
     }
     // Endpoint
     rhs.setEndpoint( node["endpointFilename"].as<std::string>() );
-    // Conditional (optional)
-    if ( auto condNode = node["condition"] ) {
-      auto& reg = ConditionRegistry::getInstance();
-      try {
-        auto conditionName = condNode.as<std::string>();
-        try {
-          auto& it = reg.at( conditionName );
-          rhs.setCondition( it );
-        }
-        catch ( const std::out_of_range& e ) {
-          std::cerr << "Couldn't find condition " << conditionName << " in ConditionRegistry.\n";
-          throw e;
-        }
-      }
-      catch ( const YAML::Exception& e ) {
-        std::cerr << "Error converting condition node to a string\n";
-        throw e;
-      }
-    }  // if this edge is conditional
     return true;
   }
 };
