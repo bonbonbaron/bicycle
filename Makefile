@@ -11,13 +11,13 @@ BICTGT := o  # for now
 all: $(BICTGT)
 
 $(BICTGT): $(BICOBJS)
-	g++ -fvisibility=default $(DBG) $(STD) $(BICOBJS) $(shell ncursesw6-config --libs) -lfluidsynth -lyaml-cpp -o $@
+	g++ -Wall -fvisibility=default $(DBG) $(STD) $(BICOBJS) $(shell ncursesw6-config --libs) -lfluidsynth -lyaml-cpp -o $@
 
 $(BICREPO)/build/%.o: $(BICREPO)/src/%.cpp $(BICREPO)/include/%.h 
-	g++ -fvisibility=default $(DBG) $(STD) -c $< -I$(BICREPO)/include $(shell ncursesw6-config --cflags ) -o $@
+	g++ -Wall -fvisibility=default $(DBG) $(STD) -c $< -I$(BICREPO)/include $(shell ncursesw6-config --cflags ) -o $@
 
 $(BICREPO)/build/%.o: $(BICREPO)/src/%.cpp 
-	g++ -fvisibility=default $(DBG) $(STD) -c $< -I$(BICREPO)/include $(shell ncursesw6-config --cflags ) -o $@
+	g++ -Wall -fvisibility=default $(DBG) $(STD) -c $< -I$(BICREPO)/include $(shell ncursesw6-config --cflags ) -o $@
 
 $(BICREPO)/build/:
 	mkdir -p $(BICREPO)/build

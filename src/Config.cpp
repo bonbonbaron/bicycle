@@ -8,7 +8,7 @@
 #include "bicycle.h"
 #include "Personality.h"
 
-static void registerPortTypes( void* handle, const std::string& GAME_FP ) {
+static void registerPortTypes( void* handle ) {
   PortTypeRegistry::value_type* ports = extGrab<PortTypeRegistry::value_type>( handle, "ports" );
   int* numPorts = extGrab<int>( handle, "numPorts" );
 
@@ -17,7 +17,7 @@ static void registerPortTypes( void* handle, const std::string& GAME_FP ) {
   }
 }
 
-static void registerActions( void* handle, const std::string& GAME_FP ) {
+static void registerActions( void* handle ) {
   ActPkg* actions = extGrab<ActPkg>( handle, "actions" );
   const int* numActions = extGrab<int>( handle, "numActions" );
 
@@ -54,11 +54,10 @@ static void registerActions( void* handle, const std::string& GAME_FP ) {
   }
 }
 
-static void registerBlackboards() {
+static void registerBlackboards( void* handle ) {
 }
 
 void config( const std::string& gameName ) {
-  // TODO make sure this'll work
   constexpr std::string_view GAME_DIR{ "/usr/local/games/" };
   const std::string GAME_FP = GAME_DIR.data() + gameName + ".so";
   void* handle = dlopen( GAME_FP.c_str(), RTLD_LAZY | RTLD_GLOBAL | RTLD_NODELETE );
@@ -66,9 +65,9 @@ void config( const std::string& gameName ) {
     bicycle::die( "Couldn't find shared library " + GAME_FP + '\n' );
   }
 
-  registerPortTypes( handle, GAME_FP );
-  registerActions( handle, GAME_FP );
-  registerBlackboards(); // TODO #4:  get array of blackboards
+  registerPortTypes( handle );
+  registerActions( handle );
+  registerBlackboards( handle ); 
 
   dlclose( handle );
 }

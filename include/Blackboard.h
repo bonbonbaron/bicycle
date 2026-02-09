@@ -7,8 +7,6 @@
 using BbKey = std::string;
 using Blackboard = std::map<BbKey, std::any>;
 
-auto deepCopy( const Blackboard& rhs );
-
 class BlackboardRegistry : public std::map<std::string, std::shared_ptr<Blackboard>> {
   public:
     static auto getInstance() -> BlackboardRegistry&;
@@ -19,6 +17,4 @@ class BlackboardRegistry : public std::map<std::string, std::shared_ptr<Blackboa
     BlackboardRegistry& operator=( const BlackboardRegistry& ) = delete;
 };
 
-#define BB( _bbName_, ... ) \
-  auto _bbName_##Ptr = std::make_shared<Blackboard>( Blackboard { __VA_ARGS__ } );\
-  BlackboardRegistry::add( #_bbName_, _bbName_##Ptr );
+#define BB( _bbName_, ... ) auto _bbName_ = std::make_shared<Blackboard>( Blackboard { __VA_ARGS__ } );
