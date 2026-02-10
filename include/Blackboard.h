@@ -7,14 +7,14 @@
 using BbKey = std::string;
 using Blackboard = std::map<BbKey, std::any>;
 
-class BlackboardRegistry : public std::map<std::string, std::shared_ptr<Blackboard>> {
+class BlackboardRegistry : public std::map<std::string, Blackboard> {
   public:
     static auto getInstance() -> BlackboardRegistry&;
-    static void add( const std::string& name, const std::shared_ptr<Blackboard>& bb );
+    static void add( const BlackboardRegistry::value_type& val );
   private:
     BlackboardRegistry() = default;
     BlackboardRegistry( const BlackboardRegistry& rhs ) = delete;
     BlackboardRegistry& operator=( const BlackboardRegistry& ) = delete;
 };
 
-#define BB( _bbName_, ... ) auto _bbName_ = std::make_shared<Blackboard>( Blackboard { __VA_ARGS__ } );
+#define BB( _bbName_ )  { #_bbName_, _bbName_ }

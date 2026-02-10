@@ -9,7 +9,7 @@
 #include "Personality.h"
 
 static void registerPortTypes( void* handle ) {
-  PortTypeRegistry::value_type* ports = extGrab<PortTypeRegistry::value_type>( handle, "ports" );
+  auto* ports = extGrab<PortTypeRegistry::value_type>( handle, "ports" );
   int* numPorts = extGrab<int>( handle, "numPorts" );
 
   for (int i = 0; i < *numPorts; ++i ) {
@@ -18,7 +18,7 @@ static void registerPortTypes( void* handle ) {
 }
 
 static void registerActions( void* handle ) {
-  ActPkg* actions = extGrab<ActPkg>( handle, "actions" );
+  auto* actions = extGrab<ActPkg>( handle, "actions" );
   const int* numActions = extGrab<int>( handle, "numActions" );
 
   // Allow devs some room for ignorance of macros unfortunate inclusion of undesirable characters.
@@ -55,8 +55,16 @@ static void registerActions( void* handle ) {
 }
 
 static void registerBlackboards( void* handle ) {
+  auto bbs = extGrab<std::shared_ptr<std::map<std::string, Blackboard>>>( handle, "blackboards" );
+  if ( !(*bbs) || (*bbs)->size() == 0 ) {
+    bicycle::die( "Game has no blackboards." );
+  }
+  for ( const auto& pair : **bbs ) {
+    BlackboardRegistry::add( pair );
+  }
 }
 
+// We have to jump through some hoops to smuggle goods across the dynamically loaded library boundary.
 void config( const std::string& gameName ) {
   constexpr std::string_view GAME_DIR{ "/usr/local/games/" };
   const std::string GAME_FP = GAME_DIR.data() + gameName + ".so";

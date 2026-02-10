@@ -5,7 +5,7 @@ auto BlackboardRegistry::getInstance() -> BlackboardRegistry& {
   return registry;
 }
 
-void BlackboardRegistry::add( const std::string& name, const std::shared_ptr<Blackboard>& bb ){
+void BlackboardRegistry::add( const BlackboardRegistry::value_type& val ){
   auto& reg = getInstance();
-  reg[name] = bb;
+  reg.insert( val );
 }
