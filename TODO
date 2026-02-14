@@ -1,3 +1,29 @@
+goal: 
+  1. make action headers
+  2. auto-register actions
+  3. detect ports and their types used in actions
+  4. check for port type conflicts; bomb if so
+  5. if no conflicts exist, auto-register the port
+
+  1. auto-register BBs
+
+  1. CRUD ops for:
+    * entites
+      * bodies
+      * BBs
+      * personaltiies
+        * trees
+          * actions
+    * menus
+    * dialogues
+    * grids
+      * BGs
+
+OR...
+
+I could simply start making games and worry about the above later.
+
+
 ------------
 version 2.0:
 ------------
