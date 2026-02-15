@@ -42,6 +42,30 @@ class Camera {
     std::shared_ptr<Entity> _focus{};  // input is forwarded to this guy
 };
 
+template<typename T>
+class Matrix {
+
+  public:
+    Matrix(size_t r, size_t c) : rows(r), cols(c), data(r*c) {}
+    const size_t rows{};
+    const size_t cols{};
+
+    // Proxy row object
+    class Row {
+      T* row_data;
+      public:
+        Row(T* p) : row_data(p) {}
+        T& operator[](size_t col) { return row_data[col]; }
+        const T& operator[](size_t col) const { return row_data[col]; }
+    };
+
+    Row operator[](size_t row) { return Row(data.data() + row*cols); }
+  private:
+    std::vector<T> data{};
+};
+
+// Matrix usage: m[23][45] = 42;
+
 struct Environment {
   std::string bg;
   Dimensions bgDims{};

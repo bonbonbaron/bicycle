@@ -21,7 +21,7 @@ void Entity::onTimer( const std::string& timerId ) {
 }
 
 void Entity::onCollision( const int collisionType ) {
-  (*bb)["collsion"] = collisionType;
+  (*bb)["collsionType"] = collisionType;
   personality.trigger( "onCollision" );
 }
 
