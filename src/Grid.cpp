@@ -109,13 +109,6 @@ Grid::Grid( const std::string& gridName ) : Window() {
       throw std::runtime_error( BG_FP + " is empty." );
     }
 
-    // Get backround data/string
-    std::string str(size, '\0'); // construct string to stream size
-    bgFile.seekg(0);
-    if(bgFile.read(&str[0], size)) {
-      _env->bg = str;
-    }
-
     // Get background dimensions before pruning newlines.
     // TODO does line.length() include new lines?
     bgFile.seekg(0);
@@ -125,6 +118,21 @@ Grid::Grid( const std::string& gridName ) : Window() {
       if ( line.length() > _env->bgDims.w ) {
         _env->bgDims.w = line.length();
       }
+    }
+    _env->bgm = std::make_shared<Matrix<Tile>>( _env->bgDims.h, _env->bgDims.w );
+
+    // Get backround data/string
+    std::string str(size, '\0'); // construct string to stream size
+    bgFile.seekg(0);
+    if(bgFile.read(&str[0], size)) {
+      _env->bg = str;
+    }
+
+    // Convert bg string to bg matrix 
+    int i{};
+    for ( auto c : _env->bg ) {
+      (*_env->bgm)[i / _env->bgDims.w][i % _env->bgDims.w].symbol = c;
+      // TODO determine collision type of each character
     }
 
     // Prune newlines out. They'd mess up drawing.

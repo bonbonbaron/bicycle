@@ -66,7 +66,13 @@ class Matrix {
 
 // Matrix usage: m[23][45] = 42;
 
+struct Tile {
+  char symbol;
+  int type;
+};
+
 struct Environment {
+  std::shared_ptr<Matrix<Tile>> bgm;  // TODO try this out
   std::string bg;
   Dimensions bgDims{};
   std::map<std::string, std::shared_ptr<Entity>> fg{};

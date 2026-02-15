@@ -17,7 +17,7 @@ struct Position {
     y += rhs.y;
   }
 
-  auto operator+( const Position& rhs ) -> Position {
+  auto operator+( const Position& rhs ) const -> Position {
     Position pos;
     pos.x = x + rhs.x;
     pos.y = y + rhs.y;
