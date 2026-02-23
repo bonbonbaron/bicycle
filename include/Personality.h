@@ -46,7 +46,7 @@ class ActArg {
       }
       // Make sure the blackboard even has a value for the key.
       if ( !_bb->contains( key ) ) {
-        throw std::runtime_error( "blackbaord has no key named \'" + key + "\'." );
+        throw std::runtime_error( "blackboard has no key named \'" + key + "\'." );
       }
       // Return the value... FINALLY.
       return std::any_cast<T&>( _bb->at( key ) );

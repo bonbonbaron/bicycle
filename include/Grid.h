@@ -42,37 +42,7 @@ class Camera {
     std::shared_ptr<Entity> _focus{};  // input is forwarded to this guy
 };
 
-template<typename T>
-class Matrix {
-
-  public:
-    Matrix(size_t r, size_t c) : rows(r), cols(c), data(r*c) {}
-    const size_t rows{};
-    const size_t cols{};
-
-    // Proxy row object
-    class Row {
-      T* row_data;
-      public:
-        Row(T* p) : row_data(p) {}
-        T& operator[](size_t col) { return row_data[col]; }
-        const T& operator[](size_t col) const { return row_data[col]; }
-    };
-
-    Row operator[](size_t row) { return Row(data.data() + row*cols); }
-  private:
-    std::vector<T> data{};
-};
-
-// Matrix usage: m[23][45] = 42;
-
-struct Tile {
-  char symbol;
-  int type;
-};
-
 struct Environment {
-  std::shared_ptr<Matrix<Tile>> bgm;  // TODO try this out
   std::string bg;
   Dimensions bgDims{};
   std::map<std::string, std::shared_ptr<Entity>> fg{};
@@ -93,8 +63,6 @@ class Grid : public Window {
     std::shared_ptr<Environment> _env{};
 };
 
-
-
 // Provide yaml-cpp library with template candidate for Quirk's specific struct
 template<>
 struct YAML::convert<Grid> {
@@ -103,8 +71,6 @@ struct YAML::convert<Grid> {
     if (!node.IsMap()) {
       return false;
     }
-
-
     return true;
   }
 };   // Grid YML conversion
