@@ -1,3 +1,13 @@
+I'm finally opening my eyes I'd kept closed out of pride against the knowledge of the world; fostering the belief that I'm better, I'm smarter than them, I'm more gifted.
+To face the truth means to be open to humbling. To admit others are better, smarter, know more, faster, and beyond my grasp.
+The wisdom in God lifting up those who humble themselves is profound.
+
+So with that pontificating out of my system, let's talk about what i've learned so far:
+
+Archetypes: They have SoA with no holes, allowing for rapid processing. The reason it's SoA rather than AoS is because of parallelization opportunities and SIMD.
+            When an entity gains a new component, it migrates to another archetype; one that may or may not exist.
+            Allows trivial adding/removing of components; that wouldn't be the case with AoS.
+            
 goal: 
   1. make action headers
   2. auto-register actions

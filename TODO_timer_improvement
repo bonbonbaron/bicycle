@@ -1,0 +1,24 @@
+#include <arm_neon.h> // For NEON intrinsics
+#include <vector>
+
+std::vector<int32_t> timers(1000); // Assuming 32-bit counters in "frames" or ticks
+
+void updateTimers() {
+  // Vectorized decrement (process 4 at a time)
+  for (size_t i = 0; i < timers.size(); i += 4) {
+    int32x4_t vec = vld1q_s32(&timers[i]);
+    vec = vsubq_s32(vec, vdupq_n_s32(1)); // Decrement by 1
+    vst1q_s32(&timers[i], vec);
+
+    // Check for zero (vectorized)
+    uint32x4_t zeros = vceqq_s32(vec, vdupq_n_s32(0));
+    if (vaddvq_u32(zeros) > 0) { // If any are zero
+      for (size_t j = 0; j < 4; ++j) {
+        if (timers[i + j] <= 0) {
+          // Fire event for i + j
+          timers[i + j] = 0; // Or reset
+        }
+      }
+    }
+  }
+}
