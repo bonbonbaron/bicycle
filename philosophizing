@@ -1,0 +1,76 @@
+archetypes seem to present a problem in the area of swithcing things across entities too often.
+If I can implement 
+
+
+what do we need (and KISS)
+  Systems:
+  ========
+    timer system (frame-based to keep machine cool): separate timers from communication structs; lambdas can simplify mailbox structure     <----- WORK ON THIS SYTEM FIRST! Super important.
+    render system: includes BG, FG, and camera
+    collision system
+    motion system
+    motion+collision system
+    animation system (should this even be a system if it's timer-based?)
+    action system    (should this even be a system if it's timer-based?)
+    
+  Ecosystem for those systems:
+    1) those that run every frame (timer): thread 1
+    2) those that run on input, timer, and collision (all the rest): thread 2
+
+  Separation of presentation from processing: systems shouldn't know the presentation implementation
+    
+  Since there are so few of them, they should be allowed to talk to each other directly instead of pretending not to know who their "neighbors" are.
+  So they should be accessible from within the singleton holding them.
+
+
+  Components:
+  ===========
+    timers
+    collision  (xyz)
+    positions  (xyz)
+    siz        (xyz)
+    velocities (xyz)
+    animation source images and src rects
+    actions
+    images + colors
+
+    Systems should be allowed to grab from these global arrays at will.
+    They won't process simultaneously, to keep things simple.
+
+  However, the only case in which archetypes-- which my game may have only very few of-- will help is Body, Ghost, and Object:
+    
+    Body:
+      collision
+      position
+      size
+      animation
+      velocity
+      personality
+      timer
+
+Systems are categorized by three dichotomies:
+=============================================
+  Iterates over components   VS.    Targeted
+  Event-based / On-Demand    VS.    Periodic
+  Vectorized Sparse set      VS.    ordered set (only applies to iterables)
+
+Systems can be on both sides of the fence. Motion system can continuously move some entities while moving others on demand.
+       
+Doubts about animation and actions as systems:
+==============================================
+  PERIODIC ( these systems are inherit a virtual run() ):
+    motion: vectorized sparse set
+    timer:  vectorized sparse set
+    motion+collision-checking (for a duration of time): granular processing of swapped, ordered members (per layer)
+
+  EVENT-BASED / ON-DEMAND:
+    animation:                     targeted
+    move-once:                     targeted
+    move-once-and-collision-check: targeted
+    rendering:                     granular processing of swapped (expecting members on-screen multiple frames, warranting swapping), ordered members; DOES need to iterate, done on demand
+    sound:                         targeted
+  
+  So there's an unordered, sparse system, and an ordered system, both inheriting from system.
+
+    
+So things are getting tangled a bit. I need to draw this on paper for a clear picture of what's going on.
