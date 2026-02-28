@@ -1,31 +1,21 @@
 #pragma once
-#include <thread>
-#include <chrono>
-#include <atomic>
-#include <iostream>
-#include <functional>
+#include "c/System.h"
 
-using Clock = std::chrono::steady_clock;
-using Duration = Clock::duration;
-using Callback = std::function<void()>;
+constexpr unsigned long MAX_NUM_TIMERS{1024};
 
-class Timer {
+class Timer : public System {
   public:
-    Timer() = default;
-    Timer( Callback&& callback, const Duration interval = std::chrono::milliseconds(0), const bool repeat = false, const int reps = -1 );
-    ~Timer();
+    Timer();
 
-    void stop();
-    void pause();
-    void resume();
-    void setInterval( const Duration interval );  // lets you speed up or slow down its pace
+    // Overrides
+    void run() override;
+    void enable( const Entity entity ) override;  // turns 0 to 1 in time decrementer
+    void disable( const Entity entity ) override;
+    void pause( const Entity entity ) override;
 
+    // Timer-specific functions
+    
   private:
-    Duration _interval{};
-    int _reps{-1};
-    std::atomic<bool> _running{true};
-    Callback _callback{};
-    int _id{};
-    bool _repeat{ false };
-    std::jthread _thread;
+    std::bitset _timersUsed{MAX_NUM_TIMERS};
+    std::array<unsigned, MAX_NUM_TIMERS> _decrementers;
 };
