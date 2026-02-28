@@ -2,7 +2,6 @@
 #include "Window.h"
 #include <array>
 #include <memory>
-#include <cursesw.h>
 #include <mutex>
 
 constexpr int MAX_NUM_WINDOWS{50};

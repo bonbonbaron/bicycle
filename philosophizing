@@ -62,6 +62,7 @@ Doubts about animation and actions as systems:
     motion: vectorized sparse set
     timer:  vectorized sparse set
     motion+collision-checking (for a duration of time): granular processing of swapped, ordered members (per layer)
+    animation of BG tiles
 
   EVENT-BASED / ON-DEMAND:
     animation:                     targeted
