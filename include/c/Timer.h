@@ -1,29 +1,36 @@
 #pragma once
 #include "c/System.h"
+#include <array>
 #include <string>
+#include <bitset>
 
 constexpr unsigned long MAX_NUM_TIMERS{1024};
 
 struct TimeoutMsg {
   Entity entity{};
-  std::string timeoutType;
+  std::string val;
+  int nReps{};
+  unsigned full{};
 };
 
 class Timer : public System {
   public:
-    Timer();
+    Timer() = default;
 
     // Overrides
     void run() override;
-    void enable( const Entity entity ) override;  // turns 0 to 1 in time decrementer
-    void disable( const Entity entity ) override;
 
     // Timer-specific functions
+    auto start( const unsigned timeMs, const Entity entity, const std::string& timeoutMsg, const int nReps = 0 ) -> unsigned;
+    void stop( unsigned timerId );
+    void pause( const unsigned timerId );
+    void unpause( const unsigned timerId );
+    void setDuration( const unsigned timerId, const unsigned durMs );
     
   private:
-    std::bitset _timersUsed{MAX_NUM_TIMERS};
-    std::array<unsigned, MAX_NUM_TIMERS> _decrementers;
-    // There's supposed to be an onTimer() entrypoint I haven't deeply considered yet.
+    std::bitset<MAX_NUM_TIMERS> _availableTimers{ ~std::bitset<MAX_NUM_TIMERS>{} }; // 1 = unused
+    std::array<unsigned, MAX_NUM_TIMERS> _decrementers{};
+    std::array<TimeoutMsg, MAX_NUM_TIMERS> _msgs{};
 
     auto findAvailableTimer() -> unsigned;
 };

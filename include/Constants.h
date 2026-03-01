@@ -2,6 +2,10 @@
 #include <string>
 #include <string_view>
 
+constexpr unsigned FRAMES_PER_SECOND{ 30 };
+constexpr double MILLISECONDS_PER_FRAME{ 1e3 / FRAMES_PER_SECOND };
+constexpr double FRAMES_PER_MILLISECOND{ 1.0 / MILLISECONDS_PER_FRAME };
+
 constexpr std::string_view SUFFIX{ ".yml" };
 const std::string_view CFG_DIR{ "./config/" };
 

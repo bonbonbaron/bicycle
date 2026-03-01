@@ -1,5 +1,5 @@
 Finish fleshing out Timer and test. First make World::set<T>( const unsigned idx, const T& val );
-
+I'm gonna fly with std::map until I see any bottlenecks related to it.
 
 ------------
 version 2.0:

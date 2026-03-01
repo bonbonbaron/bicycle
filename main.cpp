@@ -1,24 +1,41 @@
 #include <iostream>
 #include "m/World.h"
+#include "c/Timer.h"
+#include <chrono>
+#include <thread>
+#include "Constants.h"
 
 using namespace std;
 
-void f() {
-  auto& times = World::get<Time>();
-  times[253] = 111;
-  times[247] = 111;
-  times[251] = 111;
-  times[250] = 111;
-}
+int main()
+{
+  using namespace std::chrono_literals;
 
+  std::chrono::milliseconds interval(static_cast<int>(MILLISECONDS_PER_FRAME));
+  Timer t;
+  auto timerId = t.start( 500, 1, "digidigi", -1 );
 
-int main() {
-  f();
-  auto& t = World::get<Time>( 255 );
-  t = 12345678;
-  const auto& times = World::get<Time>();
-  for ( const auto& t : times ) {
-    std::cout << "time is " << t << '\n';
+  int i = 0; 
+  while (true)
+  {
+    auto start = std::chrono::steady_clock::now();
+    auto elapsed = std::chrono::steady_clock::now() - start;
+    t.run();
+    if (elapsed < interval) {
+      std::this_thread::sleep_for(interval - elapsed);
+    }
+    else {
+      std::cout << "went overboard\n";
+    }
+    if (++i == 100 ) {
+      t.pause(timerId);
+    }
+    else if ( i == 200 ) {
+      t.unpause(timerId);
+      t.setDuration( timerId, 333 );
+    }
+    else if ( i == 300 ) {
+      t.stop( timerId );
+    }
   }
-  return 0;
 }

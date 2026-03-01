@@ -57,6 +57,14 @@ class World {  // The name "World" is too dramatic. It doesn't include BBs. I'll
     }
 
     template <typename T>
+    static void set( const unsigned idx, const T& val ) {
+      auto& world = getInstance();
+      auto& arr = world.get( getTypeTag<T>() );
+      auto& t_arr = std::get< std::array< T, NUM_SUPPORTED_ENTITIES > >( arr );
+      t_arr.at( idx ) = val;
+    }
+
+    template <typename T>
     static auto get() -> std::array<T, NUM_SUPPORTED_ENTITIES>& {
       auto& world = getInstance();
       auto& arr = world.get( getTypeTag<T>() );
@@ -73,7 +81,7 @@ class World {  // The name "World" is too dramatic. It doesn't include BBs. I'll
 
     auto get( const void* type ) -> ArrayVar& {
       assert( _m.contains( type ) );
-      return _m[ type ];
+      return _m.at( type );
     }
 
     // Variadic template - initialize any number of types (including zero)
