@@ -10,7 +10,6 @@ class System {
     virtual void run() = 0;
     virtual void enable( const Entity entity ) = 0;
     virtual void disable( const Entity entity ) = 0;
-    virtual void pause( const Entity entity ) = 0;
 
   private:
     std::string _id;                 
