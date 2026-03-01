@@ -57,10 +57,18 @@ class World {  // The name "World" is too dramatic. It doesn't include BBs. I'll
     }
 
     template <typename T>
+    static auto get() -> std::array<T, NUM_SUPPORTED_ENTITIES>& {
+      auto& world = getInstance();
+      auto& arr = world.get( getTypeTag<T>() );
+      return std::get< std::array< T, NUM_SUPPORTED_ENTITIES > >( arr );
+    }
+
+    template <typename T>
     static auto get( const Entity entity ) -> T& {
       auto& world = getInstance();
-      const auto key = getTypeTag<T>();
-      world.get( key );
+      auto& arr = world.get( getTypeTag<T>() );
+      auto& castArr = std::get< std::array< T, NUM_SUPPORTED_ENTITIES > >( arr );
+      return castArr.at(entity);
     }
 
     auto get( const void* type ) -> ArrayVar& {
