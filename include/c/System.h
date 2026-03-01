@@ -1,5 +1,4 @@
 #pragma once
-#include "m/World.h"
 
 class System {
   public:

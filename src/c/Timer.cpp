@@ -4,15 +4,13 @@
 #include <iostream> // TODO delete
 
 void Timer::run() {
-  auto& times = World::get<Time>();
-  
   for ( unsigned i = 0; i < MAX_NUM_TIMERS; ++i ) {
-    times[i] -= _decrementers[i];
-    if ( _decrementers[i] > 0 && times[i] == 0 ) {
-      // TODO activity.onTimer( _msgs[i] );
-      auto& msg = _msgs[i];
+    _times.at(i) -= _decrementers.at(i);
+    if ( _decrementers.at(i) > 0 && _times.at(i) == 0 ) {
+      // TODO activity.onTimer( _msgs.at(i) );
+      auto& msg = _msgs.at(i);
       // Unconditionally reset the timer to avoid complex branching.
-      times[i] = msg.full;
+      _times.at(i) = msg.full;
       std::cout << "Timer " << msg.val << " fired.\n";
       msg.nReps -= ( msg.nReps > 0 );
       if ( msg.nReps == 0 ) {  // -1 repeats forever til disabled
@@ -23,11 +21,11 @@ void Timer::run() {
 }
 
 void Timer::pause( const unsigned timerId ) {
-  _decrementers[timerId] = 0;
+  _decrementers.at(timerId) = 0;
 }
 
 void Timer::unpause( const unsigned timerId ) {
-  _decrementers[timerId] = 1;
+  _decrementers.at(timerId) = 1;
 }
 
 auto Timer::start( const unsigned timeMs, const Entity entity, const std::string& timeoutMsg, const int nReps ) -> unsigned {
@@ -41,9 +39,9 @@ auto Timer::start( const unsigned timeMs, const Entity entity, const std::string
     // frames/sec * sec/msec * msec = frames
     unsigned nFrames{ (FRAMES_PER_SECOND * timeMs) / 1000 };
 #endif
-    World::set<Time>( timerId, nFrames );  
-    _decrementers[ timerId ] = 1;
-    _msgs[ timerId ] = TimeoutMsg{ entity, timeoutMsg, nReps, nFrames };
+    _times.at( timerId ) = nFrames;
+    _decrementers.at(timerId) = 1;
+    _msgs.at(timerId)  = TimeoutMsg{ entity, timeoutMsg, nReps, nFrames };
   }
   return timerId;
 }

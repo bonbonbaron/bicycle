@@ -1,6 +1,5 @@
 #pragma once
 #include <typeindex>
-// #include <string>
 #include <variant>
 #include <array>
 #include <unordered_map>
@@ -28,13 +27,10 @@ struct Image {
   unsigned char data[];
 };
 
-using Time = unsigned;
-
 using ArrayVar = std::variant<
   std::array<Position, NUM_SUPPORTED_ENTITIES>,
   std::array<Size, NUM_SUPPORTED_ENTITIES>,
-  std::array<Image, NUM_SUPPORTED_ENTITIES>,
-  std::array<Time, NUM_SUPPORTED_ENTITIES>
+  std::array<Image, NUM_SUPPORTED_ENTITIES>
 >;
 
 template <typename T>
@@ -92,7 +88,7 @@ class World {  // The name "World" is too dramatic. It doesn't include BBs. I'll
 
     // Convenience: initialize all known types in one call
     void initialize_all() {
-      initialize<Position, Size, Image, Time>();
+      initialize<Position, Size, Image >();
     }
 
     // Optional: check whether a type is already initialized

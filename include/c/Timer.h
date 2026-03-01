@@ -4,6 +4,8 @@
 #include <string>
 #include <bitset>
 
+using Entity = unsigned;
+
 constexpr unsigned long MAX_NUM_TIMERS{1024};
 
 struct TimeoutMsg {
@@ -31,6 +33,6 @@ class Timer : public System {
     std::bitset<MAX_NUM_TIMERS> _availableTimers{ ~std::bitset<MAX_NUM_TIMERS>{} }; // 1 = unused
     std::array<unsigned, MAX_NUM_TIMERS> _decrementers{};
     std::array<TimeoutMsg, MAX_NUM_TIMERS> _msgs{};
-
     auto findAvailableTimer() -> unsigned;
+    std::array<unsigned, MAX_NUM_TIMERS> _times{};
 };
