@@ -21,6 +21,7 @@ class Timer : public System {
 
     // Overrides
     void run() override;
+    // BEcause timer has so little in common with other systems, i'm thjinkng screw the system class.
 
     // Timer-specific functions
     auto start( const unsigned timeMs, const Entity entity, const std::string& timeoutMsg, const int nReps = 0 ) -> unsigned;
