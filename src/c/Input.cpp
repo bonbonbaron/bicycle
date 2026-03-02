@@ -1,103 +1,16 @@
-#include <bitset>
-#include <cstdint>
-#include <thread>
-#include <atomic>
-#include <mutex>
-#include <iostream>
-#include <string>
-#include <array>
-#include <vector>
-#include <fcntl.h>
-#include <unistd.h> // For read/write
-#include <poll.h>
-#include <linux/input.h>
-#include <string_view>
-#include <libevdev/libevdev.h>
-#include <dirent.h>
-#include <sys/types.h>
+#include "c/Input.h"
 
 // ────────────────────────────────────────────────
 //  Logical keys – our unified, cross-platform key namespace
 //  Based on USB HID Usage IDs (Keyboard page 0x07)
 // ────────────────────────────────────────────────
 
-enum class LogicalKey : uint8_t {
-    // Letters (HID 0x04–0x1D)  <-- these will be treated as case-insensitive
-    A ,   B ,   C ,   D ,   E ,
-    F ,   G ,   H ,   I ,   J ,
-    K ,   L ,   M ,   N ,   O ,
-    P ,   Q ,   R ,   S ,   T ,
-    U ,   V ,   W ,   X ,   Y ,
-    Z ,
-
-    // Numbers (HID 0x1E–0x27)
-    Key1 , Key2 , Key3 , Key4 , Key5 ,
-    Key6 , Key7 , Key8 , Key9 , Key0 ,
-
-    // Common punctuation / symbols
-    Enter     ,
-    Escape    ,
-    Tab       ,
-    Space     ,
-
-    // Modifiers
-    LeftCtrl ,
-    LeftShift ,
-    LeftAlt   ,     // Left Option on macOS
-    LeftMeta  ,     // Left Win / Left Cmd
-    RightCtrl ,
-    RightShift,
-    RightAlt  ,     // Right Option / AltGr
-    RightMeta ,     // Right Win / Right Cmd
-
-    COUNT     // ← use this to know how many we defined (not a real key)
-};  // enum LogicalKey
-
-// We use these values directly as bit indices
-using KeyState = std::bitset<static_cast<long unsigned int>(LogicalKey::COUNT)>;  // C++ is hyper-autistic.
-
-// ────────────────────────────────────────────────
-//  Main listener class
-// ────────────────────────────────────────────────
-constexpr std::string_view DEV_FP{ "/dev/input/event2" };
-class KeyboardListener {
-  public:
-    static auto getInstance() -> KeyboardListener&;
-    void listen();
-  private:
-    KeyboardListener();
-    KeyboardListener(const KeyboardListener&) = delete;
-    KeyboardListener operator=(const KeyboardListener&) = delete;
-    KeyboardListener(const KeyboardListener&&) = delete;
-    KeyboardListener operator=(const KeyboardListener&&) = delete;
-
-    int _fd{-1};
-    auto convertCodeToLogicalInt(int code) -> LogicalKey;
-
-    // Most importantly...
-    KeyState _keyState{};
-
-    // To support not knowing where keyboard lives...
-    struct Device {
-      int fd = -1;
-      struct libevdev* dev = nullptr;
-      std::string path;
-    };
-
-    std::vector<Device> devices_;
-
-    void discoverPotentialKeyboards();
-    // void close_all();
-    void reopenIfNeeded();  // optional: call every ~5s for hot-switch support
-
-};  // class KeyboardListener
-
 // Get singleton
-auto KeyboardListener::getInstance() -> KeyboardListener& {
-  static KeyboardListener kbListener;
+auto Input::getInstance() -> Input& {
+  static Input kbListener;
   return kbListener;
 }
-void KeyboardListener::discoverPotentialKeyboards()
+void Input::discoverPotentialKeyboards()
 {
   // close_all();
 
@@ -131,7 +44,7 @@ void KeyboardListener::discoverPotentialKeyboards()
       libevdev_has_event_type(dev, EV_KEY);
 
     if (isKeyboard) {
-      devices_.push_back({fd, dev, path});
+      _devices.push_back({fd, dev, path});
       std::cout << "Keyboard listener attached: " << libevdev_get_name(dev) << " → " << path << "\n";
     } 
     else {
@@ -143,18 +56,23 @@ void KeyboardListener::discoverPotentialKeyboards()
 }
 
 // Constructor
-KeyboardListener::KeyboardListener() {
+Input::Input() {
   discoverPotentialKeyboards();
 }
 
+void Input::listen() {
+  auto& kbl = Input::getInstance();
+  kbl._listen();
+}
+
 // Check dev file for keyboard events
-void KeyboardListener::listen() {
+void Input::_listen() {
   // Constants
   constexpr unsigned VAL_KEY_UP{0};
   constexpr unsigned VAL_KEY_DOWN{1};
   constexpr unsigned VAL_KEY_REPEAT{2};
 
-  if (devices_.empty()) {
+  if (_devices.empty()) {
     std::cout << "devices is empty\n";
     // Optional: re-scan every few seconds if nothing is connected yet
     static int counter = 0;
@@ -164,47 +82,30 @@ void KeyboardListener::listen() {
     return;
   }
 
-  std::vector<pollfd> pfds;  // pfd == polled file descriptor
-  for (auto& d : devices_) {
-    pfds.push_back({d.fd, POLLIN, 0});
-  }
-
-  int ready = poll(pfds.data(), pfds.size(), -1);  // non-blocking
-  if (ready <= 0) {
-    std::cerr << "not ready to poll\n";
-    return;
-  }
-
   // Check for key-up-or-down events.
-  struct pollfd pfd = {_fd, POLLIN, 0};
-  input_event ev{};
   auto oldKeystate = _keyState;
-  std::cout << "about to poll\n";
-  for ( auto& pfd : pfds ) {
-    std::cout << "checking device\n";
-    if (pfd.revents & POLLIN) {
-      input_event ev{};
-      std::cout << "polling\n";
-      if (read(_fd, &ev, sizeof(ev)) == sizeof(ev)) {
-        std::cout << "hearing " << ev.code << '\n';
-        // If it's not a key event, we're not interested.
-        if (ev.type != EV_KEY) {  // TODO what about mouse movements? Is there one for that?
-          continue;
-        }
-        // Get key's index in bitset.
-        auto lk = convertCodeToLogicalInt(ev.code);
-        // Skip if we don't support this key.
-        if (lk != LogicalKey::COUNT) {
-          continue;
-        }
-        if ( ev.value == VAL_KEY_DOWN ) {
-          _keyState.set( static_cast<size_t>(lk), true );
-          std::cout << "down on " << ev.code << '\n';
-        }
-        if ( ev.value == VAL_KEY_UP ) {
-          _keyState.set( static_cast<size_t>(lk), false );
-          std::cout << "up on " << ev.code << '\n';
-        }
+  input_event ev{};
+  for ( unsigned i = 0; i < _devices.size(); ++i ) {
+    input_event ev{};
+    // power through all the events currently queued on this device
+    while (read(_devices.at(i).fd, &ev, sizeof(ev)) == sizeof(ev)) {
+      // If it's not a key event, we're not interested.
+      if (ev.type != EV_KEY || ev.value == VAL_KEY_REPEAT ) {  // TODO what about mouse movements? Is there one for that?
+        continue;
+      }
+      // Get key's index in bitset.
+      auto lk = convertCodeToLogicalInt(ev.code);
+      // Skip if we don't support this key.
+      if (lk == LogicalKey::COUNT) {
+        continue;
+      }
+      if ( ev.value == VAL_KEY_DOWN ) {
+        _keyState.set( static_cast<size_t>(lk), true );
+        std::cout << "down on " << ev.code << '\n';
+      }
+      if ( ev.value == VAL_KEY_UP ) {
+        _keyState.set( static_cast<size_t>(lk), false );
+        std::cout << "up on " << ev.code << '\n';
       }
     }
   }
@@ -219,10 +120,9 @@ void KeyboardListener::listen() {
 // Platform implementations (mapping native → LogicalKey)
 // ────────────────────────────────────────────────
 
-#include <linux/input.h>   // KEY_A, KEY_LEFTCTRL, etc.
 
 // Linux evdev / input-event-codes.h uses its own set (often close to USB HID)
-auto KeyboardListener::convertCodeToLogicalInt(int code) -> LogicalKey {
+auto Input::convertCodeToLogicalInt(int code) -> LogicalKey {
   switch (code)
   {
     case KEY_A: return LogicalKey::A;
@@ -280,15 +180,3 @@ auto KeyboardListener::convertCodeToLogicalInt(int code) -> LogicalKey {
     default: return LogicalKey::COUNT;
   }
 }  // Native key to LogicalKey converter
-
-int main() {
-  auto& input = KeyboardListener::getInstance();
-  std::cout << "starting\n";
-  while (true) {
-    std::cout << "iterating\n";
-    input.listen();
-    std::this_thread::sleep_for( std::chrono::milliseconds(250) );
-  }
-  std::cout << "\nDone.\n";
-  return 0;
-}

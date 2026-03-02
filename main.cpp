@@ -1,6 +1,7 @@
 #include <iostream>
 #include "m/World.h"
 #include "c/Timer.h"
+#include "c/Input.h"
 #include <chrono>
 #include <thread>
 #include "Constants.h"
@@ -20,12 +21,9 @@ int main()
     auto start = std::chrono::steady_clock::now();
     auto elapsed = std::chrono::steady_clock::now() - start;
 
-    // Keyboard events
-    kb.platform_pump();                 // ← THIS is what feeds push_event
-    kb.process_all([](const KeyEvent& e) { /* your bit-toggle logic here */ });
-
     // Timer stuff
     t.run();
+    Input::listen();
 
     // General loop-regulating
     if (elapsed < interval) {
