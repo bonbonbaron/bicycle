@@ -4,6 +4,11 @@
 #include <iostream> // TODO delete
 
 void Timer::run() {
+  auto& t = Timer::getInstance();
+  t.run();
+}
+
+void Timer::_run() {
   for ( unsigned i = 0; i < MAX_NUM_TIMERS; ++i ) {
     _times.at(i) -= _decrementers.at(i);
     if ( _decrementers.at(i) > 0 && _times.at(i) == 0 ) {
