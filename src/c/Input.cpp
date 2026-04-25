@@ -109,12 +109,12 @@ void Input::_listen() {
       }
     }
   }
-  // Send new events, bundled up in a single bitset, to activity system.
+  // Send new events, bundled up in a single bitset, to activity SYSTEM.
   if ( _keyState != oldKeystate ) {
     // We don't have to know who has focus. Activity should know.
     // TODO activity.onInput( _keyState );  
   }
-}
+}  // Input::listen()
 
 // ────────────────────────────────────────────────
 // Platform implementations (mapping native → LogicalKey)

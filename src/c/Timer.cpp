@@ -61,7 +61,7 @@ void Timer::setDuration( unsigned timerId, unsigned durMs ) {
 }
 
 auto Timer::findAvailableTimer() -> unsigned {
-  const auto idx = _availableTimers._Find_first();
-  _availableTimers.set( idx, 0 );
+  const auto idx = _availableTimers._Find_first();  // _Find_first() is a g++ extension. Lucky me.
+  _availableTimers.set( idx, false );
   return idx;
 }

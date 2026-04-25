@@ -1,6 +1,6 @@
-#include "ColorPalette.h"
-#include "Menu.h"
-#include "WindowManager.h"
+#include "v/ColorPalette.h"
+#include "v/Menu.h"
+#include "c/WindowManager.h"
 
 #include <cassert>
 #include <algorithm>

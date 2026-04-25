@@ -2,7 +2,7 @@
 #include <string>
 #include <mutex>
 
-#include "WindowManager.h"
+#include "c/WindowManager.h"
 
 namespace bicycle {
   auto isInit() -> bool;

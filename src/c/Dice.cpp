@@ -1,4 +1,4 @@
-#include "Dice.h"
+#include "c/Dice.h"
 
 Dice::Dice( const int min, const int max ) : _e1(_r()), _uniform_dist( min, max ) {}
 

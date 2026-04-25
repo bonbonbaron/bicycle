@@ -1,4 +1,4 @@
-#include "ColorPalette.h"
+#include "v/ColorPalette.h"
 
 void ColorPalette::init() {
   init_pair( BLACK, COLOR_BLACK, COLOR_BLACK );

@@ -6,7 +6,17 @@
 #include "Config.h"
 #include "Constants.h"
 #include "bicycle.h"
-#include "Personality.h"
+#include "m/Personality.h"
+
+/* These static functions act like the video game console.
+ * The "game cartridge," or shared object file, gets dynamically
+ * linked in at runtime. That linkage entails the following:
+ *
+ *  1) port types (not networking ports; blackboard ports)
+ *  2) blackboards
+ *  3) actions (i had impl'd that before and then deleted it; need to figure 
+ *              out why and where I was taking that idea instead)
+ */
 
 static void registerPortTypes( void* handle ) {
   auto* ports = extGrab<PortTypeRegistry::value_type>( handle, "ports" );
@@ -14,43 +24,6 @@ static void registerPortTypes( void* handle ) {
 
   for (int i = 0; i < *numPorts; ++i ) {
     PortTypeRegistry::add( ports[i] );
-  }
-}
-
-static void registerActions( void* handle ) {
-  auto* actions = extGrab<ActPkg>( handle, "actions" );
-  const int* numActions = extGrab<int>( handle, "numActions" );
-
-  // Allow devs some room for ignorance of macros unfortunate inclusion of undesirable characters.
-  const std::string ILLEGAL_CHARS{ "\", " };
-
-  for ( int i = 0 ; i < *numActions; ++i ) { 
-    std::vector<BbKey> dstPorts;
-    std::string& srcPorts = actions[i].ports;
-    // Kind of like null-terminated strings, but it's an empty-string-terminated array.
-    size_t start = srcPorts.find_first_not_of( ILLEGAL_CHARS );
-    if ( start != std::string::npos ) {
-      size_t end   = srcPorts.find_first_of( ILLEGAL_CHARS, start );
-      for ( ;; ) {
-        if ( end == std::string::npos ) {
-          dstPorts.emplace_back( srcPorts, start );
-          break;
-        }
-        assert( end > start );
-        dstPorts.emplace_back( srcPorts, start, end - start );
-        if ( start == std::string::npos ) {
-          break;
-        }
-        start = srcPorts.find_first_not_of( ILLEGAL_CHARS, end );
-        if ( start == std::string::npos ) {
-          break;
-        }
-        end   = srcPorts.find_first_of( ILLEGAL_CHARS, start );
-      } 
-    }
-    auto action = std::make_shared<Action>( actions[i].func, dstPorts );
-    std::pair< std::string, ActionPtr > pair{ actions[i].name, action };
-    ActionRegistry::add( pair );
   }
 }
 
@@ -74,7 +47,7 @@ void config( const std::string& gameName ) {
   }
 
   registerPortTypes( handle );
-  registerActions( handle );
+  // TODO: registerActions( handle );
   registerBlackboards( handle ); 
 
   dlclose( handle );

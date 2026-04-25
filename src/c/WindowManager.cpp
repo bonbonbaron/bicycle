@@ -1,4 +1,4 @@
-#include "WindowManager.h"
+#include "c/WindowManager.h"
 
 auto WindowManager::back() const -> const std::shared_ptr<Window> {
   if ( _population > 0 ) {

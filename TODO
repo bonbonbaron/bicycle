@@ -4,6 +4,8 @@ Input  outputs the following in a single struct:
   # frames since last key event
 Activity
 
+It looks like I changed the way actions were going to be implemented. I got rid of registerActions() for some reason; obviously I should create them game-side, but I don't recall how that gets shipped across the linking layer. Maybe I shouldn't worry too much about that now and focus instead on how actions will look in the first place. I'd been focused on timer and input-- ahh, two fundamentals -- before. Maybe I should turn to that whiteboard in my garage for clues on what I'd been thinking before.
+
 ------------
 version 2.0:
 ------------

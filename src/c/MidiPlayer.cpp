@@ -1,5 +1,5 @@
 #include <iostream>
-#include "MidiPlayer.h"
+#include "c/MidiPlayer.h"
 
 MidiPlayer::MidiPlayer() {
 

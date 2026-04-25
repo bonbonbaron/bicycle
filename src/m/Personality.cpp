@@ -1,4 +1,4 @@
-#include "Personality.h"
+#include "m/Personality.h"
 
 void ActArg::setBlackboard( std::shared_ptr<Blackboard> bb ) {
   _bb = bb;

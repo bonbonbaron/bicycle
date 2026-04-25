@@ -1,4 +1,4 @@
-#include "RenderSystem.h"
+#include "c/RenderSystem.h"
 
 RenderSystem::RenderSystem() : System<Image>( "Image" ) {}
 
