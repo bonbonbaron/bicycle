@@ -14,11 +14,11 @@ class Bar {
   private:
     std::shared_ptr<unsigned> _curr{};
     unsigned _max{};
-    int _x{};
-    int _y{};
-    int _len{};
+    unsigned int _x{};
+    unsigned int _y{};
+    unsigned int _len{};
     // constants
-    const int ONE_THIRD_MAX_BAR_LENGTH{ _len / 3};  // red threshold
-    const int TWO_THIRDS_BAR_LENGTH{ static_cast<int>(2 * ONE_THIRD_MAX_BAR_LENGTH) }; // yellow threshold
+    const unsigned int ONE_THIRD_MAX_BAR_LENGTH{ _len / 3};  // red threshold
+    const unsigned int TWO_THIRDS_BAR_LENGTH{ 2 * ONE_THIRD_MAX_BAR_LENGTH }; // yellow threshold
 };
 

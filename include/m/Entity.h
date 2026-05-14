@@ -5,28 +5,6 @@
 
 #include <memory>
 
-enum class EntityStatus {
-  HIGHLIGHTED,
-  SELECTED,
-};
-
-struct Entity {
-  std::string name;
-
-  Body body{};
-  Personality personality{};
-  std::shared_ptr<Blackboard> bb{};  // this is shared with action nodes
-  unsigned int flags;
-
-  void validate();
-
-  // The three primary reactions. Otherwise, there's no way to initiate action in an Entity except manually.
-  void onInput( const int input );
-  void onTimer( const std::string& timerId );
-  void onCollision( const int collisionType );
-};
-
-
 // Provide yaml-cpp library with template candidate for Quirk's specific struct
 template<>
 struct YAML::convert<Entity> {

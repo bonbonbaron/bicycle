@@ -1,8 +1,16 @@
-Input  outputs the following in a single struct:
-  Bitset of buttons pressed
-  Bitset of delta buttons
-  # frames since last key event
-Activity
+NOW
+===
+  Get reorg'd things to compile again. Menu's failing to build now. I'm trying to make Entity an int, so I have to
+    figure out first what the heck I was thinking when I put shared pointers to Entities as MenuItem.
+  Input  outputs the following in a single struct:
+    Bitset of buttons pressed
+    Bitset of delta buttons
+    # frames since last key event ( i can make a constexpr convert millis to frames )
+  Activity
+
+FUTURE DIRECTION:
+=================
+  Input and Timer feed Activity
 
 It looks like I changed the way actions were going to be implemented. I got rid of registerActions() for some reason; obviously I should create them game-side, but I don't recall how that gets shipped across the linking layer. Maybe I shouldn't worry too much about that now and focus instead on how actions will look in the first place. I'd been focused on timer and input-- ahh, two fundamentals -- before. Maybe I should turn to that whiteboard in my garage for clues on what I'd been thinking before.
 

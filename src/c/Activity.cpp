@@ -1,8 +1,4 @@
-#include "m/Entity.h"
-
-void Entity::validate() {
-  personality.validate();
-}
+#include "c/Activity.h"
 
 // HYPOTHESIS: Entities have only three ways of being activated: input, timers, and collisions.
 
@@ -25,3 +21,6 @@ void Entity::onCollision( const int collisionType ) {
   personality.trigger( "onCollision" );
 }
 
+void Entity::validate() {
+  personality.validate();
+}

@@ -54,8 +54,7 @@ using KeyState = std::bitset<static_cast<long unsigned int>(LogicalKey::COUNT)>;
 class Input {
   public:
     static auto getInstance() -> Input&;
-    void _listen();
-    static void listen();
+    void listen();   // this is called by the Input instance itself
   private:
     Input();
     Input(const Input&) = delete;

@@ -6,12 +6,11 @@
 #include <functional>
 
 #include "Window.h"
-#include "Entity.h"
 
 static const std::string CURSOR{ " > " };
 static constexpr long unsigned int CURSOR_WIDTH{ 3 + ( WINDOW_PADDING / 2 )};
 
-using MenuItem = std::shared_ptr<Entity>;
+using MenuItem = std::string;
 
 class Menu : public Window {
   public:

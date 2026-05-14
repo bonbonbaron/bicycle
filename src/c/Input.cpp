@@ -60,13 +60,8 @@ Input::Input() {
   discoverPotentialKeyboards();
 }
 
-void Input::listen() {
-  auto& kbl = Input::getInstance();
-  kbl._listen();
-}
-
 // Check dev file for keyboard events
-void Input::_listen() {
+void Input::listen() {
   // Constants
   constexpr unsigned VAL_KEY_UP{0};
   constexpr unsigned VAL_KEY_DOWN{1};

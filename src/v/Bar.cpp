@@ -13,7 +13,7 @@ Bar::Bar(
   _y( y ),
   _len( len ),
   ONE_THIRD_MAX_BAR_LENGTH( _len / 3),  // red threshold
-  TWO_THIRDS_BAR_LENGTH( static_cast<int>(2 * ONE_THIRD_MAX_BAR_LENGTH) ) {} // yellow threshold
+  TWO_THIRDS_BAR_LENGTH( 2 * ONE_THIRD_MAX_BAR_LENGTH ) {} // yellow threshold
 
 void Bar::setPos( const int x, const int y ) {
   _x = x;

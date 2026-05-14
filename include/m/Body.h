@@ -1,6 +1,6 @@
 #pragma once
 #include <string>
-#include "ColorPalette.h"
+#include "v/ColorPalette.h"
 #include "Config.h"
 #include <yaml-cpp/node/convert.h>
 struct Position {
