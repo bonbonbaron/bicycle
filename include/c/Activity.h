@@ -15,6 +15,12 @@ class Activity {
     static void onInput( const InputState& input );  // straightforward feeding to entities that can handle input.
     static void onTimer( const TimerId timerIdx );  // TODO: timer ID should map to a quirk.
     static void onCollision( const int collisionType );  // TODO
+  private:
+    Activity() = default;
+    Activity(const Activity&) = delete;
+    Activity operator=(const Activity&) = delete;
+    Activity(const Activity&&) = delete;
+    Activity operator=(const Activity&&) = delete;
 
     /* Input goals:
        ============

@@ -3,6 +3,11 @@
 
 using namespace std;
 
+auto SshInput::getInstance() -> SshInput& {
+  static SshInput kbListener;
+  return kbListener;
+}
+
 SshInput::SshInput() {
   tcgetattr( 0, &origTerm );
   struct termios raw = origTerm;

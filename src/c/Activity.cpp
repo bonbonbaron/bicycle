@@ -3,9 +3,15 @@
 #include "c/Timer.h"
 #include "m/Personality.h"
 
+auto Activity::getInstance() -> Activity& {
+  static Activity activity;
+  return activity;
+}
+
+
 // ONLY inputs are context-sensitive. Collisions and timers are transitive.
 void Activity::onInput( const InputState& input ) {
-  auto& activity = Activity::getInstance();
+  // auto& activity = Activity::getInstance();
 
 }
 
