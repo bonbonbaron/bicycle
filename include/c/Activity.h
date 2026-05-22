@@ -1,34 +1,25 @@
 #pragma once
-#include <vector>
+#include <map>
+#define SSH
+
 
 // TODO wait till core Activity takes shape before you worry about orchestrating stopping components.
 class Activity {
   public:
     static auto getInstance() -> Activity&;
     void run();
-  private:
-    Activity();
-    Activity(const Activity&) = delete;
-    Activity operator=(const Activity&) = delete;
-    Activity(const Activity&&) = delete;
-    Activity operator=(const Activity&&) = delete;
 
-    struct Quirk {
-      Acit tree{};
-      int priority{};  // higher values take precedence
-      unsigned freq{};  // freq at quirk-level gives entities more ownership over their own rates
-      unsigned reps{};  // freq at quirk-level gives entities more ownership over their own rates
-    };
+    // Le trifecta
+    static void onInput( const InputState& input );  // straightforward feeding to entities that can handle input.
+    static void onTimer( const TimerId );  // TODO: timer ID should map to a quirk.
+    static void onCollision();  // TODO
 
-    struct ActionStatus {
-      
+    /* Input goals:
+       ============
+       0. make it build (excluding things you don't need atm)
+       1. receive Input... print here
+       2. have a context... pretend like input is going to context
+       3. pretend to trigger an action on that context by getting its personality (key-quirk mapping, right?)
+    */
 
-    struct ActiveComponents {
-      std::vector timerIds{};
-      // TODO add more here as your engine matures
-    };
-
-    /
-
-    // members
 };  // class Activity

@@ -1,3 +1,9 @@
+by Tuesday morning, i want input, timer, and action all causing entities to do and say things.
+Hell, it would be even *ideal* to move a character around and see him changing colors every so many milliseconds.
+Actually, what would be best, would ( and this would be ambitious ) be to have a Battle again.
+  With music, menus, actions, and stats.
+  Idk about nodes yet. That's an annoying tidbit I've neglected for a while now.
+
 NOW
 ===
   Get reorg'd things to compile again. Menu's failing to build now. I'm trying to make Entity an int, so I have to

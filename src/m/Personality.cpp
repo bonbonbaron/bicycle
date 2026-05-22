@@ -233,7 +233,7 @@ void Personality::setQuirks( const Quirks& quirks ) {
   _quirks = quirks;
 }
 
-void Personality::trigger( const std::string& rootKey ) {
+void Personality::trigger( const QKey& rootKey ) {
   try {
     auto& quirk = _quirks.at( rootKey );
     if ( quirk.priority >= _activePriority ) {
@@ -268,7 +268,7 @@ void Personality::distributeBlackboard( std::shared_ptr<Blackboard> bb ) {
   }
 }
 
-auto Personality::hasTrigger( const std::string& key ) -> bool {
+auto Personality::hasTrigger( const QKey& key ) -> bool {
   return _quirks.find( key ) != _quirks.end();
 }
 

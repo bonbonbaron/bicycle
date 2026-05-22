@@ -1,8 +1,18 @@
 #include "c/Activity.h"
+#include "m/Entity.h"
+#include "c/Timer.h"
+#include "m/Personality.h"
+#ifdef SSH
+#include "c/SshInput.h"
+#else
+#include "c/Input.h"
+#endif
 
 // HYPOTHESIS: Entities have only three ways of being activated: input, timers, and collisions.
 
-void Entity::onInput( const int input ) {
+// ONLY inputs are context-sensitive. Collisions and timers are transitive.
+void Activity::onInput( const InputState& input ) {
+  auto& activity = Activity::getInstance();
   try {
     (*bb)["input"] = std::make_any<char>( input );
     personality.trigger( "onInput" );
@@ -12,15 +22,17 @@ void Entity::onInput( const int input ) {
   }
 }
 
-void Entity::onTimer( const std::string& timerId ) {
+void Activity::onTimer( const TimerId& timerId ) {
   personality.trigger( timerId );
 }
 
-void Entity::onCollision( const int collisionType ) {
+void Activity::onCollision( const int collisionType ) {
   (*bb)["collsionType"] = collisionType;
   personality.trigger( "onCollision" );
 }
 
-void Entity::validate() {
+#if 0 //TODO
+void Activity::validate() {
   personality.validate();
 }
+#endif

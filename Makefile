@@ -2,8 +2,8 @@ DBG=-g
 STD=-std=c++20
 
 BICREPO := $(shell git rev-parse --show-toplevel)
-BICSRCS := main bicycle v/Bar m/Blackboard m/Body v/ColorPalette Config v/Dialogue c/Dice v/Menu c/MidiPlayer v/Graph v/Grid c/Timer m/Personality v/Window c/WindowManager 
-BICINCS := bicycle ColorPalette Dialogue Menu MidiPlayer Window WindowManager  # TODO fix this
+BICSRCS := main bicycle Config c/Activity c/SshInput # m/Body c/Input v/ColorPalette v/Bar m/Blackboard v/Dialogue c/Dice v/Menu c/MidiPlayer v/Graph v/Grid c/Timer m/Personality v/Window c/WindowManager 
+BICINCS := bicycle Image ColorPalette Dialogue Menu MidiPlayer Window WindowManager  # TODO fix this
 BICINCS := $(BICINCS:%=$(BICREPO)/include/%.h)
 
 BICOBJS := $(BICSRCS:%=$(BICREPO)/build/%.o)
@@ -13,7 +13,7 @@ all: $(BICTGT)
 # Consider these compiler options when you're ready to hard-core optimize.
 # g++ -O3 -march=armv8-a -mcpu=cortex-a72 -mtune=cortex-a72 -mfpu=neon-fp-armv8 -mfloat-abi=hard ...
 $(BICTGT): $(BICOBJS)
-	g++ -Wall -fvisibility=default $(DBG) $(STD) $(BICOBJS) $(shell ncursesw6-config --libs) -lfluidsynth -lyaml-cpp -o $@
+	g++ -Wall -fvisibility=default $(DBG) -levdev $(STD) $(BICOBJS) $(shell ncursesw6-config --libs) -lfluidsynth -lyaml-cpp -o $@
 
 $(BICREPO)/build/%.o: $(BICREPO)/src/%.cpp $(BICREPO)/include/%.h 
 	g++ -Wall -fvisibility=default $(DBG) $(STD) -c $< -I$(BICREPO)/include $(shell ncursesw6-config --cflags ) -o $@

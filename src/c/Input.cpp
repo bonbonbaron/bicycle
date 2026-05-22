@@ -1,4 +1,5 @@
 #include "c/Input.h"
+#include "c/Activity.h"
 
 // ────────────────────────────────────────────────
 //  Logical keys – our unified, cross-platform key namespace
@@ -10,9 +11,10 @@ auto Input::getInstance() -> Input& {
   static Input kbListener;
   return kbListener;
 }
+
 void Input::discoverPotentialKeyboards()
 {
-  // close_all();
+  // close_all();  // TODO is this needed?
 
   auto dir = opendir("/dev/input");
   if (!dir) {
@@ -67,6 +69,7 @@ void Input::listen() {
   constexpr unsigned VAL_KEY_DOWN{1};
   constexpr unsigned VAL_KEY_REPEAT{2};
 
+  // If device got disconnected, scan for other devices. Currently this does nothing.
   if (_devices.empty()) {
     std::cout << "devices is empty\n";
     // Optional: re-scan every few seconds if nothing is connected yet
@@ -77,9 +80,10 @@ void Input::listen() {
     return;
   }
 
-  // Check for key-up-or-down events.
-  auto oldKeystate = _keyState;
+  auto oldKeystate = _state;
   input_event ev{};
+
+  // Check for key-up-or-down events.
   for ( unsigned i = 0; i < _devices.size(); ++i ) {
     input_event ev{};
     // power through all the events currently queued on this device
@@ -95,19 +99,20 @@ void Input::listen() {
         continue;
       }
       if ( ev.value == VAL_KEY_DOWN ) {
-        _keyState.set( static_cast<size_t>(lk), true );
+        _state.currKeyState.set( static_cast<size_t>(lk), true );
         std::cout << "down on " << ev.code << '\n';
       }
       if ( ev.value == VAL_KEY_UP ) {
-        _keyState.set( static_cast<size_t>(lk), false );
+        _state.currKeysPressed.set( static_cast<size_t>(lk), false );
         std::cout << "up on " << ev.code << '\n';
       }
     }
   }
+
   // Send new events, bundled up in a single bitset, to activity SYSTEM.
-  if ( _keyState != oldKeystate ) {
+  if ( _state.deltaKeysPressed.any() ) {
     // We don't have to know who has focus. Activity should know.
-    // TODO activity.onInput( _keyState );  
+    activity::onInput( _keyState );  
   }
 }  // Input::listen()
 

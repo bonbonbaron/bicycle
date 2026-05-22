@@ -5,8 +5,8 @@
 #include <unordered_map>
 #include <cassert>
 
-// TODO delete this line when you sort Entities out
-using Entity = unsigned;
+#include "m/Entity.h"
+
 constexpr unsigned NUM_SUPPORTED_ENTITIES{256};
 
 struct Position {
@@ -43,7 +43,7 @@ inline const void* getTypeTag() noexcept {
   return &TypeTag<T>::dummy;
 }
 
-class World {  // The name "World" is too dramatic. It doesn't include BBs. I'll rename later.
+class World {
   public:
     // Allows you to more easily make an event mapping
     template <typename T>
@@ -52,14 +52,16 @@ class World {  // The name "World" is too dramatic. It doesn't include BBs. I'll
       //world.
     }
 
+    // set-wrapper setting a value in a component array
     template <typename T>
-    static void set( const unsigned idx, const T& val ) {
+    static void set( const Entity entity, const T& val ) {
       auto& world = getInstance();
       auto& arr = world.get( getTypeTag<T>() );
       auto& t_arr = std::get< std::array< T, NUM_SUPPORTED_ENTITIES > >( arr );
-      t_arr.at( idx ) = val;
+      t_arr.at( entity ) = val;
     }
 
+    // get-wrapper returning component array allowing users to not have to get World's instance every time
     template <typename T>
     static auto get() -> std::array<T, NUM_SUPPORTED_ENTITIES>& {
       auto& world = getInstance();
@@ -67,6 +69,7 @@ class World {  // The name "World" is too dramatic. It doesn't include BBs. I'll
       return std::get< std::array< T, NUM_SUPPORTED_ENTITIES > >( arr );
     }
 
+    // get-wrapper returning Entity allowing users to not have to get World's instance every time
     template <typename T>
     static auto get( const Entity entity ) -> T& {
       auto& world = getInstance();
@@ -91,7 +94,7 @@ class World {  // The name "World" is too dramatic. It doesn't include BBs. I'll
       initialize<Position, Size, Image >();
     }
 
-    // Optional: check whether a type is already initialized
+    // Optional: check whether a type is already initialized  // TODO delete if unneeded
     template <typename T>
       bool is_initialized() const {
         return _m.contains( getTypeTag<T>() );

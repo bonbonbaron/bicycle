@@ -1,28 +1,27 @@
 #pragma once
 
-#include <string>
 #include <vector>
-#include <curses.h>
 #include <functional>
 
-#include "Window.h"
+#include "m/Position.h"
 
-static const std::string CURSOR{ " > " };
-static constexpr long unsigned int CURSOR_WIDTH{ 3 + ( WINDOW_PADDING / 2 )};
+struct Cursor {
+  Image img;
+  Position offset;
+  int currItemIdx{};
+};
 
-using MenuItem = std::string;
-
-class Menu : public Window {
+class Menu {
   public:
     Menu( const std::string& menuName );
     Menu() = delete;  // ensure they pass in items.
     const MenuItem& getCurrMenuItem() const;
-    void update() override;
-    void react( const int input ) override;
+    void onInput( );
+    void moveCursor( int amt );
+
   private:
-    WINDOW* _win;
-    std::vector< MenuItem > _items{};
-    int _currMenuItemIdx{};
+    Cursor _cursor;
+    std::vector< Entity > _items{};
     int _firstDispIdx{};
     void addItem( const MenuItem& entity );
 };

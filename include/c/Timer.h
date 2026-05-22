@@ -14,6 +14,8 @@ struct TimeoutMsg {
   unsigned full{};
 };
 
+using TimerId = unsigned;
+
 class Timer {
   public:
     static auto getInstance() -> Timer&;
@@ -21,11 +23,11 @@ class Timer {
 
     // Timer-specific functions
     void _run();
-    auto start( const unsigned timeMs, const Entity entity, const std::string& timeoutMsg, const int nReps = 0 ) -> unsigned;
-    void stop( unsigned timerId );
-    void pause( const unsigned timerId );
-    void unpause( const unsigned timerId );
-    void setDuration( const unsigned timerId, const unsigned durMs );
+    auto start( const unsigned timeMs, const Entity entity, const std::string& timeoutMsg, const int nReps = 0 ) -> TimerId;  // returns the ID of the timer started for caller's future reference
+    void stop( TimerId timerId );
+    void pause( const TimerId timerId );
+    void unpause( const TimerId timerId );
+    void setDuration( const TimerId timerId, const unsigned durMs );
     
   private:
     Timer() = default;

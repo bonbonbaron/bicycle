@@ -41,7 +41,7 @@ class ActArg {
         int i;
         auto actual = __cxxabiv1::__cxa_demangle( type.name(), nullptr, 0, &i );
         auto expect = __cxxabiv1::__cxa_demangle( typeid(T).name(), nullptr, 0, &i );
-        bicycle::die( std::string("Your call to get<") + expect + ">( \"" + key + "\" ) should be get<" + actual + ">( \"" + key + "\" ).\n" );
+        bicycle::die( std::string("Your call to ActArg::get<") + expect + ">( \"" + key + "\" ) should be ActArg::get<" + actual + ">( \"" + key + "\" ).\n" );
       }
       // Make sure the blackboard even has a value for the key.
       if ( !_bb->contains( key ) ) {
@@ -67,7 +67,7 @@ class ActArg {
         int i;
         auto actual = __cxxabiv1::__cxa_demangle( type.name(), nullptr, 0, &i );
         auto expect = __cxxabiv1::__cxa_demangle( typeid(T).name(), nullptr, 0, &i );
-        bicycle::die( std::string("Your call to get<") + expect + ">( \"" + key + "\" ) should be get<" + actual + ">( \"" + key + "\" ).\n" );
+        bicycle::die( std::string("Your call to ActArg::set<") + expect + ">( \"" + key + "\" ) should be ActArg::set<" + actual + ">( \"" + key + "\" ).\n" );
       }
       // Finally, if the type is correct, set it.
       (*_bb)[key] = std::make_any<T>( val );
@@ -172,12 +172,13 @@ struct Quirk {
 };
 
 using Quirks = std::map< std::string, Quirk >;
+using QKey = std::string;  // LATER i might want to make this more minute like an enum.
 
 class Personality  {
   public:
     Personality() = default;
-    auto hasTrigger( const std::string& key ) -> bool;
-    void trigger( const std::string& rootKey );
+    auto hasTrigger( const QKey& key ) -> bool;
+    void trigger( const QKey& rootKey );
     void cancel();
     void distributeBlackboard( std::shared_ptr<Blackboard> bb );
     void setQuirks( const Quirks& quirks );

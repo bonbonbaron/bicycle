@@ -3,48 +3,15 @@
 #include "v/ColorPalette.h"
 #include "Config.h"
 #include <yaml-cpp/node/convert.h>
-struct Position {
-  Position() = default;
-  Position( const Position& ) = default;
-  Position( Position&& ) = default;
-  Position& operator=( const Position& ) = default;
-  Position& operator=( Position&& ) = default;
-  int x{};
-  int y{};
-
-  void operator+=( const Position& rhs ) {
-    x += rhs.x;
-    y += rhs.y;
-  }
-
-  auto operator+( const Position& rhs ) const -> Position {
-    Position pos;
-    pos.x = x + rhs.x;
-    pos.y = y + rhs.y;
-    return pos;
-  }
-};
-
-using Image = std::string;
+#include "v/Image.h"
 
 // Body is the visual representation of an entity.
 class Body {
-  public:
-    auto getPosition() const -> const std::shared_ptr<Position>&;
-    void setPosition( const std::shared_ptr<Position>& pos );
-
-    auto getColor() const -> Color;
-    void setColor( const std::string& color );
-    void setColor( const Color& color );
-
-    auto getSymbol() const -> const Image&;
-    void setSymbol( const Image& sym );
-    void setSymbol( const Image&& sym );
+  // TODO should this just become a strucxt instead of a full-blown class?
 
   private:
-    Image _sym;  
+    Image _img;  
     std::shared_ptr<Position> _pos{};  // shared with blackboards 
-    Color _color{};
 };
 
 
@@ -62,8 +29,7 @@ struct YAML::convert<Body> {
     }
     // We don't set pos here. Why would a body have a permanent position? :) We'll make that easy later.
     try {
-      rhs.setSymbol( node["sym"].as<Image>() );
-      rhs.setColor( node["color"].as<std::string>() );
+      rhs.setImage( node["img"].as<Image>() );
     }
     catch ( const std::invalid_argument &e ) {
       throw e;  // All this throwing just makes a big baseball game at this point.

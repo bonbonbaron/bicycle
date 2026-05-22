@@ -25,17 +25,6 @@ const std::map<std::string, Color> strToColor {
     {"WHITE", WHITE   },
 };
 
-
-
-enum ColorPair : short {
-  WINDOW_ = 0,
-  DIALOGUE =1,
-  MENU_SEL = 3,
-  MENU_UNSEL = 4,
-  // TODO more to come later
-};
-
-
 class ColorPalette {
   private:
     ColorPalette() = default;
@@ -48,4 +37,5 @@ class ColorPalette {
     }
     static void init();
 };
+
 

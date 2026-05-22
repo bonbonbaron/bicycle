@@ -1,15 +1,14 @@
 #include <termios.h>
 #include <unistd.h>
-//#include <cstdio.h>
 #include <iostream>
 
 using namespace std;
 
-class SshKeyForwarder {
+class SshInput {
   struct termios origTerm;
 
   public: 
-  SshKeyForwarder() {
+  SshInput() {
     tcgetattr( 0, &origTerm );
     struct termios raw = origTerm;
     raw.c_lflag &= ~( ICANON | ECHO );
@@ -18,7 +17,7 @@ class SshKeyForwarder {
     tcsetattr( 0, TCSANOW, &raw );
   }
 
-  ~SshKeyForwarder() {
+  ~SshInput() {
     tcsetattr( 0, TCSANOW, &origTerm );
   }
 
@@ -32,7 +31,7 @@ class SshKeyForwarder {
 };
 
 int main() {
-  SshKeyForwarder kf;
+  SshInput kf;
   while ( true ) {
     auto key = kf.getKey();
     cout << "you pressed " << key << ".\n";
