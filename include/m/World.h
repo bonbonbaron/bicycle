@@ -6,31 +6,16 @@
 #include <cassert>
 
 #include "m/Entity.h"
+#include "v/Image.h"
+#include "m/Position.h"
+#include "m/Personality.h"
 
 constexpr unsigned NUM_SUPPORTED_ENTITIES{256};
 
-struct Position {
-  int x{};
-  int y{};
-};
-
-struct Size {
-  unsigned w{};
-  unsigned h{};
-};
-
-using Color = unsigned int;
-
-struct Image {
-  Size size{};
-  Color color{};
-  unsigned char data[];
-};
-
 using ArrayVar = std::variant<
   std::array<Position, NUM_SUPPORTED_ENTITIES>,
-  std::array<Size, NUM_SUPPORTED_ENTITIES>,
-  std::array<Image, NUM_SUPPORTED_ENTITIES>
+  std::array<Image, NUM_SUPPORTED_ENTITIES>,
+  std::array<Personality, NUM_SUPPORTED_ENTITIES>
 >;
 
 template <typename T>
@@ -91,7 +76,7 @@ class World {
 
     // Convenience: initialize all known types in one call
     void initialize_all() {
-      initialize<Position, Size, Image >();
+      initialize<Position, Image, Personality>();
     }
 
     // Optional: check whether a type is already initialized  // TODO delete if unneeded

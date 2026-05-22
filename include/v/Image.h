@@ -8,6 +8,7 @@ using Graybody = Symbol;  // Graybodies can combine with Color(Palettes) to crea
 // Image won't have position, because it needs to be inherited by Animation later.
 class Image {
   public:
+    Image() = default;
     Image( const Graybody& graybody, const ColorPalette& colorPalette );
     // Color
     auto getColor() const -> Color;

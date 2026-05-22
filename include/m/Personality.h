@@ -90,6 +90,20 @@ using ActFunc = std::function<ActionState(ActArg&)>;
 class Action;
 using ActionPtr = std::shared_ptr<Action>;
 
+class ActionRegistry : public std::map<std::string, ActionPtr> {
+  public:
+    // Allows you to more easily make an event mapping
+    static auto get( const std::string& name ) -> ActionPtr;
+    // Allows you to more easily make an event mapping
+    static void add( const ActionRegistry::value_type& val );
+
+  private:
+    static auto getInstance() -> ActionRegistry&;
+    ActionRegistry() = default;
+    ActionRegistry( const ActionRegistry& rhs ) = delete;
+    ActionRegistry& operator=( const ActionRegistry& ) = delete;
+};
+
 class PortTypeRegistry : public std::map< const std::string, std::type_index > {
   public:
     static void add( const PortTypeRegistry::value_type& val );
@@ -130,8 +144,6 @@ struct ActPkg {
 #define PORT( _portName_, _type_ )\
   PortTypeRegistry::value_type{ std::string(#_portName_), std::type_index( typeid( _type_ ) ) }
 
-class Tree;
-
 // Inheritors of ActionNode will implement their ports.
 class ActionNode {
   public:
@@ -155,17 +167,8 @@ class ActionNode {
     ActArg _arg;  // BB + PortSet
 };
 
-class Tree {
-  public:
-    void setRoot( const std::shared_ptr<ActionNode> action );
-    void run();
-    auto getRoot() ->  const std::shared_ptr<ActionNode>;
-  private:
-    std::shared_ptr<ActionNode> _root{};
-};
-
 struct Quirk {
-  Tree tree{};
+  ActionNode actNode{};
   int priority{};  // higher values take precedence
   unsigned freq{};  // freq at quirk-level gives entities more ownership over their own rates
   unsigned reps{};  // freq at quirk-level gives entities more ownership over their own rates

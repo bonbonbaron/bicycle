@@ -1,4 +1,5 @@
 #pragma once
+#include <bitset>
 
 // A bunch of stuff used by both controller types (physical keyboard and SSH key events)
 enum class LogicalKey : uint8_t {

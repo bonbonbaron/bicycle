@@ -1,7 +1,9 @@
 #pragma once
 #include <map>
 #define SSH
-
+#include "c/InputData.h"
+#include "c/Timer.h"
+#include "m/World.h"
 
 // TODO wait till core Activity takes shape before you worry about orchestrating stopping components.
 class Activity {
@@ -11,8 +13,8 @@ class Activity {
 
     // Le trifecta
     static void onInput( const InputState& input );  // straightforward feeding to entities that can handle input.
-    static void onTimer( const TimerId );  // TODO: timer ID should map to a quirk.
-    static void onCollision();  // TODO
+    static void onTimer( const TimerId timerIdx );  // TODO: timer ID should map to a quirk.
+    static void onCollision( const int collisionType );  // TODO
 
     /* Input goals:
        ============

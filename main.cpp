@@ -1,7 +1,7 @@
 #include <iostream>
 #include "m/World.h"
 #include "c/Timer.h"
-#include "c/Input.h"
+#include "c/SshInput.h"
 #include <chrono>
 #include <thread>
 #include "Constants.h"
@@ -13,7 +13,7 @@ int main()
 
   std::chrono::milliseconds interval(static_cast<int>(MILLISECONDS_PER_FRAME));
   Timer t;
-  auto& input = Input::getInstance();
+  auto& input = SshInput::getInstance();
   auto timerId = t.start( 500, 1, "digidigi", -1 );
 
   int i = 0; 

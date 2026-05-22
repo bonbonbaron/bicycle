@@ -10,7 +10,7 @@ Window::Window( const int w, const int h ) : _win( newwin( h, w, LINES / 2 - h/2
 
 Window::Window( const int x, const int y, const int w, const int h ) : _win( newwin( h, w, y, x ) ), _w(w), _h(h) {
   assert( _win );
-  const auto& cp = ColorPalette::getInstance();
+  // const auto& cp = ColorPalette::getInstance();
 }
 
 Window::~Window(){

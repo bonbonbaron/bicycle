@@ -2,7 +2,7 @@ DBG=-g
 STD=-std=c++20
 
 BICREPO := $(shell git rev-parse --show-toplevel)
-BICSRCS := main bicycle Config c/Activity c/SshInput # m/Body c/Input v/ColorPalette v/Bar m/Blackboard v/Dialogue c/Dice v/Menu c/MidiPlayer v/Graph v/Grid c/Timer m/Personality v/Window c/WindowManager 
+BICSRCS := main bicycle Config c/Activity c/SshInput v/ColorPalette v/Window c/WindowManager m/Personality # m/Body c/Input v/Bar m/Blackboard v/Dialogue c/Dice v/Menu c/MidiPlayer v/Graph v/Grid c/Timer 
 BICINCS := bicycle Image ColorPalette Dialogue Menu MidiPlayer Window WindowManager  # TODO fix this
 BICINCS := $(BICINCS:%=$(BICREPO)/include/%.h)
 

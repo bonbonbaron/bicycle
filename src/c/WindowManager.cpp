@@ -26,7 +26,7 @@ void WindowManager::pop() {
 }
 
 void WindowManager::refreshAll() {
-  for (int i = 0; i < _population; ++i ) {
+  for (unsigned i = 0; i < _population; ++i ) {
     if ( _windows.at(i) != nullptr ) {
       _windows.at(i)->clear();
       _windows.at(i)->update();

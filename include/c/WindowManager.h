@@ -30,7 +30,7 @@ class WindowManager {
     // We have to use an array despite stack-like functionality to protect the iterator from vector/list reallocations.
     std::shared_ptr<Window> _currWindow{};
     std::array<std::shared_ptr<Window>, MAX_NUM_WINDOWS> _windows;
-    int _population{};
+    unsigned _population{};
     std::mutex _mut{};
 };
 
