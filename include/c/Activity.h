@@ -24,8 +24,8 @@ class Activity {
 
     /* Input goals:
        ============
-       0. make it build (excluding things you don't need atm)
-       1. receive Input... print here
+       \0. make it build (excluding things you don't need atm)
+       1. receive Input... print here (see if you can hack it to not need game data for now)
        2. have a context... pretend like input is going to context
        3. pretend to trigger an action on that context by getting its personality (key-quirk mapping, right?)
     */
