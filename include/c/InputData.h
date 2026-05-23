@@ -40,6 +40,6 @@ using KeyState = std::bitset<static_cast<long unsigned int>(LogicalKey::COUNT)>;
 struct InputState {
   KeyState currKeysPressed{};
   KeyState deltaKeysPressed{};
-  int millisSinceLast{};
+  int millisSinceLast{};  // i don't like making input dependent on Timer.
 };
 

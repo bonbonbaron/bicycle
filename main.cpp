@@ -1,6 +1,6 @@
 #include <iostream>
 #include "m/World.h"
-#include "c/Timer.h"
+#include "c/Activity.h"
 #include "c/SshInput.h"
 #include <chrono>
 #include <thread>
@@ -8,21 +8,13 @@
 
 int main()
 {
-  using namespace std::chrono_literals;
-  KeyboardListener kb;
-
-  std::chrono::milliseconds interval(static_cast<int>(MILLISECONDS_PER_FRAME));
-  Timer t;
-  auto& input = SshInput::getInstance();
-  auto timerId = t.start( 500, 1, "digidigi", -1 );
-
   int i = 0; 
   while (true) {
     // General loop-regulating
     auto start = std::chrono::steady_clock::now();
 
     // Timer stuff
-    t.run();
+    Timer::run();
     Input::listen();
 
     // Action stuff

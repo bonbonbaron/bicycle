@@ -2,6 +2,9 @@
 #include <array>
 #include <string>
 #include <bitset>
+#include <chrono>
+
+#include "Constants.h"
 
 using Entity = unsigned;
 
@@ -14,12 +17,16 @@ struct TimeoutMsg {
   unsigned full{};
 };
 
+using namespace std::chrono_literals;
+constexpr std::chrono::milliseconds INTERVAL(static_cast<int>(MILLISECONDS_PER_FRAME));
+
 using TimerId = unsigned;
 
 class Timer {
   public:
     static auto getInstance() -> Timer&;
     static void run();
+    static void sleepFrame();
 
     // Timer-specific functions
     void _run();
@@ -30,7 +37,7 @@ class Timer {
     void setDuration( const TimerId timerId, const unsigned durMs );
     
   private:
-    Timer() = default;
+    Timer();
     Timer(const Timer&) = delete;
     Timer operator=(const Timer&) = delete;
     Timer(const Timer&&) = delete;
@@ -40,4 +47,5 @@ class Timer {
     std::array<TimeoutMsg, MAX_NUM_TIMERS> _msgs{};
     auto findAvailableTimer() -> unsigned;
     std::array<unsigned, MAX_NUM_TIMERS> _times{};
+    std::chrono::time_point<std::chrono::steady_clock> frameStartTime{};
 };

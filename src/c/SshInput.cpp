@@ -1,5 +1,6 @@
 #include "c/SshInput.h"
 #include "c/InputData.h"
+#include <fcntl.h>
 
 using namespace std;
 
@@ -11,10 +12,23 @@ auto SshInput::getInstance() -> SshInput& {
 SshInput::SshInput() {
   tcgetattr( 0, &origTerm );
   struct termios raw = origTerm;
-  raw.c_lflag &= ~( ICANON | ECHO );
-  raw.c_cc[VMIN] = 1;
-  raw.c_cc[VTIME] = 0;
-  tcsetattr( 0, TCSANOW, &raw );
+  // Canonical mode = line-buffering; we don't want players to wait till they press Enter to process input.
+  // Echo = printing input; we don't want that either!
+  // ISIG *would* prevent signals like ^C from interrupting your program, but I think we should allow those.
+  raw.c_lflag &= ~( ICANON | ECHO | IEXTEN );
+  // IXON would allow pausing and unpausing program with ^S and ^Q respectively; we don't want that.
+  // ICRNL translates carriage return (CR) to newline (NL); we don't want that.
+  // BRKINT would prevent break interrupts; we want to keep those.
+  // ISTRIP would strip the 8th bit off characters; we want to preserve them instead.
+  raw.c_iflag &= ~( IXON | ICRNL | INPCK | ISTRIP );
+  raw.c_cflag |= CS8;  // sets the character size to 8 bits to prevent truncation of larger char sizes
+  raw.c_cc[VMIN] = 0;  // minimum number of bytes that must be read before read() returns
+  raw.c_cc[VTIME] = 0;  // specifies timeout; 0 disables it (not sure that matters given the above)
+  // tcsetattr( STDIN_FILENO, TCSANOW, &raw );  // makes changes take effect immediately w/o flushing current content
+  tcsetattr( STDIN_FILENO, TCSAFLUSH, &raw );
+  
+  int flags = fcntl( STDIN_FILENO, F_GETFL, 0 );
+  fcntl( STDIN_FILENO, F_SETFL, flags | O_NONBLOCK );
 }
 
 SshInput::~SshInput() {
@@ -62,7 +76,7 @@ auto SshInput::convertCodeToLogicalInt(int code) -> LogicalKey {
     case '8': return LogicalKey::Key8;
     case '9': return LogicalKey::Key9;
 
-// TODO
+// TODO: support these keys as well once you figure out their ASCII codes.
 #if 0
     case KEY_ENTER:     return LogicalKey::Enter;
     case KEY_ESC:       return LogicalKey::Escape;
@@ -81,18 +95,27 @@ auto SshInput::convertCodeToLogicalInt(int code) -> LogicalKey {
 
     default: return LogicalKey::COUNT;
   }
+} // SshInput::convertCodeToLogicalInt()
+
+void SshInput::_listen() {
+  char buffer[static_cast<unsigned>(LogicalKey::COUNT)] = {};  
+  // TODO i put "8" so i can support multiple button presses per frame later... 
+  // for now, i'm happy with actually only working wiht one byte
+  // Reads 1 byte from fd 0 into a buffer.
+  read( STDIN_FILENO, buffer, 1 );
+  if ( buffer[0] != '\0' ) {
+    auto lkey = convertCodeToLogicalInt( buffer[0] );
+    _inputState.currKeysPressed.reset(); // SSH mode doesn't support key press/release distinctions. Press-detections only.
+    _inputState.currKeysPressed.set( static_cast<unsigned>( lkey ) );
+    cout << _inputState.currKeysPressed << '\n';
+    // TODO iter thru all high bits to determine whether we process "KEY DOWN" events for them or not.
+    //      We're fortunate to know that an entire frame's timespan has passed since last processing this.
+    //      So we can check unconditionally without regard for time in Input's perspective.
+  }
 }
 
-int SshInput::listen() {
-  int key;
-  char buffer[8] = {};
-  
-  while ( ( key = read( 0, buffer, 1 ) ) != 1 ) {
-    cout << "you pressed " << key << ".\n";
-  }
-  if ( key == 'q' ) {
-    return -1;
-  }
-  return 0;
+void SshInput::listen() {
+  auto& input = getInstance();
+  input._listen();
 }
 

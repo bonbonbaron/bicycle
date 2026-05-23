@@ -2,10 +2,30 @@
 #include "Constants.h"
 // TODO #include "c/Activity.h"
 #include <iostream> // TODO delete
+#include <thread>
+
+Timer::Timer() : frameStartTime( std::chrono::steady_clock::now() ) {}
+
+auto Timer::getInstance() -> Timer& {
+  static Timer timer;
+  return timer;
+}
 
 void Timer::run() {
   auto& t = Timer::getInstance();
-  t.run();
+  t._run();
+}
+
+// Sleeps for the rest of this frame
+void Timer::sleepFrame() {
+  auto& t = Timer::getInstance();
+  // Sleep till the end of this frame.
+  auto elapsed = std::chrono::steady_clock::now() - t.frameStartTime;
+  if (elapsed < INTERVAL) {
+    std::this_thread::sleep_for(INTERVAL - elapsed);
+  }
+  // Mark the start of the next frame.
+  t.frameStartTime = std::chrono::steady_clock::now();
 }
 
 void Timer::_run() {
