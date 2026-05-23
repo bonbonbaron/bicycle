@@ -135,12 +135,11 @@ void ActionNode::setAction( const ActionPtr& action ) {
   _arg.setPortSet( _action.getPortSet() ); 
 }
 
-
 void Personality::setQuirks( const Quirks& quirks ) {
   _quirks = quirks;
 }
-auto Personality::hasTrigger( const QKey& key ) -> bool {
+
+auto Personality::hasQuirk( const QKey& key ) -> bool {
   return _quirks.find( key ) != _quirks.end();
 }
-
 

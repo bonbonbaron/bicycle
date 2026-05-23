@@ -1,6 +1,8 @@
+#include <fcntl.h>
+
 #include "c/SshInput.h"
 #include "c/InputData.h"
-#include <fcntl.h>
+#include "c/Activity.h"
 
 using namespace std;
 
@@ -99,18 +101,18 @@ auto SshInput::convertCodeToLogicalInt(int code) -> LogicalKey {
 
 void SshInput::_listen() {
   char buffer[static_cast<unsigned>(LogicalKey::COUNT)] = {};  
-  // TODO i put "8" so i can support multiple button presses per frame later... 
+  // TODO i put "LogicalKey::COUNT" abvoe so i can support multiple button presses per frame later... 
   // for now, i'm happy with actually only working wiht one byte
   // Reads 1 byte from fd 0 into a buffer.
   read( STDIN_FILENO, buffer, 1 );
   if ( buffer[0] != '\0' ) {
     auto lkey = convertCodeToLogicalInt( buffer[0] );
     _inputState.currKeysPressed.reset(); // SSH mode doesn't support key press/release distinctions. Press-detections only.
-    _inputState.currKeysPressed.set( static_cast<unsigned>( lkey ) );
-    cout << _inputState.currKeysPressed << '\n';
-    // TODO iter thru all high bits to determine whether we process "KEY DOWN" events for them or not.
-    //      We're fortunate to know that an entire frame's timespan has passed since last processing this.
-    //      So we can check unconditionally without regard for time in Input's perspective.
+    if ( lkey != LogicalKey::COUNT ) {
+      _inputState.currKeysPressed.set( static_cast<unsigned>( lkey ) );
+      cout << _inputState.currKeysPressed << '\n';
+      Activity::onInput();
+    }
   }
 }
 
@@ -119,3 +121,6 @@ void SshInput::listen() {
   input._listen();
 }
 
+auto SshInput::getState() const -> const InputState& {
+  return _inputState;
+}

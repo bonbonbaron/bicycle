@@ -18,6 +18,13 @@
 #include "m/Blackboard.h"
 #include "c/Timer.h"
 
+/* Here's the order of containment:
+ *
+ * Personality > Quirk > ActionNode > 
+ *    1. ActArg > { Blackboard, PortSet }
+ *    2. Action > { ActFunc, PortSet } 
+ */
+
 enum class ActionState { READY, FAILED, IN_PROGRESS, COMPLETE };
 
 using PortSet = std::map<BbKey, std::type_index>;;
@@ -85,6 +92,20 @@ class ActArg {
     std::shared_ptr<PortSet> _ps;
 };  // ActArg
 
+// TODO we need these (cowbell) action functions:
+//  1. input
+//  2. collisions
+//  3. timers
+
+// META thinking:
+//  should coding only happen at home? No more done at coffee houses?
+//  Only design work at coffee houses?
+
+// ... but what if the above are the wrapper functions that shunt to the action nodes we're familiar with?
+//     And how can we inherit, as is needed in the case of menu? Are most menus, except for Select, universal?
+//     YEs. So walk me through what needs to happen in a battle menu:
+//
+//
 using ActFunc = std::function<ActionState(ActArg&)>;
 
 class Action;
@@ -139,8 +160,6 @@ struct ActPkg {
 #define ACT( _funcName_, ... ) \
   ActPkg{ std::string(#_funcName_), _funcName_, std::string(#__VA_ARGS__) }
 
-
-
 #define PORT( _portName_, _type_ )\
   PortTypeRegistry::value_type{ std::string(#_portName_), std::type_index( typeid( _type_ ) ) }
 
@@ -151,12 +170,11 @@ class ActionNode {
     ActionNode() = default;
     ActionNode( const ActionNode& ) = default;
     auto operator=( const ActionNode& ) -> ActionNode& = default;
-    static auto extractNode( const YAML::Node& node ) -> std::shared_ptr<ActionNode>;
     void setAction( const ActionPtr& action );
     auto getState() const -> ActionState;
     virtual void setBlackboard ( const std::shared_ptr<Blackboard> bb );
     virtual void validateBlackboard();
-    virtual void run();  // runs only if READY or ONGOING; returns state otherwise.
+    virtual void run();  
     virtual void reset();
   protected:
     void setState( const ActionState& state );
@@ -165,31 +183,102 @@ class ActionNode {
     Action _action{};  // TODO initialize with key in constructor
     ActionState _state{ ActionState::READY };
     ActArg _arg;  // BB + PortSet
-};
+};  // ActionNode
 
 struct Quirk {
   ActionNode actNode{};
   int priority{};  // higher values take precedence
   unsigned freq{};  // freq at quirk-level gives entities more ownership over their own rates
-  unsigned reps{};  // freq at quirk-level gives entities more ownership over their own rates
+  unsigned reps{};  // reps at quirk-level gives entities more ownership over their own repetitions
 };
 
-using Quirks = std::map< std::string, Quirk >;
 using QKey = std::string;  // LATER i might want to make this more minute like an enum.
+using Quirks = std::map< QKey, Quirk >;
 
 class Personality  {
   public:
     Personality() = default;
-    auto hasTrigger( const QKey& key ) -> bool;
-    void trigger( const QKey& rootKey );
-    void cancel();
+    auto hasQuirk( const QKey& key ) -> bool;
+    auto getQuirk( const QKey& key ) -> Quirk&;
     void distributeBlackboard( std::shared_ptr<Blackboard> bb );
     void setQuirks( const Quirks& quirks );
     void validate();
   private:
-    Quirks _quirks{};
-    int _activePriority{ -1 };
-    int _remainingReps{ -1 };
-    std::shared_ptr<Timer> _timer{};  // for looping at a given frequency OR delays 
+    Quirks _inputQuirks{};
+    Quirks _timerQuirks{};
+    Quirks _collisionQuirks{};
 };
+
+// =======================================================
+// ********************** YAML ***************************
+// =======================================================
+
+// Provide yaml-cpp library with template candidate for ActionNode's specific struct
+template<>
+struct YAML::convert<ActionNode> {
+  static YAML::Node encode(const std::string& rhs) { return YAML::Node(rhs); }
+  static bool decode(const YAML::Node& node, ActionNode& rhs) {
+    if (!node.IsScalar()) {
+      return false;
+    }
+    auto actionName = node.as<std::string>();
+    try {
+      const auto& it = ActionRegistry::get( actionName );  // TODO try-catch for clearer errors
+      rhs.setAction( it );
+    }
+    catch ( const YAML::Exception& e ) {
+      throw e;  // Throw so upper level can tell us what file had the issue.
+    }
+    catch ( const std::out_of_range& e ) {
+      std::cerr << "No such key " << actionName << " set in ActionRegistry.\n";
+      bicycle::die( e.what() );
+    }
+    catch ( const std::exception& e ) {
+      bicycle::die( e.what() );
+    }
+
+    return true;
+  }
+}; // ActionNode YML conversion
+
+// Helper function converting raw object to shared_ptr since yaml-cpp only deals in default constructors for rhs.
+template<typename T>
+static auto makeShared( const YAML::Node& node ) -> std::shared_ptr<T>{
+  return std::make_shared<T>( node.as<T>() );
+}
+
+// Provide yaml-cpp library with template candidate for Quirk's specific struct
+template<>
+struct YAML::convert<Quirk> {
+  static YAML::Node encode(const std::string& rhs) { return YAML::Node(rhs); }
+  static bool decode(const YAML::Node& node, Quirk& rhs) {
+    if (!node.IsMap()) {
+      return false;
+    }
+    rhs.priority = node["priority"].as<decltype(Quirk::priority)>();
+    if ( auto freq = node["freq"] ) {
+      rhs.freq = freq.as<decltype(Quirk::freq)>();
+    }
+    if ( auto freq = node["reps"] ) {
+      rhs.freq = freq.as<decltype(Quirk::reps)>();
+    }
+    return true;
+  }
+};   // Quirk YML conversion
+
+// Provide yaml-cpp library with template candidate for Quirk's specific struct
+template<>
+struct YAML::convert<Personality> {
+  static YAML::Node encode(const std::string& rhs) { return YAML::Node(rhs); }
+  static bool decode(const YAML::Node& node, Personality& rhs) {
+    if (!node.IsMap()) {
+      return false;
+    }
+    // You can reuse the same file as either a sequence or fallback/selector.
+    rhs.setQuirks( node.as<Quirks>() );  // Nah, don't do this. How is this compiling?
+    return true;
+  }
+};   // Personality YML conversion
+
+
 

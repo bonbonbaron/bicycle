@@ -10,6 +10,7 @@ class SshInput {
     static auto getInstance() -> SshInput&;
     static void listen();   // this is called by the SshInput instance itself
     void _listen();   // this is called by the SshInput instance itself
+    auto getState() const -> const InputState&;
     ~SshInput();
   private:
     SshInput();
