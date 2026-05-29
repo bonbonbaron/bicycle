@@ -2,6 +2,11 @@
 #include "m/Entity.h"
 #include "c/Timer.h"
 
+auto ActionRegistry::getInstance() -> ActionRegistry& {
+  static ActionRegistry reg;
+  return reg;
+}
+
 auto ActionRegistry::get( const std::string& name ) -> ActCallback {
   auto& reg = getInstance();
   try {
@@ -41,7 +46,7 @@ void Activity::onInput() {
     // TODO compare priority to active priority
     // TODO we need to pass in act arg 
     // TODO get entity's blackboard
-    inputQuirk->second.action();
+    // inputQuirk->second.action();
   }
 }
 

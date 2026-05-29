@@ -12,20 +12,10 @@
  * The "game cartridge," or shared object file, gets dynamically
  * linked in at runtime. That linkage entails the following:
  *
- *  1) port types (not networking ports; blackboard ports)
- *  2) blackboards
- *  3) actions (i had impl'd that before and then deleted it; need to figure 
+ *  1) blackboards
+ *  2) actions (i had impl'd that before and then deleted it; need to figure 
  *              out why and where I was taking that idea instead)
  */
-
-static void registerPortTypes( void* handle ) {
-  auto* ports = extGrab<PortTypeRegistry::value_type>( handle, "ports" );
-  int* numPorts = extGrab<int>( handle, "numPorts" );
-
-  for (int i = 0; i < *numPorts; ++i ) {
-    PortTypeRegistry::add( ports[i] );
-  }
-}
 
 static void registerBlackboards( void* handle ) {
   auto bbs = extGrab<std::shared_ptr<std::map<std::string, Blackboard>>>( handle, "blackboards" );
@@ -46,7 +36,6 @@ void config( const std::string& gameName ) {
     bicycle::die( "Couldn't find shared library " + GAME_FP + '\n' );
   }
 
-  registerPortTypes( handle );
   // TODO: registerActions( handle );
   registerBlackboards( handle ); 
 
