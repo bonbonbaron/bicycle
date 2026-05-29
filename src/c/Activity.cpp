@@ -1,7 +1,24 @@
 #include "c/Activity.h"
 #include "m/Entity.h"
 #include "c/Timer.h"
-#include "m/Personality.h"
+
+auto ActionRegistry::get( const std::string& name ) -> ActCallback {
+  auto& reg = getInstance();
+  try {
+    return reg.at( name );
+  }
+  catch ( const std::out_of_range& e ) {
+    bicycle::die( "Action Registry hasn't mapped anything yet to key " + name + "." );
+  }
+  return {};
+}
+
+// Allows you to more easily make an event mapping
+void ActionRegistry::add( const ActionRegistry::value_type& val ) {
+  auto& reg = getInstance();
+  reg.insert( val );
+}
+
 
 auto Activity::getInstance() -> Activity& {
   static Activity activity;
@@ -12,30 +29,19 @@ auto Activity::getInstance() -> Activity& {
 // ONLY inputs are context-sensitive. Collisions and timers are transitive.
 void Activity::onInput() {
   auto& activity = getInstance();
-  auto entityPersonalityPair = activity._personalityMap.find( activity._context );
-  if ( entityPersonalityPair == activity._personalityMap.end() ) {
+  auto personality = activity._personalityMap.find( activity._context );
+  if ( personality == activity._personalityMap.end() ) {
     std::cout << "Activity's personality map doesn't have entity " << activity._context << '\n';
     return;
   }
-  if ( entityPersonalityPair->second.hasQuirk( "ON_INPUT" ) ) {
-    auto& inputQuirk = second.getQuirk( "ON_INPUT" );
-
-    // Choices:
-    //  1. make auto-attached onInput() function at entity level that lets us pass in input state
-    //  2. force every onInput action to get the instance of Input and grab its state, making passage of Input useless
-    //        But wait. If I want to map inputs via yaml, then need I write any code for each input at all?
-    //        The only code I ought to write is the simple response to the button press, e.g. move().
-    //        This code can either check the state of Input class, or it can auto-act (e.g. punch).
-    //  3. attach input as a blackboard item, which would be insanely dumb
-    //  4. Better idea:If every action is accounted for, then give personality a sub-mapping of...
-    //        input triggers      -> input actions
-    //        collision triggers  -> collision actions
-    //        timer triggers      -> timer actions
-    //
-    //      Then each type can have its own function signature to allow for easier passage of relevant info.
-    //      Collisions need to know who bumped into whom, their types, et.c
-    //      While timers need to know what timer went off (ID and type).
-    //      Input needs to know the state of the input world without forcing direct retrieval.
+  auto inputQuirk = personality->second.find( "ON_INPUT" );
+  if ( inputQuirk != personality->second.end() ) {
+    // TODO the following TODOs should be wrapped in a common, templated function (<InputState> in this case)
+    // TODO check reps remaining
+    // TODO compare priority to active priority
+    // TODO we need to pass in act arg 
+    // TODO get entity's blackboard
+    inputQuirk->second.action();
   }
 }
 

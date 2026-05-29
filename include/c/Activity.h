@@ -3,17 +3,25 @@
 #include "c/InputData.h"
 #include "c/Timer.h"
 #include "m/World.h"
+#include "m/Personality.h"
 
 // Activity will have a map of entities-to-personalities. We DON'T iterate through all of these every frame.
 // That would be dumb. Instead, we let events (collisions, timers, and input) drive it. 
 // Once a behavior starts that needs to happen on a regular basis, it's given a timer to repeat
 // it at a given frequency for a specified number of reps (which can be infinite).
 
-// this is separate from personality. Personality is just how an entity behaves.
-// Activity is what it's currently doing.
-struct ActivityIner {
-  Quirk currQuirk{};
-  decltype(Quirk::reps) repsRemaining{};
+class ActionRegistry : public std::map<std::string, ActCallback> {
+  public:
+    // Allows you to more easily make an event mapping
+    static auto get( const std::string& name ) -> ActCallback;
+    // Allows you to more easily make an event mapping
+    static void add( const ActionRegistry::value_type& val );
+
+  private:
+    static auto getInstance() -> ActionRegistry&;
+    ActionRegistry() = default;
+    ActionRegistry( const ActionRegistry& rhs ) = delete;
+    ActionRegistry& operator=( const ActionRegistry& ) = delete;
 };
 
 // TODO wait till core Activity takes shape before you worry about orchestrating stopping components.

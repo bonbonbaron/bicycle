@@ -1,29 +1,26 @@
 #include <iostream>
-#include "m/World.h"
-#include "c/Activity.h"
-#include "c/SshInput.h"
-#include <chrono>
-#include <thread>
-#include "Constants.h"
+#include <functional>
+#include <string>
 
-int main()
-{
-  int i = 0; 
-  while (true) {
-    // General loop-regulating
-    auto start = std::chrono::steady_clock::now();
+using namespace std;
 
-    // Timer stuff
-    Timer::run();
-    Input::listen();
+template<typename T>
+using f = function<int(int, T)>;
 
-    // Action stuff
-    // TODO
+int a( int i, string j ){
+  cout << "a() got string " << j << '\n';
+  return i * 12;
+}
 
-    auto elapsed = std::chrono::steady_clock::now() - start;
-    // General loop-regulating
-    if (elapsed < interval) {
-      std::this_thread::sleep_for(interval - elapsed);
-    }
-  }
+template<typename T>
+struct funcdata {
+  f<T> func;
+  int i{};
+};
+
+
+int main() {
+  funcdata<string> data{ a, 2 };
+  data.func( 12, "i am a string" );
+  return 0;
 }
