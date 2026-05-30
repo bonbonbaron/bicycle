@@ -37,10 +37,6 @@ void Timer::_run() {
       // Unconditionally reset the timer to avoid complex branching.
       _times.at(i) = msg.full;
       std::cout << "Timer " << msg.val << " fired.\n";
-      msg.nReps -= ( msg.nReps > 0 );
-      if ( msg.nReps == 0 ) {  // -1 repeats forever til disabled
-        stop( i );
-      }
     }
   }
 }
@@ -53,7 +49,7 @@ void Timer::unpause( const unsigned timerId ) {
   _decrementers.at(timerId) = 1;
 }
 
-auto Timer::start( const unsigned timeMs, const Entity entity, const std::string& timeoutMsg, const int nReps ) -> unsigned {
+auto Timer::start( const unsigned timeMs, const Entity entity, const std::string& timeoutMsg ) -> unsigned {
   auto timerId = findAvailableTimer();
   if ( timerId < MAX_NUM_TIMERS )  {
     // float mult faster than div
@@ -66,7 +62,7 @@ auto Timer::start( const unsigned timeMs, const Entity entity, const std::string
 #endif
     _times.at( timerId ) = nFrames;
     _decrementers.at(timerId) = 1;
-    _msgs.at(timerId)  = TimeoutMsg{ entity, timeoutMsg, nReps, nFrames };
+    _msgs.at(timerId)  = TimeoutMsg{ entity, timeoutMsg, nFrames };
   }
   return timerId;
 }

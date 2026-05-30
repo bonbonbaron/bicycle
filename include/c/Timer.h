@@ -10,14 +10,14 @@ using Entity = unsigned;
 
 constexpr unsigned long MAX_NUM_TIMERS{1024};
 
+// TODO perhaps this is a good candidate for 
 struct TimeoutMsg {
   Entity entity{};
-  std::string val;
-  int nReps{};
-  unsigned full{};
+  std::string val;  // TODO replace with a proper enum
 };
 
 using namespace std::chrono_literals;
+// Interval allows us to know how much of the current frame is left for sleeping.
 constexpr std::chrono::milliseconds INTERVAL(static_cast<int>(MILLISECONDS_PER_FRAME));
 
 using TimerId = unsigned;
@@ -30,7 +30,7 @@ class Timer {
 
     // Timer-specific functions
     void _run();
-    auto start( const unsigned timeMs, const Entity entity, const std::string& timeoutMsg, const int nReps = 0 ) -> TimerId;  // returns the ID of the timer started for caller's future reference
+    auto start( const unsigned timeMs, const Entity entity, const TimeoutMsg& timeoutMsg ) -> TimerId;  // returns the ID of the timer started for caller's future reference
     void stop( TimerId timerId );
     void pause( const TimerId timerId );
     void unpause( const TimerId timerId );

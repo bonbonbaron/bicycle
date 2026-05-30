@@ -24,8 +24,6 @@ class TriggerRegistry : public std::map<std::string, ActCallback> {
     TriggerRegistry& operator=( const TriggerRegistry& ) = delete;
 };
 
-
-
 // TODO wait till core Trigger takes shape before you worry about orchestrating stopping components.
 class Trigger {
   public:
@@ -46,27 +44,64 @@ class Trigger {
     Entity _context{};  // The context receives inputs.
     std::map<Entity, Personality> _personalityMap{};
 
+    /* 
+     * TIMER: timer ID goes off, asks Trigger whose it was and gets the entity.
+     *        timer type fishes out the quirk and triggers it. We pass in the timer information
+     *        for the hell of it; whether or not the game actually uses it is none of our concern rn.
+     */
+
     // General trigger of input, timer, and collision actions
     template<typename T>
-      auto& onTrigger( const std::string&& stimulus ) -> ActionState {
-        auto inputQuirk = personality->second.find( stimulus );
-        if ( inputQuirk != personality->second.end() ) {
-          // First, we need to see what the entity's active quirk is, if any.
+      void onTrigger( const std::string&& stimulus, const Entity entity, T& t ) {
+        // Get the entity's personality.
+        auto& trigger = getInstance();
+        auto personality = trigger._personalityMap.find( entity );
+        if ( personality == trigger._personalityMap.end() ) {
+          std::cout << "Trigger's personality map doesn't have entity " << trigger._context << '\n';
+          return;
+        }
+        // Get the triggered quirk.
+        auto quirk = personality->second.find( stimulus );
+        if ( quirk == personality->second.end() ) {
+          return;
+        }
+        // Get triggered action and current activity to see whether the former overrides the latter.
+        auto& triggeredAction = std::get<Cb<T>>( quirk->second.action );
+        auto& currActivity = World::get<Activity>( entity );
+        auto& bb = World::get<Blackboard>( entity );
+        if ( currActivity.state == ActionState::IN_PROGRESS || 
+            currActivity.priority > triggeredAction.priority ) {
+          // TODO does this mean we call the current activity's callback again and decrement its nRepsRemaining?
+        }
+        else {
+          // Initialize and start overriding activity.
+          currActivity = quirk;
+        }
 
-          auto& action = std::get<Cb<T>>( inputQuirk->second.action );
-          
-          // TODO the following TODOs should be wrapped in a common, templated function (<InputState> in this case)
-          // TODO check reps remaining
-          // TODO compare priority to active priority
-          // TODO we need to pass in act arg 
-          // TODO get entity's blackboard
-          // inputQuirk->second.action();
-        /* Input goals:
-           ============
-           \0. make it build (excluding things you don't need atm)
-           \1. receive Input... print here (see if you can hack it to not need game data for now)
-           2. have a context... direct input to it.
-           3. pretend to trigger an action on that context by getting its personality (key-quirk mapping, right?)
-           */
+        // Talk to timer if this is a periodic activity.
+        if ( currActivity.nRepsRemaining > 0 ) {
+          --currActivity.nRepsRemaining;
+          auto& timer = Timer::getInstance();
+          // (30/s * 1s/1000ms)^-1
+          timer.start( 1e3 / currActivity.freq, entity, { entity, "REGULAR_REPEAT" } );
+        }
+        // Call current activity's callback.
+        currActivity.state = currActivity.callback( bb, t );
+        
 
-      };  // class Trigger
+        // auto& currActivity =
+        // TODO check reps remaining
+        // TODO compare priority to active priority
+        // TODO we need to pass in act arg 
+        // TODO get entity's blackboard
+        // inputQuirk->second.action();
+      }
+    /* Input goals:
+       ============
+       \0. make it build (excluding things you don't need atm)
+       \1. receive Input... print here (see if you can hack it to not need game data for now)
+       2. have a context... direct input to it.
+       3. pretend to trigger an action on that context by getting its personality (key-quirk mapping, right?)
+       */
+
+};  // class Trigger

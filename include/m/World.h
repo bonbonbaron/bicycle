@@ -9,13 +9,16 @@
 #include "v/Image.h"
 #include "m/Position.h"
 #include "m/Personality.h"
+#include "m/Activity.h"
 
 constexpr unsigned NUM_SUPPORTED_ENTITIES{256};
 
 using ArrayVar = std::variant<
   std::array<Position, NUM_SUPPORTED_ENTITIES>,
   std::array<Image, NUM_SUPPORTED_ENTITIES>,
-  std::array<Personality, NUM_SUPPORTED_ENTITIES>
+  std::array<Personality, NUM_SUPPORTED_ENTITIES>,
+  std::array<Activity, NUM_SUPPORTED_ENTITIES>,
+  std::array<Blackboard, NUM_SUPPORTED_ENTITIES>
 >;
 
 template <typename T>
@@ -76,7 +79,7 @@ class World {
 
     // Convenience: initialize all known types in one call
     void initialize_all() {
-      initialize<Position, Image, Personality>();
+      initialize<Position, Image, Personality, Activity, Blackboard>();
     }
 
     // Optional: check whether a type is already initialized  // TODO delete if unneeded
