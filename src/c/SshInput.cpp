@@ -2,7 +2,7 @@
 
 #include "c/SshInput.h"
 #include "c/InputData.h"
-#include "c/Activity.h"
+#include "c/Trigger.h"
 
 using namespace std;
 
@@ -110,8 +110,8 @@ void SshInput::_listen() {
     _inputState.currKeysPressed.reset(); // SSH mode doesn't support key press/release distinctions. Press-detections only.
     if ( lkey != LogicalKey::COUNT ) {
       _inputState.currKeysPressed.set( static_cast<unsigned>( lkey ) );
-      cout << _inputState.currKeysPressed << '\n';
-      Activity::onInput();
+      // cout << _inputState.currKeysPressed << '\n';  // This prints out the bitset for debugging.
+      Trigger::onInput( _inputState );
     }
   }
 }

@@ -1,4 +1,4 @@
-#include "c/Activity.h"
+#include "c/Trigger.h"
 #include "m/Entity.h"
 #include "c/Timer.h"
 
@@ -25,22 +25,23 @@ void ActionRegistry::add( const ActionRegistry::value_type& val ) {
 }
 
 
-auto Activity::getInstance() -> Activity& {
-  static Activity activity;
+auto Trigger::getInstance() -> Trigger& {
+  static Trigger activity;
   return activity;
 }
 
 
 // ONLY inputs are context-sensitive. Collisions and timers are transitive.
-void Activity::onInput() {
+void Trigger::onInput( const InputState& input ) {
   auto& activity = getInstance();
   auto personality = activity._personalityMap.find( activity._context );
   if ( personality == activity._personalityMap.end() ) {
-    std::cout << "Activity's personality map doesn't have entity " << activity._context << '\n';
+    std::cout << "Trigger's personality map doesn't have entity " << activity._context << '\n';
     return;
   }
   auto inputQuirk = personality->second.find( "ON_INPUT" );
   if ( inputQuirk != personality->second.end() ) {
+    auto& action = std::get<Cb<InputState>>( inputQuirk->second.action );
     // TODO the following TODOs should be wrapped in a common, templated function (<InputState> in this case)
     // TODO check reps remaining
     // TODO compare priority to active priority
@@ -50,14 +51,14 @@ void Activity::onInput() {
   }
 }
 
-void Activity::onTimer( const TimerId timerId ) {
+void Trigger::onTimer( const TimerId timerId ) {
 }
 
-void Activity::onCollision( const int collisionType ) {
+void Trigger::onCollision( const int collisionType ) {
 }
 
 #if 0 //TODO
-void Activity::validate() {
+void Trigger::validate() {
   personality.validate();
 }
 #endif

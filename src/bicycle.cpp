@@ -7,7 +7,7 @@
 #include "Config.h"
 #include "Constants.h"
 #include "m/World.h"
-#include "c/Activity.h"
+#include "c/Trigger.h"
 #include "c/SshInput.h"
 
 namespace bicycle {

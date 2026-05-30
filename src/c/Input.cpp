@@ -1,5 +1,5 @@
 #include "c/Input.h"
-#include "c/Activity.h"
+#include "c/Trigger.h"
 
 // ────────────────────────────────────────────────
 //  Logical keys – our unified, cross-platform key namespace
@@ -109,10 +109,10 @@ void Input::listen() {
     }
   }
 
-  // Send new events, bundled up in a single bitset, to activity SYSTEM.
+  // Send new events, bundled up in a single bitset, to Trigger SYSTEM.
   if ( _state.deltaKeysPressed.any() ) {
-    // We don't have to know who has focus. Activity should know.
-    activity::onInput( _keyState );  
+    // We don't have to know who has focus. Trigger should know.
+    Trigger::onInput( _keyState );  
   }
 }  // Input::listen()
 

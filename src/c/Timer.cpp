@@ -1,6 +1,6 @@
 #include "c/Timer.h"
 #include "Constants.h"
-// TODO #include "c/Activity.h"
+// TODO #include "c/Trigger.h"
 #include <iostream> // TODO delete
 #include <thread>
 

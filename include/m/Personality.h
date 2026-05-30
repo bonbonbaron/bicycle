@@ -14,7 +14,7 @@
 #include "c/Timer.h"
 #include "c/InputData.h"
 
-// TODO
+// TODO resolve these to real datatypes
 using CollisionData = int;
 using TimerData = double;
 
