@@ -8,17 +8,11 @@
 #include "m/Entity.h"
 #include "v/Image.h"
 #include "m/Position.h"
-#include "m/Personality.h"
-#include "m/Activity.h"
 
-constexpr unsigned NUM_SUPPORTED_ENTITIES{256};
 
 using ArrayVar = std::variant<
   std::array<Position, NUM_SUPPORTED_ENTITIES>,
   std::array<Image, NUM_SUPPORTED_ENTITIES>,
-  std::array<Personality, NUM_SUPPORTED_ENTITIES>,
-  std::array<Activity, NUM_SUPPORTED_ENTITIES>,
-  std::array<Blackboard, NUM_SUPPORTED_ENTITIES>
 >;
 
 template <typename T>

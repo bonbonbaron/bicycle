@@ -33,7 +33,7 @@ auto Trigger::getInstance() -> Trigger& {
 
 // ONLY inputs are context-sensitive. Collisions and timers are transitive.
 void Trigger::onInput( const InputState& input ) {
-
+    std::cout << "Triggered input response for input " << input.currKeysPressed << '\n';
     // TODO the following TODOs should be wrapped in a common, templated function (<InputState> in this case)
     // TODO check reps remaining
     // TODO compare priority to active priority
@@ -42,7 +42,8 @@ void Trigger::onInput( const InputState& input ) {
     // inputQuirk->second.action();
 }
 
-void Trigger::onTimer( const TimerId timerId ) {
+void Trigger::onTimer( const TimeoutMsg& timeoutMsg ) {
+  std::cout << "Triggered timeout response for timer ID " << timeoutMsg.id << ", type " << timeoutMsg.type << ", val " << timeoutMsg.val << '\n';
 }
 
 void Trigger::onCollision( const int collisionType ) {

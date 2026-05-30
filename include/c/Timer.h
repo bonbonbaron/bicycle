@@ -6,13 +6,12 @@
 
 #include "Constants.h"
 
-using Entity = unsigned;
-
 constexpr unsigned long MAX_NUM_TIMERS{1024};
 
 // TODO perhaps this is a good candidate for 
 struct TimeoutMsg {
-  Entity entity{};
+  unsigned id{};  // An entity can have multiple timers running simulatneously. ID
+  unsigned type{};  // B
   std::string val;  // TODO replace with a proper enum
 };
 
@@ -30,7 +29,7 @@ class Timer {
 
     // Timer-specific functions
     void _run();
-    auto start( const unsigned timeMs, const Entity entity, const TimeoutMsg& timeoutMsg ) -> TimerId;  // returns the ID of the timer started for caller's future reference
+    auto start( const unsigned timeMs, const unsigned timerType, const std::string& timeoutMsg ) -> TimerId;  // returns the ID of the timer started for caller's future reference
     void stop( TimerId timerId );
     void pause( const TimerId timerId );
     void unpause( const TimerId timerId );

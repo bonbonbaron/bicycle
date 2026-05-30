@@ -18,7 +18,7 @@
 using CollisionData = int;
 using TimerData = double;
 
-enum class ActionState { READY, FAILED, IN_PROGRESS, COMPLETE };
+enum class ActionState { READY, FAILED, PAUSED, IN_PROGRESS, COMPLETE };
 //
 // Function template
 template<typename T>

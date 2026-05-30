@@ -1,9 +1,11 @@
 #pragma once
 #include <map>
-#include "c/InputData.h"
+#include "c/InputData.h"  // TODO: Shouldn't this be m/InputData?
 #include "c/Timer.h"
-#include "m/World.h"
+#include "m/Entity.h"
 #include "m/Personality.h"
+#include "m/Activity.h"
+#include "m/Blackboard.h"
 
 // Trigger will have a map of entities-to-personalities. We DON'T iterate through all of these every frame.
 // That would be dumb. Instead, we let events (collisions, timers, and input) drive it. 
@@ -32,7 +34,7 @@ class Trigger {
 
     // Le trifecta
     static void onInput( const InputState& input );  // straightforward feeding to whatever holds context
-    static void onTimer( const TimerId timerIdx );  // TODO: timer ID should map to a quirk.
+    static void onTimer( const TimeoutMsg& timeoutMsg );  // TODO: timer ID should map to a quirk.
     static void onCollision( const int collisionType );  // TODO
   private:
     Trigger() = default;
@@ -43,7 +45,12 @@ class Trigger {
 
     Entity _context{};  // The context receives inputs.
     std::map<Entity, Personality> _personalityMap{};
-
+    // timeout ID gives entity; timeout type gives entity's quirk
+    // Entities don't have to implement "onTimeout "ANIMATION_TIMEOUT" or anything basic like that.
+    std::array<Entity, MAX_NUM_TIMERS> activeTimers{};
+    std::array<Personality, NUM_SUPPORTED_ENTITIES> _personalities{};
+    std::array<Activity, NUM_SUPPORTED_ENTITIES> _activities{};
+    std::array<Blackboard, NUM_SUPPORTED_ENTITIES> _blackboards{};
     /* 
      * TIMER: timer ID goes off, asks Trigger whose it was and gets the entity.
      *        timer type fishes out the quirk and triggers it. We pass in the timer information
@@ -60,15 +67,17 @@ class Trigger {
           std::cout << "Trigger's personality map doesn't have entity " << trigger._context << '\n';
           return;
         }
-        // Get the triggered quirk.
-        auto quirk = personality->second.find( stimulus );
+
+        // Get entity's triggered quirk from its personality.
+        auto quirk = personality->second.find( stimulus );  // TODO does this need to be an orchestra instead?
         if ( quirk == personality->second.end() ) {
           return;
         }
+
         // Get triggered action and current activity to see whether the former overrides the latter.
         auto& triggeredAction = std::get<Cb<T>>( quirk->second.action );
-        auto& currActivity = World::get<Activity>( entity );
-        auto& bb = World::get<Blackboard>( entity );
+        auto& currActivity = _activities.at( entity );
+        auto& bb = _blackboards.at( entity );
         if ( currActivity.state == ActionState::IN_PROGRESS || 
             currActivity.priority > triggeredAction.priority ) {
           // TODO does this mean we call the current activity's callback again and decrement its nRepsRemaining?
@@ -83,24 +92,17 @@ class Trigger {
           --currActivity.nRepsRemaining;
           auto& timer = Timer::getInstance();
           // (30/s * 1s/1000ms)^-1
-          timer.start( 1e3 / currActivity.freq, entity, { entity, "REGULAR_REPEAT" } );
+          constexpr unsigned REGULAR_TIMER_TYPE{0};
+          auto timerId = timer.start( static_cast<unsigned>( 1e3 / currActivity.freq ), REGULAR_TIMER_TYPE, "REGULAR_REPEAT" );
         }
         // Call current activity's callback.
         currActivity.state = currActivity.callback( bb, t );
-        
-
-        // auto& currActivity =
-        // TODO check reps remaining
-        // TODO compare priority to active priority
-        // TODO we need to pass in act arg 
-        // TODO get entity's blackboard
-        // inputQuirk->second.action();
-      }
+      }  // onTrigger()
     /* Input goals:
        ============
        \0. make it build (excluding things you don't need atm)
        \1. receive Input... print here (see if you can hack it to not need game data for now)
-       2. have a context... direct input to it.
+       \2. have a context... direct input to it.
        3. pretend to trigger an action on that context by getting its personality (key-quirk mapping, right?)
        */
 

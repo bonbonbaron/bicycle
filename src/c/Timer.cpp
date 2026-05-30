@@ -1,8 +1,10 @@
 #include "c/Timer.h"
 #include "Constants.h"
-// TODO #include "c/Trigger.h"
+#include "c/Trigger.h"
+
 #include <iostream> // TODO delete
 #include <thread>
+
 
 Timer::Timer() : frameStartTime( std::chrono::steady_clock::now() ) {}
 
@@ -29,14 +31,10 @@ void Timer::sleepFrame() {
 }
 
 void Timer::_run() {
-  for ( unsigned i = 0; i < MAX_NUM_TIMERS; ++i ) {
-    _times.at(i) -= _decrementers.at(i);
-    if ( _decrementers.at(i) > 0 && _times.at(i) == 0 ) {
-      // TODO activity.onTimer( _msgs.at(i) );
-      auto& msg = _msgs.at(i);
-      // Unconditionally reset the timer to avoid complex branching.
-      _times.at(i) = msg.full;
-      std::cout << "Timer " << msg.val << " fired.\n";
+  for ( unsigned timerId = 0; timerId < MAX_NUM_TIMERS; ++timerId ) {
+    _times.at(timerId) -= _decrementers.at(timerId);
+    if ( _decrementers.at(timerId) > 0 && _times.at(timerId) == 0 ) {
+      Trigger::onTimer( _msgs.at(timerId) );
     }
   }
 }
@@ -49,7 +47,7 @@ void Timer::unpause( const unsigned timerId ) {
   _decrementers.at(timerId) = 1;
 }
 
-auto Timer::start( const unsigned timeMs, const Entity entity, const std::string& timeoutMsg ) -> unsigned {
+auto Timer::start( const unsigned timeMs, const unsigned timerType, const std::string& timeoutMsg ) -> unsigned {
   auto timerId = findAvailableTimer();
   if ( timerId < MAX_NUM_TIMERS )  {
     // float mult faster than div
@@ -62,7 +60,7 @@ auto Timer::start( const unsigned timeMs, const Entity entity, const std::string
 #endif
     _times.at( timerId ) = nFrames;
     _decrementers.at(timerId) = 1;
-    _msgs.at(timerId)  = TimeoutMsg{ entity, timeoutMsg, nFrames };
+    _msgs.at(timerId)  = TimeoutMsg{ timerId, timerType, timeoutMsg };
   }
   return timerId;
 }
@@ -70,10 +68,6 @@ auto Timer::start( const unsigned timeMs, const Entity entity, const std::string
 void Timer::stop( unsigned timerId ) {
   _decrementers.at(timerId) = 0;
   _availableTimers.set( timerId, true );
-}
-
-void Timer::setDuration( unsigned timerId, unsigned durMs ) {
-  _msgs.at( timerId ).full = (FRAMES_PER_SECOND * durMs) / 1000;
 }
 
 auto Timer::findAvailableTimer() -> unsigned {
