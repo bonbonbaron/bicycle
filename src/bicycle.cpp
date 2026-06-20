@@ -64,6 +64,7 @@ namespace bicycle {
       }
     }
     catch ( std::exception& e ) {
+      endwin();
       std::cerr << e.what();
     }
 #if 0

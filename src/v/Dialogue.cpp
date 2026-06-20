@@ -33,7 +33,6 @@ void Dialogue::init() {
 // TODO provide dev-friendly key masks
 void Dialogue::react( const InputState& input ) {
   auto& wm = WindowManager::getInstance();
-  std::cout << "input is " << input.currKeysPressed << '\n';
   if ( (MASK_J & input.currKeysPressed).any() ) {
     ++initLineNum;
     initLineNum = std::clamp<unsigned>( initLineNum, 0, lineLimits.size()  - 4 );
@@ -52,14 +51,11 @@ void Dialogue::react( const InputState& input ) {
     initLineNum = std::clamp<unsigned>( initLineNum, 0, lineLimits.size() - 1 );
   }
   else if ( (MASK_SPACE & input.currKeysPressed).any() ) {
-    std::cout << "pressed space\n";
     wm.pop();
   }
   else {
-    std::cout << "unsupported\n";
     Window::react( input );
   }
-  getch();
   update();
 }
 
