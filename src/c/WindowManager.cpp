@@ -40,7 +40,7 @@ auto WindowManager::size() const -> int {
   return _population;
 }
 
-void WindowManager::react( const int input ) {
+void WindowManager::react( const InputState& input ) {
   // std::unique_lock<std::mutex> l( _mut );  // This lets both timers and the controller trigger rendering.
   if ( auto w = back() ) {
     w->react( input );  // Let the topmost window alone receive key-presses.

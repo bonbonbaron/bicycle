@@ -3,6 +3,7 @@
 #include <array>
 #include <memory>
 #include <mutex>
+#include "c/InputData.h"
 
 constexpr int MAX_NUM_WINDOWS{50};
 
@@ -15,7 +16,7 @@ class WindowManager {
     }
 
     void render();
-    void react( const int i );
+    void react( const InputState& i );
     auto size() const -> int;
     auto back() const -> const std::shared_ptr<Window>;
     void push( const std::shared_ptr<Window> win );

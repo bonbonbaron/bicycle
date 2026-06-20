@@ -2,7 +2,7 @@ DBG=-g
 STD=-std=c++20
 
 BICREPO := $(shell git rev-parse --show-toplevel)
-BICSRCS := main bicycle Config c/Trigger c/Timer c/SshInput v/ColorPalette v/Window c/WindowManager v/Dialogue m/Blackboard # m/Body c/Input v/Bar v/Dialogue c/Dice v/Menu c/MidiPlayer v/Graph v/Grid 
+BICSRCS := main bicycle Config c/Trigger c/Timer c/SshInput v/ColorPalette v/Window c/WindowManager v/Dialogue m/Blackboard # m/Body c/Input v/Bar c/Dice v/Menu c/MidiPlayer v/Graph v/Grid 
 BICINCS := bicycle Image ColorPalette Dialogue Menu MidiPlayer Window WindowManager  # TODO fix this
 BICINCS := $(BICINCS:%=$(BICREPO)/include/%.h)
 
@@ -33,4 +33,5 @@ install: $(BICTGT)
 
 .PHONY: clean
 clean:
-	rm -rf $(BICREPO)/build/*
+	rm -rf $(BICREPO)/build/*/*.o
+	rm -rf $(BICREPO)/build/*.o
