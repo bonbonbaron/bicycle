@@ -39,9 +39,8 @@ void Trigger::onInput( const InputState& input ) {
   const auto& wm = WindowManager::getInstance();
   const auto currWindow = wm.back();
   assert( currWindow != nullptr );
-  Entity entity{};
   if ( currWindow->hasChildEntities() ) {
-    entity = currWindow->getContext();
+    const auto entity = currWindow->getContext();
     auto& trig = getInstance();
     trig.onTrigger( Constants::INPUT.data(), entity, input );
   }
