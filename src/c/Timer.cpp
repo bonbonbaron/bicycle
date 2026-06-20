@@ -56,7 +56,7 @@ auto Timer::start( const unsigned timeMs, const unsigned timerType, const std::s
     unsigned nFrames{static_cast<unsigned>(timeMs * FRAMES_PER_MILLISECOND)};
 #else
     // frames/sec * sec/msec * msec = frames
-    unsigned nFrames{ (FRAMES_PER_SECOND * timeMs) / 1000 };
+    unsigned nFrames{ (Constants::FRAMES_PER_SECOND * timeMs) / 1000 };
 #endif
     _times.at( timerId ) = nFrames;
     _decrementers.at(timerId) = 1;

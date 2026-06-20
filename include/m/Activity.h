@@ -8,7 +8,7 @@ struct Activity : public Quirk {
   decltype(Quirk::reps) nRepsRemaining{};
   ActionState state{};
   std::vector<Activity> children{};
-  std::set<Timer> timers{};  // should only be populated for the top level
+  std::set<TimerId> timers{};  // should only be populated for the top level
 
   auto operator=( const Quirk& q ) -> Activity {
     Activity a;  // The 3 trigger types will know which variant this is.

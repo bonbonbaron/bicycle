@@ -6,6 +6,9 @@
 #include "m/Personality.h"
 #include "m/Activity.h"
 #include "m/Blackboard.h"
+#include "c/WindowManager.h"
+
+// Wait,does input need to handle things differently from timer & collision?
 
 // Trigger will have a map of entities-to-personalities. We DON'T iterate through all of these every frame.
 // That would be dumb. Instead, we let events (collisions, timers, and input) drive it. 
@@ -43,7 +46,7 @@ class Trigger {
     Trigger(const Trigger&&) = delete;
     Trigger operator=(const Trigger&&) = delete;
 
-    Entity _context{};  // The context receives inputs.
+    std::shared_ptr<Window> _context{};  // The context receives inputs.
     std::map<Entity, Personality> _personalityMap{};
     // timeout ID gives entity; timeout type gives entity's quirk
     // Entities don't have to implement "onTimeout "ANIMATION_TIMEOUT" or anything basic like that.
@@ -127,7 +130,7 @@ class Trigger {
        ============
        \0. make it build (excluding things you don't need atm)
        \1. receive Input... print here (see if you can hack it to not need game data for now)
-       \2. have a context... direct input to it.
+       2. have a top-level window... direct input to it.
        3. pretend to trigger an action on that context by getting its personality (key-quirk mapping, right?)
        */
 

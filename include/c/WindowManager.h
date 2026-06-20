@@ -16,7 +16,6 @@ class WindowManager {
     }
 
     void render();
-    void react( const InputState& i );
     auto size() const -> int;
     auto back() const -> const std::shared_ptr<Window>;
     void push( const std::shared_ptr<Window> win );

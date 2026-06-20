@@ -17,7 +17,7 @@ struct TimeoutMsg {
 
 using namespace std::chrono_literals;
 // Interval allows us to know how much of the current frame is left for sleeping.
-constexpr std::chrono::milliseconds INTERVAL(static_cast<int>(MILLISECONDS_PER_FRAME));
+constexpr std::chrono::milliseconds INTERVAL(static_cast<int>(Constants::MILLISECONDS_PER_FRAME));
 
 using TimerId = unsigned;
 

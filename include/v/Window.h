@@ -2,6 +2,7 @@
 #include <string>
 #include "ColorPalette.h"
 #include "c/InputData.h"
+#include "m/Entity.h"
 
 static constexpr int WINDOW_PADDING{2};
 
@@ -9,8 +10,8 @@ class Window {
   public:
     // i know this doesn't align with ncurses' paramter order, but I like my order better :)
     Window() = default;
-    Window( const int w, const int h );
-    Window( const int x, const int y, const int w, const int h );
+    Window( const int w, const int h, const bool hasChildren = false );
+    Window( const int x, const int y, const int w, const int h, const bool hasChildren = false );
     ~Window();
     void create();
     void show();
@@ -42,6 +43,10 @@ class Window {
     void addmvch( const int y, const int x, char c ) const;  // mvaddch() might be a macro, blows compilation
     void putc( const char c ) const;
     void print( const std::string& s ) const;
+
+    auto hasChildEntities() const -> bool;
+    auto getId() const -> Entity; // window's an entity now
+    auto getContext() const -> Entity; // window's an entity now
   private:
     WINDOW* _win;
     chtype _colorPair;
@@ -51,4 +56,7 @@ class Window {
     int _h{};
     int _x{};
     int _y{};
+    const bool _hasChildEntities{};
+    const Entity _id{};
+    const Entity _context{};
 };

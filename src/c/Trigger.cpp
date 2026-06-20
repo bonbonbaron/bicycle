@@ -1,6 +1,7 @@
 #include "c/Trigger.h"
 #include "m/Entity.h"
 #include "c/Timer.h"
+#include "Constants.h"
 
 auto TriggerRegistry::getInstance() -> TriggerRegistry& {
   static TriggerRegistry reg;
@@ -34,8 +35,19 @@ auto Trigger::getInstance() -> Trigger& {
 // ONLY inputs are context-sensitive. Collisions and timers are transitive.
 void Trigger::onInput( const InputState& input ) {
   std::cout << "Triggered input response for input " << input.currKeysPressed << '\n';
-  auto& trig = getInstance();
-  trig.onTrigger( "idklol", 1, input );
+  // If top window has sub-entities, get its inner context.
+  const auto& wm = WindowManager::getInstance();
+  const auto currWindow = wm.back();
+  assert( currWindow != nullptr );
+  Entity entity{};
+  if ( currWindow->hasChildEntities() ) {
+    entity = currWindow->getContext();
+    auto& trig = getInstance();
+    trig.onTrigger( Constants::INPUT.data(), entity, input );
+  }
+  else {
+    currWindow->react( input );
+  }
   // TODO the following TODOs should be wrapped in a common, templated function (<InputState> in this case)
   // TODO check reps remaining
   // TODO compare priority to active priority
