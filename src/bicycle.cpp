@@ -67,14 +67,6 @@ namespace bicycle {
       endwin();
       std::cerr << e.what();
     }
-#if 0
-    int i{}; 
-    do {
-      wm.react( i );
-      wm.render();
-      // napms( 30 );  // delay to prevent flickering
-    } while ( wm.size() > 0 && ( i = getch() ) != 'q' );
-#endif
 
     return endwin();
   }
