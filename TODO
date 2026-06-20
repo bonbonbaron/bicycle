@@ -1,25 +1,23 @@
-CoMMENTED OUT GAME LOADER TO TEST INPUT
-by Tuesday morning, i want input, timer, and action all causing entities to do and say things.
-Hell, it would be even *ideal* to move a character around and see him changing colors every so many milliseconds.
-Actually, what would be best, would ( and this would be ambitious ) be to have a Battle again.
-  With music, menus, actions, and stats.
-  Idk about nodes yet. That's an annoying tidbit I've neglected for a while now.
+Timer needs pointer to activity for group-wide management.
+Input needs redirecting to a top-level window (some of which can redirect it, in turn, to an entity)
+Collision only needs to 
+Activities need children. 
+  - Parent needs to know 
+      * what timers to pause... that's literally it. 
+        Inputs always matter (filter-able by given context), and
+        collisions can be filtered individually.
+  struct Activity {
+    set<Timer> childTimers{};  // i like set better for no searching
+    
+  };
 
-NOW
-===
-  Get reorg'd things to compile again. Menu's failing to build now. I'm trying to make Entity an int, so I have to
-    figure out first what the heck I was thinking when I put shared pointers to Entities as MenuItem.
-  Input  outputs the following in a single struct:
-    Bitset of buttons pressed
-    Bitset of delta buttons
-    # frames since last key event ( i can make a constexpr convert millis to frames )
-  Activity
+  struct Timer {
+    shared_ptr<Activity> activityP{};
 
-FUTURE DIRECTION:
-=================
-  Input and Timer feed Activity
 
-It looks like I changed the way actions were going to be implemented. I got rid of registerActions() for some reason; obviously I should create them game-side, but I don't recall how that gets shipped across the linking layer. Maybe I shouldn't worry too much about that now and focus instead on how actions will look in the first place. I'd been focused on timer and input-- ahh, two fundamentals -- before. Maybe I should turn to that whiteboard in my garage for clues on what I'd been thinking before.
+Hate to be a perpetual dreamer-- all the more reason to expedite this engine's RE-completion-- but I cannot wait to
+design cities in my games. Bikable cities that fertilize happiness. I want to read more of that happy city book to
+understand how best to make my game's towns.
 
 ------------
 version 2.0:
@@ -49,3 +47,5 @@ testing:
   go to Battle node on contact with enemy; return when done with enemy disappearing
   go from one room to the other
 
+
+eventualy, i'd like to make a function automatically check all the different combinations of inputs that can map to different behaviors.

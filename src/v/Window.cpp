@@ -33,8 +33,8 @@ void Window::clear() {
   werase( _win );
 }
 
-void Window::react( const int input ) {
-  }
+void Window::react( const InputState& input ) {
+}
 
 auto Window::getX() const -> int{
   return getbegx( _win );
@@ -44,11 +44,11 @@ auto Window::getY() const -> int{
   return getbegy( _win );
 }
 
-auto Window::getWidth() const -> int{
+auto Window::getWidth() const -> unsigned {
   return _w;
 }
 
-auto Window::getHeight() const -> int{
+auto Window::getHeight() const -> unsigned {
   return _h;
 }
 

@@ -67,7 +67,7 @@ const MenuItem& Menu::getCurrMenuItem() const {
 
 constexpr std::string_view ON_SELECT{ "onSelect" };
 
-void Menu::react( const int input ) {
+void Menu::react( const InputState& input ) {
   auto& wm = WindowManager::getInstance();
   const int NUM_ROWS_DISP = getHeight() - WINDOW_PADDING;
   MenuItem item;

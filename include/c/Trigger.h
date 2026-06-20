@@ -56,6 +56,28 @@ class Trigger {
      *        timer type fishes out the quirk and triggers it. We pass in the timer information
      *        for the hell of it; whether or not the game actually uses it is none of our concern rn.
      */
+    /*
+     * But if i want timer -> animation to... 
+     *  1. not stop the larger action that animation belongs to (such as walking and thinking)
+     *  2. be pausable/stoppable along with the larger action
+     *
+     *  ... then we need to rethink quirks.
+     *  Quirks assume one piece of action only and inhibits multiple timers from triggering concurrent activities.
+     *  Maybe quirks need ports for various signals:
+     *    timerAnimType   -> animation sub-activity
+     *    timerMotionType -> motion sub-activity
+     *    timerCustomType -> thinking sub-activity
+     *
+     *  Let's say this group has priority 4. What happens if a collision prio 5 triggers in the middle of it?
+     *
+     *  Notice this whole problem is all about timers.
+     *  In the above ports idea, would there ever be a port for anything other than a timer?
+     *  Collision is concerned a root-level trigger as is input.
+     *  So I believe not.
+     *  But what if a timer of bigger priority happens? Can that be a root-level trigger overthrowing this overarching activity?
+     *  The Trigger::onTimer() interface needs a bit of work to distinguish between timer ports and root-level interrupts.
+     *  
+     */
 
     // General trigger of input, timer, and collision actions
     template<typename T>
@@ -64,23 +86,25 @@ class Trigger {
         auto& trigger = getInstance();
         auto personality = trigger._personalityMap.find( entity );
         if ( personality == trigger._personalityMap.end() ) {
-          std::cout << "Trigger's personality map doesn't have entity " << trigger._context << '\n';
+          std::cout << "Trigger's personality map doesn't have entity " << entity << '\n';
           return;
         }
 
         // Get entity's triggered quirk from its personality.
-        auto quirk = personality->second.find( stimulus );  // TODO does this need to be an orchestra instead?
-        if ( quirk == personality->second.end() ) {
+        auto quirkPair = personality->second.find( stimulus );  // TODO does this need to be an orchestra instead?
+        if ( quirkPair == personality->second.end() ) {
           return;
         }
+        auto& quirk = quirkPair->second;
 
         // Get triggered action and current activity to see whether the former overrides the latter.
-        auto& triggeredAction = std::get<Cb<T>>( quirk->second.action );
+        // TODO if triggered action is the same as one already ongoing (do quirks need IDs to know that?), 
         auto& currActivity = _activities.at( entity );
+        auto& triggeredAction = std::get<Cb<T>>( quirk.action );
         auto& bb = _blackboards.at( entity );
         if ( currActivity.state == ActionState::IN_PROGRESS || 
-            currActivity.priority > triggeredAction.priority ) {
-          // TODO does this mean we call the current activity's callback again and decrement its nRepsRemaining?
+            currActivity.priority > quirk.priority ) {
+          // TODO does this mean we call the current activity's action again and decrement its nRepsRemaining?
         }
         else {
           // Initialize and start overriding activity.
@@ -91,12 +115,13 @@ class Trigger {
         if ( currActivity.nRepsRemaining > 0 ) {
           --currActivity.nRepsRemaining;
           auto& timer = Timer::getInstance();
-          // (30/s * 1s/1000ms)^-1
           constexpr unsigned REGULAR_TIMER_TYPE{0};
+          // (30/s * 1s/1000ms)^-1
           auto timerId = timer.start( static_cast<unsigned>( 1e3 / currActivity.freq ), REGULAR_TIMER_TYPE, "REGULAR_REPEAT" );
+          // TODO map timer ID to an entity, orchestra, or something so at least one action can be paused/stopped
         }
-        // Call current activity's callback.
-        currActivity.state = currActivity.callback( bb, t );
+        // Call current activity's action.
+        currActivity.state = triggeredAction( bb, t );
       }  // onTrigger()
     /* Input goals:
        ============

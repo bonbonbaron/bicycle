@@ -12,7 +12,7 @@
 
 using ArrayVar = std::variant<
   std::array<Position, NUM_SUPPORTED_ENTITIES>,
-  std::array<Image, NUM_SUPPORTED_ENTITIES>,
+  std::array<Image, NUM_SUPPORTED_ENTITIES>
 >;
 
 template <typename T>
@@ -73,7 +73,7 @@ class World {
 
     // Convenience: initialize all known types in one call
     void initialize_all() {
-      initialize<Position, Image, Personality, Activity, Blackboard>();
+      initialize<Position, Image>();
     }
 
     // Optional: check whether a type is already initialized  // TODO delete if unneeded

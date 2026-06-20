@@ -1,6 +1,7 @@
 #pragma once
 #include <string>
 #include "ColorPalette.h"
+#include "c/InputData.h"
 
 static constexpr int WINDOW_PADDING{2};
 
@@ -17,15 +18,15 @@ class Window {
     void clear();
     void move( int y, int x );
     virtual void update() = 0;
-    virtual void react( const int input ) = 0;
+    virtual void react( const InputState& input ) = 0;
     void repaint();
     const char* getCurrItemName() const;
     const char* getCurrItemDesc() const;
 
     auto getX() const -> int;
     auto getY() const -> int;
-    auto getWidth() const -> int;
-    auto getHeight() const -> int;
+    auto getWidth() const -> unsigned;
+    auto getHeight() const -> unsigned;
 
     void setAttr( const int attr );
     void unsetAttr( const int attr );

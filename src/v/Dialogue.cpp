@@ -26,39 +26,40 @@ Dialogue::Dialogue( const std::string&& s, const int x, const int y, const int w
 }
 
 void Dialogue::init() {
-  const auto& cp = ColorPalette::getInstance();
+  // const auto& cp = ColorPalette::getInstance();  // TODO 
   delimitLines();
 }
 
-void Dialogue::react( const int input ) {
+// TODO provide dev-friendly key masks
+void Dialogue::react( const InputState& input ) {
   auto& wm = WindowManager::getInstance();
-  switch( input ) {
-    case 'j':
-      initLineNum = std::clamp<int>( ++initLineNum, 0, lineLimits.size()  - 4 );
-      break;
-    case 'k':
-      initLineNum = std::clamp<int>( --initLineNum, 0, lineLimits.size() );
-      break;
-    case 'f':
-      initLineNum = std::clamp<int>( initLineNum + getHeight() - WINDOW_PADDING, 0, lineLimits.size() - 1 );
-      break;
-    case 'b':
-      initLineNum = std::clamp<int>( initLineNum - getHeight() + WINDOW_PADDING, 0, lineLimits.size() - 1 );
-      break;
-    case ' ':
-      wm.pop();
-      return;
-      break;
-    default:
-      Window::react( input );
+  if ( (MASK_J & input.currKeysPressed).any() ) {
+    ++initLineNum;
+    initLineNum = std::clamp<unsigned>( initLineNum, 0, lineLimits.size()  - 4 );
+  }
+  else if ( (MASK_K & input.currKeysPressed).any() ) {
+    --initLineNum;
+    initLineNum = std::clamp<unsigned>( initLineNum, 0, lineLimits.size() );
+  }
+  else if ( (MASK_F & input.currKeysPressed).any() ) {
+    initLineNum = std::clamp<unsigned>( initLineNum + getHeight() - WINDOW_PADDING, 0, lineLimits.size() - 1 );
+  }
+  else if ( (MASK_B & input.currKeysPressed).any() ) {
+    initLineNum = std::clamp<unsigned>( initLineNum - getHeight() + WINDOW_PADDING, 0, lineLimits.size() - 1 );
+  }
+  else if ( (MASK_SPACE & input.currKeysPressed).any() ) {
+    wm.pop();
+  }
+  else {
+    Window::react( input );
   }
   update();
 }
 
 void Dialogue::delimitLines() {
   constexpr int NUM_INSTANCES_TO_FIND{1};
-  const int WIDTH = getWidth() - WINDOW_PADDING;
-  assert( WIDTH > 0 );
+  assert( getWidth() > WINDOW_PADDING );
+  const unsigned WIDTH = getWidth() - WINDOW_PADDING;
   LineLimits currLineLims;
   for ( ;; ) {
     if ( ( _content.length() - currLineLims.start ) <= WIDTH ) {
@@ -75,7 +76,7 @@ void Dialogue::delimitLines() {
 
 void Dialogue::update() {
   int windowRow{1};
-  for ( int i = initLineNum; i < getHeight() && i < lineLimits.size(); ++i ) {
+  for ( unsigned i = initLineNum; i < getHeight() && i < lineLimits.size(); ++i ) {
     mvprint( windowRow++, 1, std::string( _content, lineLimits.at(i).start, lineLimits.at(i).len ) );
   }
 }

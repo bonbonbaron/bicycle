@@ -22,7 +22,7 @@ enum class ActionState { READY, FAILED, PAUSED, IN_PROGRESS, COMPLETE };
 //
 // Function template
 template<typename T>
-using Cb = std::function<ActionState(Blackboard&, T&)>;
+using Cb = std::function<ActionState(Blackboard&, const T&)>;
 using ActCallback = std::variant< Cb<InputState>, Cb<CollisionData>, Cb<TimerData> >;
 
 
@@ -43,7 +43,7 @@ struct ActPkg {
 
 
 struct Quirk {
-  ActCallback action{};
+  ActCallback action{};  // This potentially starts a group of activities.
   int priority{};  // higher values take precedence
   unsigned freq{};  // freq at quirk-level gives entities more ownership over their own rates
   unsigned reps{};  // reps at quirk-level gives entities more ownership over their own repetitions

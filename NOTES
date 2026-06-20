@@ -1,49 +1,79 @@
+(W)indows need to have their stack so you can reroute inputs. I THINK that's the only trigger required.
+W:
+  
 O = orchestra: group of quirks initiated by a single trigger
                each quirk then runs by its own timer
                are collision and input the sole, actual initiators then?
                no
-               (S)o then do we need a level above Quirks?
-               S:
-                 Personality was a Trigger -> Quirk mapping.
-                 Or do Quirks simply need a new field: a shared pointer or index?
-                 Index might be easier to maintain.
-                 Like a group ID.
-                 Example of a group would be something like
-                   pick a random direction
-                   move
-                   animate
-                 So the thing that gives them a group ID needs a way to associate them with each other.
-                 Does Activity need a new function then to handle this?
-                 It would need to pick the 
-               (W)hat good are groups as an index if I can't stop them all at once?
-                 Well, the next timeout should check the group ID's index to see if it's still active. Perhaps
-                 group is an array of ActionStates then. It checks it to see if it's still IN_PROGRESS.
-                 Even if a sub-timer expires then, it isn't necessarily in charge of stopping the group.
-                 (BTW, I need to add a paused ActionState. Done.)
-                 But then how does Pausing work if I need to immediately stop a whole group and not just
-                   wait for its next timeout to check the ActionState?
-                 That and stopping/unpausing are what necessitates two-way communication.
-                 I could give it a vector of pointers to the Activity.
-                 Problem is, I've given all entities room for only one activity.
-                 Instead, they should have room for only one group.
-                 The group's data structure-- figuring out how to know where the activities are without creating/
-                 destroying vectors over and over again-- is the key. If I had a bump allocator, with my own home-
-                 grown arrays/vectors, that wouldn't be a problem. I can always replace std::<array|vector|map> with
-                 bic-namespaced counterparts later. But regardless, it has to make an array on the spot of how-
-                 ever many things it needs to talk to. That means the group initializer needs to be in control of
-                 creating the Activities so it find the index and feed it into the group's array. 
 
-                 struct Group {
-                   ActionState state{};
-                   std::array<unsigned, N> activityIds;
-                 };
+(S)o then do we need a level above Quirks?
+S:
+   Personality was a Trigger -> Quirk mapping.
+   Or do Quirks simply need a new field: a shared pointer or index?
+   Index might be easier to maintain.
+   Like a group ID.
+   Example of a group would be something like
+     pick a random direction (actually, this is the first step of a small sequence, but let's pretend for now it's not)
+     move
+     animate
+   So the thing that gives them a group ID needs a way to associate them with each other.
+   Because each activity can see the group ID, but not the other way around.
+   Linked lists are usually pretty good for this purpose; you can jump to the head and then to each individual element.
+   So then list seems to be a strong candidate for group to know where all its children are.
+   No need for fixed arrays. Lists might be easier to throw into a bump allocator later, provided I can intertwine
+   all the lists into one permanent array again.
 
-               (H)ow do I initiate a group so that it can be either YAML'able or code-able?
-               (R)andom frequencies per iteration would be nice. How would I make that universal?
-                  R: 
-                    Dice rolls make that easier. 
-                    Perhaps a new variant.
-                    Or a new field: min freq, max freq.
+(W)hat good are groups as an index if I can't stop them all at once?
+   Well, the next timeout should check the group ID's index to see if it's still active. Perhaps
+   group is an array of ActionStates then. It checks it to see if it's still IN_PROGRESS.
+   Even if a sub-timer expires then, it isn't necessarily in charge of stopping the group.
+   But then how does Pausing work if I need to immediately stop a whole group and not just
+     wait for its next timeout to check the ActionState?
+   That and stopping/unpausing are what necessitates two-way communication.
+   I could give it a vector of pointers to the Activity.
+   Problem is, I've given all entities room for only one activity.
+   Instead, they should have room for only one group.
+   The group's data structure-- figuring out how to know where the activities are without creating/
+   destroying vectors over and over again-- is the key. If I had a bump allocator, with my own home-
+   grown arrays/vectors, that wouldn't be a problem. I can always replace std::<array|vector|map> with
+   bic-namespaced counterparts later. But regardless, it has to make an array on the spot of how-
+   ever many things it needs to talk to. That means the group initializer needs to be in control of
+   creating the Activities so it find the index and feed it into the group's array. 
 
+   struct ActivityGroup {
+     ActionState state{};
+     std::list<Activity*, N> activityIds;
+   };
 
-                     
+   struct Activity {
+     ...
+     shared_ptr<ActivityGroup> group;
+   };
+
+   Whatever the case, the entire group needs a priority now, not each individual activity.
+   Forcing timeouts to go through Activity simplifies Timer's outlet.
+   What if timers just talk straight to motion and animation systems instead?
+   It'd be risky business not knowing if it's still running.
+
+   So to reiterate:
+   1. Input -> callback starts motion, animation, and thinking. That's 3 activities.
+   2. it looks for the entity's... oh shit, which priority is the real one?
+      Is Quirk now a group of actions instead of just one?
+      This is growign complicated.
+
+(H)ow do I initiate a group so that it can be either YAML'able or code-able?
+(R)andom frequencies per iteration would be nice. How would I make that universal?
+R: 
+   Dice rolls make that easier. 
+   Perhaps a new variant.
+   Or a new field: min freq, max freq.
+
+Here's what I think.
+Let's try to keep it simple.
+An animation loop is going to respond to one kind of timer
+A blinking loop another
+Thinking loop another
+But they all correspond to the same overarching activity.
+They reason they're lumped together is so I can start, pause, unpause, or stop all of them at once.
+That alone justifies their funneling through Trigger.cpp.
+

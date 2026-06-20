@@ -1,26 +1,15 @@
 #include <iostream>
-#include <functional>
-#include <string>
+#include <bitset>
 
 using namespace std;
 
-template<typename T>
-using f = function<int(int, T)>;
-
-int a( int i, string j ){
-  cout << "a() got string " << j << '\n';
-  return i * 12;
-}
-
-template<typename T>
-struct funcdata {
-  f<T> func;
-  int i{};
-};
-
 
 int main() {
-  funcdata<string> data{ a, 2 };
-  data.func( 12, "i am a string" );
+  bitset<5> i{3};
+  bitset<5> j{4};
+  auto k = i | j;
+  cout << "i: " << i << '\n';
+  cout << "j: " << j << '\n';
+  cout << "k: " << k << '\n';
   return 0;
 }

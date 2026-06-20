@@ -5,7 +5,7 @@
 
 // Variables
 struct LineLimits {
-  int start{}, len{};  // i just KNOW the len is gonna be mistaken for end at some point
+  unsigned start{}, len{};  // i just KNOW the len is gonna be mistaken for end at some point
 };
 
 class Dialogue : public Window {
@@ -17,7 +17,7 @@ class Dialogue : public Window {
     Dialogue( const std::string&& s, const int x, const int y, const int w, const int h );
     // Public functions
     void update() override;
-    void react( const int input ) override;
+    void react( const InputState& input ) override;
   private:
     // Private members
     std::string _content;
