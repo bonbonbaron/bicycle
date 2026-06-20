@@ -5,7 +5,7 @@ using namespace std;
 
 
 int main() {
-  bitset<5> i{3};
+  bitset<5> i{1};
   bitset<5> j{4};
   auto k = i | j;
   cout << "i: " << i << '\n';

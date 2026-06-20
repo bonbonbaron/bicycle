@@ -77,14 +77,13 @@ auto SshInput::convertCodeToLogicalInt(int code) -> LogicalKey {
     case '7': return LogicalKey::Key2;
     case '8': return LogicalKey::Key8;
     case '9': return LogicalKey::Key9;
+    case ' ':     return LogicalKey::Space;
 
 // TODO: support these keys as well once you figure out their ASCII codes.
 #if 0
     case KEY_ENTER:     return LogicalKey::Enter;
     case KEY_ESC:       return LogicalKey::Escape;
     case KEY_TAB:       return LogicalKey::Tab;
-    case KEY_SPACE:     return LogicalKey::Space;
-
     case KEY_LEFTCTRL:  return LogicalKey::LeftCtrl;
     case KEY_RIGHTCTRL: return LogicalKey::RightCtrl;
     case KEY_LEFTSHIFT: return LogicalKey::LeftShift;
@@ -110,7 +109,6 @@ void SshInput::_listen() {
     _inputState.currKeysPressed.reset(); // SSH mode doesn't support key press/release distinctions. Press-detections only.
     if ( lkey != LogicalKey::COUNT ) {
       _inputState.currKeysPressed.set( static_cast<unsigned>( lkey ) );
-      // cout << _inputState.currKeysPressed << '\n';  // This prints out the bitset for debugging.
       Trigger::onInput( _inputState );
     }
   }

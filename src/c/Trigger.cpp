@@ -34,7 +34,7 @@ auto Trigger::getInstance() -> Trigger& {
 
 // ONLY inputs are context-sensitive. Collisions and timers are transitive.
 void Trigger::onInput( const InputState& input ) {
-  std::cout << "Triggered input response for input " << input.currKeysPressed << '\n';
+  // std::cout << "Triggered input response for input " << input.currKeysPressed << '\n';
   // If top window has sub-entities, get its inner context.
   const auto& wm = WindowManager::getInstance();
   const auto currWindow = wm.back();
