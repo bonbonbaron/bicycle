@@ -11,7 +11,7 @@ namespace bicycle {
 
   void push( std::shared_ptr<Window> shared );
   void pop();
-  int run( const std::string& gameName );
+  int run();
 
   static std::mutex bike_mtx;
 

@@ -1,5 +1,4 @@
 #include <iostream> // TODO: delete when you're done debugging
-#include <iostream>
 #include <chrono>
 #include <thread>
 
@@ -28,7 +27,7 @@ namespace bicycle {
 
   void init( const std::string& gameName ) {
     // Configure game
-    // TODO uconfig( gameName );
+    // TODO config( gameName );
 
     // Init ncurses
     setlocale(LC_ALL, "");
@@ -53,15 +52,14 @@ namespace bicycle {
     wm.pop();
   }
 
-  int run( const std::string& gameName ) {
-    // init( gameName );
-    // auto& wm = WindowManager::getInstance();
+  int run() {
+    auto& wm = WindowManager::getInstance();
 
 #if 1
     while (true) {
       Timer::run();
       SshInput::listen();
-      // TODO Action stuff
+      wm.render();
       Timer::sleepFrame();
     }
 #else
