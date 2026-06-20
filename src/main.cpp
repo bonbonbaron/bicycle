@@ -9,7 +9,7 @@ int main( int argc, char** argv ) {
   }
   bicycle::init( argv[1] );
   // ___ start test here ___
-  bicycle::push<Dialogue>( "hello world", 5, 5 );
+  bicycle::push<Dialogue>( "hello world", 5, 5, 20, 20 );
   std::cout << "\e[92mThou mayest beginnnn!\e[0m\n";
   return bicycle::run();
 }
