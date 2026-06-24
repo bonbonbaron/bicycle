@@ -5,15 +5,15 @@
 #include <cassert>
 #include <algorithm>
 
-Menu::Menu( const std::string& menuName ) : Window() {
+Menu::Menu( const std::string& menuName ) : Window(), _id( menuName ) {
   auto yamlFilename = MENU_DIR + menuName + SUFFIX.data();
   try {
     auto root = YAML::LoadFile( yamlFilename );
 
     // Create window
-    auto w = root["w"].as<int>();
+    auto w = root["w"].as<unsigned>();
     setWidth( w );
-    auto h = root["h"].as<int>();
+    auto h = root["h"].as<unsigned>();
     setHeight( h );
     if ( auto x = root["x"] ) {
       setX( x.as<int>() );
@@ -117,3 +117,6 @@ void Menu::update() {
   // mvprint( _currMenuItemIdx - _firstDispIdx + WINDOW_PADDING / 2, WINDOW_PADDING / 2, CURSOR  );
 }
 
+void onCursorChange() {
+  // do nothing
+}

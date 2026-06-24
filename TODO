@@ -1,24 +1,56 @@
-windows back in workin gorder
-  Dialogue back in working order
-    Dialogue's update() needs to be moved a render() function
-  Menu back in working order
-  Grid back in working order
-orchestra
-  Timer needs pointer to activity for group-wide management.
-  Input needs redirecting to a top-level window (some of which can redirect it, in turn, to an entity)
-  Collision only needs to 
-  Activities need children. 
-    - Parent needs to know 
-        * what timers to pause... that's literally it. 
-          Inputs always matter (filter-able by given context), and
-          collisions can be filtered individually.
-    struct Activity {
-      set<Timer> childTimers{};  // i like set better for no searching
-      
-    };
++=======+
+|TRIGGER|
++=======+
+  INPUT
+  =====
+    windows back in working order
+      \ Dialogue back in working order
+        \ Dialogue's update() needs to be moved a render() function
+      Menu back in working order
+        make menus recursive w/ children, and return results back up to top layer.
+        inherit menu to text menu
+        inherit menu to entity menu
+      Grid back in working order
+        z-layers (just use vectors. It'll be okay, nobody GAF. Only change it when you absolutely need to.)
+          each layer can have a BG (potentially with animated tiles) and FG.
+          i'd like for it to have a list of tiles that change on the next timeout to minimize drawing.
+        parallax (ditto)
+        camera 
 
-  struct Timer {
-    shared_ptr<Activity> activityP{};
+
+  TIMER
+  =====
+    start/stop/pause/unpause whole action group
+    tick individual elements within group (maybe this is where activity can do either parent or child)
+    interrupt lower priority groups
+
+  COLLISION
+  =========
+    any entity, doesn't have to be in top window
+
+  ORCHESTRA
+  =========
+    Timer needs pointer to activity for group-wide management.
+    Input needs redirecting to a top-level window (some of which can redirect it, in turn, to an entity)
+    Collision only needs to 
+    Activities need children. 
+      - Parent needs to know 
+          * what timers to pause... that's literally it. 
+            Inputs always matter (filter-able by given context), and
+            collisions can be filtered individually.
+      struct Activity {
+        set<Timer> childTimers{};  // i like set better for no searching
+        
+      };
+
+================
+|AFTER THAT....|
+================
+  motion system (velocities in world)
+  animation system (velocities, rects, and collision types in world)
+  collision & motion system 
+  sound system
+
 
 TODO; look into Lua language for a scriptable engine.
 

@@ -1,15 +1,14 @@
 #include <iostream>
-#include <bitset>
+#include <vector>
 
 using namespace std;
 
 
-int main() {
-  bitset<5> i{1};
-  bitset<5> j{4};
-  auto k = i | j;
-  cout << "i: " << i << '\n';
-  cout << "j: " << j << '\n';
-  cout << "k: " << k << '\n';
+int main( int argc, char** argv) {
+  vector<int> i{};
+  for ( int j = 0; j < stoi(argv[1]); ++j ) {
+    i.push_back(j);
+    cout << (size_t)( &i ) << " with size " << i.size() << '\n';
+  }
   return 0;
 }
