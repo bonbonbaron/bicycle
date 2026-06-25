@@ -29,7 +29,7 @@ void WindowManager::refreshAll() {
   for (unsigned i = 0; i < _population; ++i ) {
     if ( _windows.at(i) != nullptr ) {
       _windows.at(i)->clear();
-      _windows.at(i)->update();
+      _windows.at(i)->render();
       _windows.at(i)->repaint();
     }
   }

@@ -56,7 +56,7 @@ void Dialogue::react( const InputState& input ) {
   else {
     Window::react( input );
   }
-  update();
+  render();
 }
 
 void Dialogue::delimitLines() {
@@ -77,7 +77,7 @@ void Dialogue::delimitLines() {
   }
 }
 
-void Dialogue::update() {
+void Dialogue::render() {
   int windowRow{1};
   for ( unsigned i = initLineNum; i < getHeight() && i < lineLimits.size(); ++i ) {
     mvprint( windowRow++, 1, std::string( _content, lineLimits.at(i).start, lineLimits.at(i).len ) );

@@ -55,17 +55,11 @@ namespace bicycle {
   int run() {
     auto& wm = WindowManager::getInstance();
 
-    try {
-      while ( wm.size() > 0 ) {
-        Timer::run();
-        SshInput::listen();
-        wm.render();   // TODO make this internally only change dirty windows
-        Timer::sleepFrame();
-      }
-    }
-    catch ( std::exception& e ) {
-      endwin();
-      std::cerr << e.what();
+    while ( wm.size() > 0 ) {
+      Timer::run();
+      SshInput::listen();
+      wm.render();   // TODO make this internally only change dirty windows
+      Timer::sleepFrame();
     }
 
     return endwin();

@@ -3,15 +3,14 @@
 #include <vector>
 #include <functional>
 #include <memory>
+#include <variant>
 
+#include "v/Image.h"
 #include "m/Position.h"
+#include "m/Entity.h"
+#include "v/Window.h"
 
-/* If Menu is a superclass.l.. what i need is my notes on how i was going to resolve this, or at least to try to recreate them here.
- * (I)t was along the lines of having children; menus *can* have children.
- *   There should be a choice.
- *   The choice of each menu should be passed back to the actor menu.
- *   The actor menu is not always the root level. Item menus act on the character you choose and don't kick you all the way back to the root.
- *   Battle menus completely exit out of all menus when you make your selection.
+/* 
  *
  * Menu -> selection -> action? -yes-> callback upon selected (T)arget
  *                              -no--> pass selection up to parent
@@ -34,33 +33,44 @@
  * (I) Should MenuItem give way to entity/string?
  */
 
-struct Cursor {
-  Image img;
-  Position offset;
-  int currItemIdx{};
-};
-
-struct Selection {
-  std::string menuid;
-  unsigned id{};
-};
-
-class Menu {
+class Menu : Window {
   public:
-    Menu( const std::string& menuName );
     Menu() = delete;  // ensure they pass in items.
-    const MenuItem& getCurrMenuItem() const;
     void onInput( );
-    void moveCursor( int amt );
+
+    using MenuItemBody = std::variant<Entity, std::string>;
+
+    struct MenuItem {
+      std::string id;
+      MenuItemBody body{};
+      std::function<void()> cb;
+    };
+
+  protected:
+    struct Cursor {
+      Image img;
+      Position offset;
+      int currItemIdx{};
+    };
+
+    struct Selection {
+      std::string menuid;
+      MenuItem& item;  // in a return body
+    };
+
+    virtual void onCursorMovement() = 0;
     auto findChild( const std::string& childId ) -> std::shared_ptr<Menu>;
+    const MenuItem& getCurrMenuItem() const;
+    void moveCursor( int amt );
+    void cancel();
 
   private:
-    virtual void onCursorChange();
     std::string id;
     Cursor _cursor;
-    std::vector< Entity > _items{};
+    bool _stopHere{};  // selecting an item in a descendant menu pops all parents until it reaches here if true
+    std::vector< MenuItem > _items{};
     Selection _selection;
-    int _firstDispIdx{};
     void addItem( const MenuItem& entity );  // upon menu pop-up
-    std::vector<std::shared_ptr<Menu>> _children{};
+    std::vector<std::shared_ptr<Window>> _children{}; // Window inclues Dialogue as potential child
+    unsigned _currMenuItemIdx{};
 };
