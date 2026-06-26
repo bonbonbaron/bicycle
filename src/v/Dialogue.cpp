@@ -31,7 +31,7 @@ void Dialogue::init() {
 }
 
 // TODO provide dev-friendly key masks
-void Dialogue::react( const InputState& input ) {
+void Dialogue::onInput( const InputState& input ) {
   auto& wm = WindowManager::getInstance();
   if ( (MASK_J & input.currKeysPressed).any() ) {
     ++initLineNum;
@@ -54,7 +54,7 @@ void Dialogue::react( const InputState& input ) {
     wm.pop();
   }
   else {
-    Window::react( input );
+    Window::onInput( input );
   }
   render();
 }

@@ -56,7 +56,7 @@ class Grid : public Window {
     Grid( const int x, const int y, const int w, const int h );
 
     void update() override;
-    void react( const int input ) override;
+    void onInput( const int input ) override;
     void addEntity( const std::string& name, const std::shared_ptr<Entity>& entity );
 
   private:

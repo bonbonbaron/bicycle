@@ -19,7 +19,7 @@ class Window {
     void clear();
     void move( int y, int x );
     virtual void render() = 0;
-    virtual void react( const InputState& input ) = 0;
+    virtual void onInput( const InputState& input ) = 0;
     void repaint();
     const char* getCurrItemName() const;
     const char* getCurrItemDesc() const;

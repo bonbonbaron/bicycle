@@ -289,7 +289,7 @@ void Grid::update() {
   }
 }
 
-void Grid::react( const int input ) {
+void Grid::onInput( const int input ) {
   auto focus = _env->camera.getFocus();
   if ( focus != nullptr && focus->bb != nullptr ) {
     focus->onInput( input );

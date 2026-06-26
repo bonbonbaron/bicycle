@@ -36,7 +36,6 @@
 class Menu : Window {
   public:
     Menu() = delete;  // ensure they pass in items.
-    void onInput( );
 
     using MenuItemBody = std::variant<Entity, std::string>;
 
@@ -55,7 +54,7 @@ class Menu : Window {
 
     struct Selection {
       std::string menuid;
-      MenuItem& item;  // in a return body
+      MenuItem& item;  
     };
 
     virtual void onCursorMovement() = 0;

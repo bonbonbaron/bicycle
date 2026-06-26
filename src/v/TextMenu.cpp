@@ -3,7 +3,7 @@
 #include <cassert>
 #include <algorithm>
 
-Menu::Menu( const std::string& menuName ) : Window(), _id( menuName ) {
+TextMenu::TextMenu( const std::string& menuName ) : Window(), _id( menuName ) {
   auto yamlFilename = MENU_DIR + menuName + SUFFIX.data();
   try {
     auto root = YAML::LoadFile( yamlFilename );
@@ -66,4 +66,7 @@ void TextMenu::render() {
     unsetAttr( A_STANDOUT );
   }
   mvprint( _currMenuItemIdx - _firstDispIdx + WINDOW_PADDING / 2, WINDOW_PADDING / 2, CURSOR  );
+}
+    
+void TextMenu::onCursorMovement() {
 }

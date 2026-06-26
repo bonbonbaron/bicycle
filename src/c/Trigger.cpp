@@ -45,7 +45,7 @@ void Trigger::onInput( const InputState& input ) {
     trig.onTrigger( Constants::INPUT.data(), entity, input );
   }
   else {
-    currWindow->react( input );
+    currWindow->onInput( input );
   }
   // TODO the following TODOs should be wrapped in a common, templated function (<InputState> in this case)
   // TODO check reps remaining

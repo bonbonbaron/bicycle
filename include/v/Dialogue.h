@@ -17,7 +17,7 @@ class Dialogue : public Window {
     Dialogue( const std::string&& s, const int x, const int y, const int w, const int h );
     // Public functions
     void render() override;
-    void react( const InputState& input ) override;
+    void onInput( const InputState& input ) override;
   private:
     // Private members
     std::string _content;
