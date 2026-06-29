@@ -1,6 +1,20 @@
 #include "bicycle.h"
 #include <iostream>
 #include "v/TextMenu.h" // TODO remov when done testing
+#include <string>
+#include <vector>
+
+void doNothing() {}
+void pushMenu() {
+  std::vector<Menu::MenuItem> v{
+    { { "itemA", 0 }, "Aslan", doNothing },
+    { { "itemB", 1 }, "Barton", doNothing },
+    { { "itemC", 2 }, "Catie", doNothing },
+    { { "itemD", 3 }, "Dumbass", doNothing }
+  };
+  bicycle::push<TextMenu>( "some text menu", v, 15, 15, 10, 10 );
+}
+
 
 int main( int argc, char** argv ) {
   if ( argc != 2 ) {
@@ -11,13 +25,13 @@ int main( int argc, char** argv ) {
   //==========================
   // ___ start test here ___
   //==========================
-  bicycle::push<TextMenu>( 
-      "see i don't want to go to the store and buy a bunch of apples if it means i have to give up my virginity to the lady at the cash register who weighs 500 pounds okay?",
-      5,
-      5,
-      20,
-      20 
-  );
+  std::vector<Menu::MenuItem> v{
+    { { "itemA", 0 }, "Aslan", doNothing },
+    { { "itemB", 1 }, "Barton", doNothing },
+    { { "itemC", 2 }, "Catie", doNothing },
+    { { "itemD", 3 }, "Dumbass", pushMenu }
+  };
+  bicycle::push<TextMenu>( "some text menu", v, 10, 10, 10, 10 );
   //==========================
   // ___ finish test here ___
   //==========================

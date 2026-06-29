@@ -45,7 +45,6 @@ class Window {
     void print( const std::string& s ) const;
 
     auto hasChildEntities() const -> bool;
-    auto getId() const -> Entity; // window's an entity now
     auto getContext() const -> Entity; // window's an entity now
   private:
     WINDOW* _win;
@@ -57,6 +56,5 @@ class Window {
     int _x{};
     int _y{};
     const bool _hasChildEntities{};
-    const Entity _id{};
     const Entity _context{};
 };

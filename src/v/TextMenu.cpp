@@ -1,72 +1,66 @@
 #include "v/TextMenu.h"
 #include "c/WindowManager.h"
-#include <cassert>
 #include <algorithm>
+#include "bicycle.h"
+#include <yaml-cpp/yaml.h>
+#include "Constants.h"
+#include <iostream>
 
-TextMenu::TextMenu( const std::string& menuName ) : Window(), _id( menuName ) {
-  auto yamlFilename = MENU_DIR + menuName + SUFFIX.data();
-  try {
-    auto root = YAML::LoadFile( yamlFilename );
-
-    // Create window
-    auto w = root["w"].as<unsigned>();
-    setWidth( w );
-    auto h = root["h"].as<unsigned>();
-    setHeight( h );
-    if ( auto x = root["x"] ) {
-      setX( x.as<int>() );
-    }
-    if ( auto y = root["y"] ) {
-      setY( y.as<int>() );
-    }
-    create();
-
-    // Menu Items
-    auto entities = root["items"];
-    if ( !entities.IsSequence() ) {
-      bicycle::die( "Menu " + menuName + "'s items node needs to be a sequence." );
-    }
-
-    // For each entity, the key is the entity name, val is position.
-    for ( const auto& e : entities ) {
-      auto entityName = e.as<std::string>();
-      YAML::Node entityNode;
-      try {
-        entityNode = YAML::LoadFile( ENTITY_DIR + entityName + SUFFIX.data() );
-      }
-      catch ( const YAML::BadFile& e ) {
-        bicycle::die( "In menu " + menuName + ": for entity " + entityName + ": We couldn't find " + ENTITY_DIR + entityName + SUFFIX.data() + "." );
-      }
-      Entity entity;
-      try {
-        entity = entityNode.as<Entity>();
-        auto entityPtr = std::make_shared<Entity>( entity );
-        addItem( entityPtr );
-      } 
-      catch ( const std::runtime_error& e ) {
-        bicycle::die( "Error for entity \'" + entityName + "\':\n" + e.what() );
-      }
-    }  // for each entity in menu's entites list
-  }  // try-block
-  catch ( const YAML::Exception& e ) {
-    std::stringstream ss;
-    ss << "Error reading from file " << yamlFilename << ":\n" << e.what();
-    bicycle::die( ss.str() );
-  }
-}
+TextMenu::TextMenu( const std::string& menuName, 
+    const std::vector<Menu::MenuItem>& items,
+    const int x,
+    const int y,
+    const int w,
+    const int h,
+    const bool hasChildEntities ) : Menu( menuName, items, x, y, w, h, hasChildEntities ) {}
 
 void TextMenu::render() {
   const int LAST_DISP_IDX = std::min<int>( _firstDispIdx + getHeight() - WINDOW_PADDING, _items.size() );
+  const auto CURSOR_WIDTH = _cursor.img.getSymbol().size();
   for ( int currRow = 1, dispIdx = _firstDispIdx; dispIdx < LAST_DISP_IDX; ++dispIdx ) {
     // CURSOR_WIDTH leaves room for cursor to the left of this menu item
-    if ( dispIdx == _currMenuItemIdx ) {
+    if ( dispIdx == _cursor.currItemIdx ) {
       setAttr( A_STANDOUT );
     }
-    mvprint( currRow++, CURSOR_WIDTH, _items.at( dispIdx )->body.getSymbol() );  
+    auto item = _items.at( dispIdx ).body;
+
+    mvprint( currRow++, WINDOW_PADDING/2 + CURSOR_WIDTH, std::get<std::string>(_items.at( dispIdx ).body) );  
     unsetAttr( A_STANDOUT );
   }
-  mvprint( _currMenuItemIdx - _firstDispIdx + WINDOW_PADDING / 2, WINDOW_PADDING / 2, CURSOR  );
+  mvprint( _cursor.currItemIdx - _firstDispIdx + WINDOW_PADDING / 2, WINDOW_PADDING / 2, _cursor.img.getSymbol()  );
 }
-    
+
 void TextMenu::onCursorMovement() {
+}
+
+// TODO I think we ought to split cursor logic from rendering logic
+// TODO and i think cursor movement ought to be moved to Menu.cpp.
+// TODO Handle the selection-filling/passing/processing here.
+void TextMenu::onInput( const InputState& input ) {
+  auto& wm = WindowManager::getInstance();
+  const int NUM_ROWS_DISP = getHeight() - WINDOW_PADDING;
+  if ( (MASK_J & input.currKeysPressed).any() ) {
+    ++_cursor.currItemIdx;
+    _cursor.currItemIdx = std::clamp<int>( _cursor.currItemIdx, 0, _items.size() - 1 );
+    if ( ( _cursor.currItemIdx ) > ( _firstDispIdx + NUM_ROWS_DISP - 1 ) ) {
+      ++_firstDispIdx;
+    }
+  }
+  if ( (MASK_K & input.currKeysPressed).any() ) {
+    --_cursor.currItemIdx;
+    _cursor.currItemIdx = std::clamp<int>( _cursor.currItemIdx, 0, _items.size() - 1 );
+    if ( _cursor.currItemIdx < _firstDispIdx ) {
+      --_firstDispIdx;
+    }
+  }
+  if ( (MASK_B & input.currKeysPressed).any() ) {
+    wm.pop();
+  }
+  if ( (MASK_SPACE & input.currKeysPressed).any() ) {
+    if ( _parent ) {
+      auto item = _items.at( _cursor.currItemIdx ).value;
+      Selection sel = { this->_id, item };
+      _parent->setChildSelection( sel );
+    }
+  }
 }

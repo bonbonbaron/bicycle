@@ -2,7 +2,7 @@
 #include "bicycle.h"
 #include <cassert>
 
-Window::Window( const int w, const int h, const bool hasChildEntities ) : _win( newwin( h, w, LINES / 2 - h/2 - 2, COLS / 2 - w / 2 ) ), _w(w), _h(h), _hasChildEntities(hasChildEntities), _id( newEntityId() ) {
+Window::Window( const int w, const int h, const bool hasChildEntities ) : _win( newwin( h, w, LINES / 2 - h/2 - 2, COLS / 2 - w / 2 ) ), _w(w), _h(h), _hasChildEntities(hasChildEntities) {
   assert( LINES / 2 - h/2 - 2 > 0 );
   assert( COLS / 2 - w / 2 > 0 );
   assert( _win != nullptr );
@@ -122,10 +122,6 @@ void Window::unsetAttr( const int attr ) {
 
 auto Window::hasChildEntities() const -> bool {
   return _hasChildEntities;
-}
-
-auto Window::getId() const -> Entity {
-  return _id;
 }
 
 auto Window::getContext() const -> Entity {

@@ -12,6 +12,7 @@ namespace Constants {
 
     // mkdir -p config/node/{dialogue,menu,grid/bg,entity/{body,personality/tree}}
   const std::string MENU_DIR{ CFG_DIR.data() + std::string("menu/") };
+  const std::string TEXT_MENU_DIR{ MENU_DIR + std::string("textMenu/") };
   const std::string DIALOGUE_DIR{ CFG_DIR.data() + std::string("dialogue/") };
   const std::string GRID_DIR{ CFG_DIR.data() + std::string("grid/") };
 

@@ -29,32 +29,43 @@
  *     Text might be an enum, but that grows unwieldy quickly.
  *     Go with Selection struct for now.
  * 
- * (S)hould this be a template?
- * (I) Should MenuItem give way to entity/string?
  */
 
-class Menu : Window {
+class Menu : public Window {
   public:
-    Menu() = delete;  // ensure they pass in items.
-
     using MenuItemBody = std::variant<Entity, std::string>;
 
-    struct MenuItem {
+    struct MenuItemValue {
       std::string id;
-      MenuItemBody body{};
-      std::function<void()> cb;
+      int value;  // this informs caller of things like Entity # or... idk
     };
 
-  protected:
-    struct Cursor {
-      Image img;
-      Position offset;
-      int currItemIdx{};
+    struct MenuItem {
+      MenuItemValue value{};
+      MenuItemBody body{};
+      std::function<void()> cb{};  // could be empty if just returning
     };
 
     struct Selection {
-      std::string menuid;
-      MenuItem& item;  
+      std::string menuid;  // tells us what menu this selection pertains to
+      MenuItemValue itemValue{};  
+    };
+
+    Menu( const std::string& menuName, 
+      const std::vector<MenuItem>& items,
+      const int x,
+      const int y,
+      const int w,
+      const int h,
+      const bool hasChildEntities = false );
+
+    void setChildSelection( const Selection& selection );
+
+  protected:
+    struct Cursor {
+      Image img{};
+      Position offset{};
+      int currItemIdx{};
     };
 
     virtual void onCursorMovement() = 0;
@@ -62,14 +73,13 @@ class Menu : Window {
     const MenuItem& getCurrMenuItem() const;
     void moveCursor( int amt );
     void cancel();
-
-  private:
-    std::string id;
-    Cursor _cursor;
-    bool _stopHere{};  // selecting an item in a descendant menu pops all parents until it reaches here if true
     std::vector< MenuItem > _items{};
-    Selection _selection;
+    Selection _selection{};
+    Cursor _cursor{ { " > ", Color::WHITE }, {0, 0}, 0 };
+    std::shared_ptr<Menu> _parent{};
+    Selection _childSelection{};
+    void onCursorChange();
+    std::string _id;
+    bool _stopHere{};  // selecting an item in a descendant menu pops all parents until it reaches here if true
     void addItem( const MenuItem& entity );  // upon menu pop-up
-    std::vector<std::shared_ptr<Window>> _children{}; // Window inclues Dialogue as potential child
-    unsigned _currMenuItemIdx{};
 };
