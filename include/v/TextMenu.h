@@ -9,8 +9,7 @@ class TextMenu : public Menu {
       const int x,
       const int y,
       const int w,
-      const int h,
-      const bool hasChildEntities = false );
+      const int h);
     void render() override;
     void onInput( const InputState& input ) override;
   private:

@@ -2,13 +2,13 @@
 #include "bicycle.h"
 #include <cassert>
 
-Window::Window( const int w, const int h, const bool hasChildEntities ) : _win( newwin( h, w, LINES / 2 - h/2 - 2, COLS / 2 - w / 2 ) ), _w(w), _h(h), _hasChildEntities(hasChildEntities) {
+Window::Window( const int w, const int h ) : _win( newwin( h, w, LINES / 2 - h/2 - 2, COLS / 2 - w / 2 ) ), _w(w), _h(h) {
   assert( LINES / 2 - h/2 - 2 > 0 );
   assert( COLS / 2 - w / 2 > 0 );
   assert( _win != nullptr );
 }
 
-Window::Window( const int x, const int y, const int w, const int h, const bool hasChildEntities ) : _win( newwin( h, w, y, x ) ), _w(w), _h(h), _hasChildEntities(hasChildEntities) {
+Window::Window( const int x, const int y, const int w, const int h ) : _win( newwin( h, w, y, x ) ), _w(w), _h(h) {
   assert( _win );
   // const auto& cp = ColorPalette::getInstance();
 }
@@ -118,10 +118,6 @@ void Window::setAttr( const int attr ) {
 
 void Window::unsetAttr( const int attr ) {
   wattroff( _win, attr );
-}
-
-auto Window::hasChildEntities() const -> bool {
-  return _hasChildEntities;
 }
 
 auto Window::getContext() const -> Entity {

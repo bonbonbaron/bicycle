@@ -10,8 +10,8 @@ class Window {
   public:
     // i know this doesn't align with ncurses' paramter order, but I like my order better :)
     Window() = default;
-    Window( const int w, const int h, const bool hasChildren = false );
-    Window( const int x, const int y, const int w, const int h, const bool hasChildren = false );
+    Window( const int w, const int h );
+    Window( const int x, const int y, const int w, const int h );
     ~Window();
     void create();
     void show();
@@ -44,7 +44,6 @@ class Window {
     void putc( const char c ) const;
     void print( const std::string& s ) const;
 
-    auto hasChildEntities() const -> bool;
     auto getContext() const -> Entity; // window's an entity now
   private:
     WINDOW* _win;
@@ -55,6 +54,5 @@ class Window {
     int _h{};
     int _x{};
     int _y{};
-    const bool _hasChildEntities{};
     const Entity _context{};
 };

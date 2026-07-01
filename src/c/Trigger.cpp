@@ -39,14 +39,7 @@ void Trigger::onInput( const InputState& input ) {
   const auto& wm = WindowManager::getInstance();
   const auto currWindow = wm.back();
   assert( currWindow != nullptr );
-  if ( currWindow->hasChildEntities() ) {
-    const auto entity = currWindow->getContext();
-    auto& trig = getInstance();
-    trig.onTrigger( Constants::INPUT.data(), entity, input );
-  }
-  else {
-    currWindow->onInput( input );
-  }
+  currWindow->onInput( input );
   // TODO the following TODOs should be wrapped in a common, templated function (<InputState> in this case)
   // TODO check reps remaining
   // TODO compare priority to active priority

@@ -7,9 +7,7 @@ Menu::Menu( const std::string& menuName,
     const int x,
     const int y,
     const int w,
-    const int h,
-    // TODO I really hate this param. Let's get rid of it somehow.
-    const bool hasChildEntities ) :  Window( x, y, w, h, hasChildEntities ), _items(items), _id( menuName ) {
+    const int h) :  Window( x, y, w, h ), _items(items), _id( menuName ) {
   auto& wm = WindowManager::getInstance();
   _parent = dynamic_pointer_cast<Menu>( wm.back() );
 }
@@ -22,10 +20,12 @@ const Menu::MenuItem& Menu::getCurrMenuItem() const {
   return _items.at( _cursor.currItemIdx );
 }
 
-void Menu::setChildSelection( const Selection& selection ) {
-  _childSelection = selection;
-}
-
 void Menu::onCursorChange() {
   // do nothing
+}
+
+// Return a copy instead of reference in case the menu size changes/reallocates.
+auto Menu::getItem() const -> MenuItem {
+  auto item = _items.at( _cursor.currItemIdx );
+  return item;
 }

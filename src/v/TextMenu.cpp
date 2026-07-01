@@ -11,8 +11,7 @@ TextMenu::TextMenu( const std::string& menuName,
     const int x,
     const int y,
     const int w,
-    const int h,
-    const bool hasChildEntities ) : Menu( menuName, items, x, y, w, h, hasChildEntities ) {}
+    const int h) : Menu( menuName, items, x, y, w, h ) {}
 
 void TextMenu::render() {
   const int LAST_DISP_IDX = std::min<int>( _firstDispIdx + getHeight() - WINDOW_PADDING, _items.size() );
@@ -57,10 +56,7 @@ void TextMenu::onInput( const InputState& input ) {
     wm.pop();
   }
   if ( (MASK_SPACE & input.currKeysPressed).any() ) {
-    if ( _parent ) {
-      auto item = _items.at( _cursor.currItemIdx ).value;
-      Selection sel = { this->_id, item };
-      _parent->setChildSelection( sel );
-    }
+    auto item = getItem();
+    item.cb();
   }
 }
