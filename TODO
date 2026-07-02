@@ -6,10 +6,9 @@
     windows back in working order
       \ Dialogue back in working order
         \ Dialogue's update() needs to be moved a render() function
-      Menu back in working order
-        make menus recursive w/ children, and return results back up to top layer.
-        inherit menu to text menu
-        inherit menu to entity menu
+      \Menu back in working order
+        \inherit menu to text menu
+        inherit menu to entity menu (later w/ grid)
       Grid back in working order
         z-layers (just use vectors. It'll be okay, nobody GAF. Only change it when you absolutely need to.)
           each layer can have a BG (potentially with animated tiles) and FG.
