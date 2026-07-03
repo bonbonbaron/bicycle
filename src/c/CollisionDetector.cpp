@@ -11,9 +11,7 @@ auto CollisionDetector::getInstance() -> CollisionDetector& {
 }
 
 void CollisionDetector::check() {
-  // TODO only check for collisions on same layer
   // TODO also check for collisions with BG tiles
-  // TODO make collision rect offset from normal rect
   auto& trig = Trigger::getInstance();
   auto& cd = getInstance();
   auto collLayers = cd.getCollisionLayers();
@@ -24,7 +22,6 @@ void CollisionDetector::check() {
       auto f1 = c1;
       f1.pos += r1.pos;
       for ( auto e2 = std::next(e1); e2 != collLayer.end(); ++e2 ) {
-        // TODO use wereCollided to detect un-collisions
 				auto wereCollided = cd.recordedCollision( *e1, *e2 );
         const auto& r2 = World::get<Rect>( *e2 );
         auto& c2 = World::get<CollRect>( *e2 );
