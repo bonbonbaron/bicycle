@@ -3,32 +3,10 @@
 #include "c/Timer.h"
 #include "Constants.h"
 
-auto TriggerRegistry::getInstance() -> TriggerRegistry& {
-  static TriggerRegistry reg;
-  return reg;
-}
-
-auto TriggerRegistry::get( const std::string& name ) -> ActCallback {
-  auto& reg = getInstance();
-  try {
-    return reg.at( name );
-  }
-  catch ( const std::out_of_range& e ) {
-    bicycle::die( "Action Registry hasn't mapped anything yet to key " + name + "." );
-  }
-  return {};
-}
-
-// Allows you to more easily make an event mapping
-void TriggerRegistry::add( const TriggerRegistry::value_type& val ) {
-  auto& reg = getInstance();
-  reg.insert( val );
-}
-
 
 auto Trigger::getInstance() -> Trigger& {
-  static Trigger activity;
-  return activity;
+  static Trigger trigger;
+  return trigger;
 }
 
 
@@ -55,8 +33,15 @@ void Trigger::onTimer( const TimeoutMsg& timeoutMsg ) {
 void Trigger::onCollision( const int collisionType ) {
 }
 
-#if 0 //TODO
-void Trigger::validate() {
-  personality.validate();
+auto Trigger::getPersonality( Entity entity ) -> Personality {
+  return _personalities.at( entity );
 }
-#endif
+
+auto Trigger::getBlackboard( Entity entity ) -> Blackboard {
+  return _blackboards.at( entity );
+}
+
+void Trigger::setPersonality( Entity entity, const Personality& personality ) {
+  std::cout << "setting personality for entity " << entity << "\n";
+  _personalities.at( entity ) = personality;
+}

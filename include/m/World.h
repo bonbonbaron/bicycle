@@ -9,22 +9,13 @@
 #include "m/Position.h"
 #include "m/Size.h"
 #include "v/Image.h"
+#include "m/TypeTag.h"
 
 using ArrayVar = std::variant<
   std::array<Position, NUM_SUPPORTED_ENTITIES>,
   std::array<Size, NUM_SUPPORTED_ENTITIES>,
   std::array<Image, NUM_SUPPORTED_ENTITIES>
 >;
-
-template <typename T>
-struct TypeTag {
-  static inline const char dummy{};
-};
-
-template <typename T>
-inline const void* getTypeTag() noexcept {
-  return &TypeTag<T>::dummy;
-}
 
 class World {
   public:

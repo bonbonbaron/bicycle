@@ -5,11 +5,55 @@
 #include <curses.h>
 #include <functional>
 #include <memory>
+#include <algorithm>
+#include <optional>
+
+#include "m/Camera.h"
+#include "m/Rect.h"
+#include "m/Entity.h"
+#include "m/Position.h"
+#include "m/Size.h"
+#include "m/World.h"
 
 #include "v/Window.h"
-#include "m/Entity.h"
-#include "m/Grid.h"
-#include "m/Camera.h"
+
+#include "LineLimits.h"
+
+struct Layer {
+  enum Type { STATIC, PARALLAX, AUTOLOOP };
+
+  Layer();
+  Layer( const std::string bgStr = "", const std::string& bgCollStr = "", Layer::Type type = Layer::Type::STATIC );
+  Entity id{};
+  std::string bgStr;
+  std::string bgCollStr;
+  std::vector<LineLimits> lineLimits{};
+  // Things Layer needs to have in World:
+  //   * entity ID
+  //   * image
+  //   * position (if PARALLAX or AUTOLOOP)
+  //   * velocity (if AUTOLOOP)
+  // Backgrounds can have positions other than (0,0) for parallax or auto-looping
+  // That implies they need to give a Position and potentially a Velocity to World.
+  // They may need to pass an Image in too.
+  Type type{};
+  std::vector<Entity> fg{};  // entities in the foreground
+  // TODO some timer tracker to know which BG tile to animate next
+};
+
+class Grid {
+  public:
+    void addEntity( const Entity entity, const unsigned layerIdx );
+    void addLayer( const Layer& layer );
+    auto getLayers() -> std::vector<Layer>&;
+    void setFocusedLayerIdx( const unsigned layerIdx );
+    auto getFocusedLayerIdx() -> unsigned;
+    auto getLayer( Entity entity ) -> std::optional<unsigned>;
+  private:
+    std::vector<Layer> _layers{};
+    std::map<Entity, unsigned> _entityToLayerMap{};
+    unsigned _focusedLayerIdx{};  // Whatever entity the camera focuses on, all other layers move in parallax wrt that layer.
+};
 
 class Scene : public Window {
   public:
@@ -18,8 +62,11 @@ class Scene : public Window {
 
     void render() override;
     void onInput( const InputState& input ) override;
+    void setFocus( Entity entity );
 
   private:
     Grid _grid{};    // This has layers of BGs and FGs.
     Camera _camera{};  // TODO  when we have minimaps, the input needs to go to a window BELOW the top of WindowManager's stack.
+    void renderStaticLayer( const Layer& layer, const Rect& camRect );
+    Entity _focus{};
 };

@@ -24,4 +24,18 @@ struct Position {
     pos.z = z + rhs.z;
     return pos;
   }
+
+  void operator-=( const Position& rhs ) {
+    x -= rhs.x;
+    y -= rhs.y;
+    z -= rhs.z;
+  }
+
+  auto operator-( const Position& rhs ) const -> Position {
+    Position pos;
+    pos.x = x - rhs.x;
+    pos.y = y - rhs.y;
+    pos.z = z - rhs.z;
+    return pos;
+  }
 };

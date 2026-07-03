@@ -62,11 +62,11 @@ void Dialogue::onInput( const InputState& input ) {
 void Dialogue::delimitLines() {
   constexpr int NUM_INSTANCES_TO_FIND{1};
   assert( getWidth() > WINDOW_PADDING );
-  const unsigned WIDTH = getWidth() - WINDOW_PADDING;
+  const int WIDTH = static_cast<int>( getWidth() - WINDOW_PADDING );
   LineLimits currLineLims;
   for ( ;; ) {
-    if ( ( _content.length() - currLineLims.start ) <= WIDTH ) {
-      lineLimits.push_back( { currLineLims.start, static_cast<int>(_content.length()) - currLineLims.start } );
+    if ( static_cast<int>( _content.length() - currLineLims.start ) <= WIDTH ) {
+      lineLimits.push_back( { currLineLims.start, static_cast<int>(_content.length() - currLineLims.start) } );
       break;
     }
     currLineLims.len = _content.rfind( " ", currLineLims.start + WIDTH, NUM_INSTANCES_TO_FIND ) - currLineLims.start;

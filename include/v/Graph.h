@@ -8,7 +8,6 @@
 #include <optional>
 #include <vector>
 
-#include <yaml-cpp/node/convert.h>
 #include "Entity.h"
       
 static std::mutex _nodeMut{};  // YAML-copying structures prevents uncopyable mutexes from being class members
@@ -47,73 +46,3 @@ namespace bicycle {  // prevent clash with YAML::Node
       Entity _rootEntity;  // this entity usually encapsulates other entities; think of it as a scene
   };  // class Node
 }  // namespace bicycle
-
-
-// ******************************
-// YAML Conversions
-// ******************************
-
-// Provide yaml-cpp library with template candidate for Edge's specific struct
-template<>
-struct YAML::convert<Edge> {
-  static YAML::Node encode(const std::string& rhs) { return YAML::Node(rhs); }
-  static bool decode(const YAML::Node& node, Edge& rhs) {
-    // Edge YAML structure should be map.
-    if (!node.IsMap()) {
-      return false;
-    }
-    // Weight (optional)
-    if ( auto weight = node["weight"] ) {
-      rhs.setWeight( weight.as<int>() );
-    }
-    // Endpoint
-    rhs.setEndpoint( node["endpointFilename"].as<std::string>() );
-    return true;
-  }
-};
-
-// Provide yaml-cpp library with template candidate for Node's specific struct
-template<>
-struct YAML::convert<bicycle::Node> {
-  static YAML::Node encode(const std::string& rhs) { return YAML::Node(rhs); }
-  static bool decode(const YAML::Node& node, bicycle::Node& rhs) {
-    if (!node.IsMap()) {
-      return false;
-    }
-    auto nodeName = node["name"].as<std::string>();
-    rhs.setName( nodeName );
-    if ( auto desc = node["desc"] ) {
-      rhs.setDesc( desc.as<std::string>() );
-    }
-    try {
-      rhs.setEdges( node["edges"].as<std::map<std::string, Edge>>() );
-    }
-    catch ( const YAML::Exception& e ) {
-      std::cerr << "Error processing YAML for node " << nodeName << "\n";
-      bicycle::die( e.what() );
-    }
-    catch ( const std::out_of_range& e ) {
-      bicycle::die( "Error processing YAML for node " + nodeName );
-    }
-
-    auto entityName = node["entity"].as<std::string>();
-
-    YAML::Node entityNode;
-    try {
-      entityNode = YAML::LoadFile( ENTITY_DIR + entityName + SUFFIX.data() );
-    }
-    catch ( const YAML::BadFile& e ) {
-      bicycle::die( "In node " + nodeName + ": for entity " + entityName + ": We couldn't find " + ENTITY_DIR + entityName + SUFFIX.data() + "." );
-    }
-    try {
-      Entity entity = entityNode.as<Entity>();
-      rhs.setRootEntity( entity );
-    } 
-    catch ( const std::runtime_error& e ) {
-      std::cerr << "Error for entity \'" << entityName << "\':\n";
-      bicycle::die( e.what() );
-    }
-
-    return true;
-  }
-};

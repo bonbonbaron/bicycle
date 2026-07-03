@@ -2,7 +2,6 @@
 #include "c/WindowManager.h"
 #include <algorithm>
 #include "bicycle.h"
-#include <yaml-cpp/yaml.h>
 #include "Constants.h"
 #include <iostream>
 

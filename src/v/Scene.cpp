@@ -2,61 +2,129 @@
 #include "m/World.h"
 #include <cursesw.h>
 #include <algorithm>
+#include "m/Rect.h"
+#include "c/Trigger.h"
+
+Layer::Layer() : id( newEntityId() ) {}
+
+Layer::Layer( const std::string bgStr, const std::string& bgCollStr, Layer::Type type ) 
+  : id( newEntityId() ) ,
+  bgStr( bgStr ),
+  bgCollStr( bgCollStr ),
+  type( type ) 
+{
+  // Determine the widest row.
+  unsigned maxLineWidth{};
+  bool continueLooking{ true };
+  LineLimits currLineLims{};
+  while ( continueLooking ) {
+    currLineLims.len = bgStr.find( "\n", currLineLims.start, 1 ) - currLineLims.start;
+    // Stop looking when no newlines remain. Width of last line is from cursor to end of the string.
+    if ( currLineLims.len < 0 ) {
+      currLineLims.len = bgStr.size() - currLineLims.start;
+      continueLooking = false;
+    }
+    // Add to line limits vector and prepare for next one.
+    lineLimits.push_back( currLineLims );
+    maxLineWidth = std::max( maxLineWidth, static_cast<unsigned>( currLineLims.len ) );
+    currLineLims.start += currLineLims.len + 1;  // "+1" includes the newline character.
+  }
+  // Even though we're not right-padding the shorter lines with spaces, we'll treat
+  // the grid as a rectangle for easier collision detection.
+  World::set<Size>( id, { static_cast<unsigned>( lineLimits.size() ), maxLineWidth } );
+}
+
+
+void Grid::addLayer( const Layer& layer ) {
+  _layers.push_back( layer );
+}
+
+void Grid::addEntity( const Entity entity, const unsigned layerIdx ) {
+  _layers.at( layerIdx ).fg.push_back( entity );
+  _entityToLayerMap[ entity ] = layerIdx;
+}
+
+auto Grid::getLayers() -> std::vector<Layer>& {
+  return _layers;
+}
+
+void Grid::setFocusedLayerIdx( const unsigned layerIdx ) {
+  _focusedLayerIdx = layerIdx;
+}
+
+auto Grid::getFocusedLayerIdx() -> unsigned {
+  return _focusedLayerIdx;
+}
+
+auto Grid::getLayer( Entity entity ) -> std::optional<unsigned> {
+  std::optional<unsigned> layerIdx{};
+  const auto& pair = _entityToLayerMap.find( entity );
+  if ( pair != _entityToLayerMap.end() ) {
+    layerIdx = pair->second;
+  }
+  return layerIdx;
+}
+
 
 Scene::Scene( const Grid& grid ) : Window( 0, 0, COLS, LINES ), _grid(grid) {
   _camera.setDims( LINES, COLS );
 }
+
 Scene::Scene( const int x, const int y, const int w, const int h ) : Window( x, y, w, h ) {
   _camera.setDims( h, w );
 }
 
-// This makes this class hard to classify: This is DEFINITELY the "view" portion.
-// May be a good idea later to split the GUI-specific mechanisms out to another class.
+void Scene::renderStaticLayer( const Layer& layer, const Rect& camRect ) {
+  const auto& layerRect = Rect( World::get<Position>( layer.id ), World::get<Size>( layer.id ) );
+  // Background
+  auto croppedRect = camRect.crop( layerRect );
+  auto layerRowIdx = std::max( 0, camRect.pos.y - layerRect.pos.y );
+  for ( unsigned croppedRectRowIdx{}; croppedRectRowIdx < croppedRect.size.h; ++croppedRectRowIdx, ++layerRowIdx ) {
+    const auto& lineLims = layer.lineLimits.at( layerRowIdx );
+    int stringStartIdx = lineLims.start;
+    int stringLength = std::min( static_cast<int>( croppedRect.size.w ), lineLims.len );
+    auto rowStr = std::string( layer.bgStr, stringStartIdx, stringLength );
+    mvprint( croppedRect.pos.y + croppedRectRowIdx, croppedRect.pos.x, rowStr );  // layerRow + 1 to skip the stop border 
+  }
+  // Foreground
+  for ( const auto& entity : layer.fg ) {
+    if ( _camera.canSee( entity ) ) {  // TODO let camera track what it sees via onCollision(), not Scene
+      const auto& entityPos = World::get<Position>( entity );
+      const auto& entityImg = World::get<Image>( entity );
+      auto posWrtCamera = entityPos + layerRect.pos - camRect.pos;
+      setAttr ( COLOR_PAIR( entityImg.getColor() ) );
+      mvprint( posWrtCamera.y, posWrtCamera.x, entityImg.getSymbol() );
+      unsetAttr ( COLOR_PAIR( entityImg.getColor() ) );
+    }
+  }
+}
+
 void Scene::render() {
+  // Camera variables
+  const auto& camRect = Rect( World::get<Position>( _camera.getId() ), World::get<Size>( _camera.getId() ) );
   // For each layer..
   for ( const auto& layer : _grid.getLayers() ) {
     // Background
-    const auto& layerPos = World::get<Position>( layer.id );
-    const auto& layerSize = World::get<Size>( layer.id );
-    const auto& camPos = World::get<Position>( _camera.getId() );
-    const auto& camSize = World::get<Size>( _camera.getId() );
-    const unsigned MAX_WIDTH{ getWidth() - WINDOW_PADDING };
-    unsigned croppedWidth{}; 
-    // If grid starts to the left of FOV...
-    if ( layerPos.x < camPos.x ) {
-      croppedWidth = std::min( MAX_WIDTH, ( layerSize.w + layerPos.x - camPos.x ) );
-    }
-    // Else if grid ends to the right of FOV...
-    else if ( ( layerPos.x + layerSize.w ) > ( camPos.x + MAX_WIDTH + 1 ) ) {
-      croppedWidth = std::min( MAX_WIDTH, ( camPos.x + camSize.w - layerPos.x ) );
-    }
-    else {
-      croppedWidth = std::min( MAX_WIDTH, layerSize.w );
-    }
-    auto lastRow = std::min<unsigned>( getHeight() - WINDOW_PADDING, layerPos.y + layerSize.h );
-    for ( unsigned row = layerPos.y; row <= lastRow; ++row ) {
-      int startPos =  ( camPos.y + row ) * layerSize.w + camPos.x;
-      int stringLength = croppedWidth;
-      auto rowStr = std::string( layer.bgStr, startPos, stringLength );
-      mvprint( row + 1, 1, rowStr );  // row + 1 to skip the stop border 
-    }
-    // Foreground
-    for ( const auto& entity : layer.fg ) {
-      if ( _camera.canSee( entity ) ) {  // TODO let camera track what it sees via onCollision(), not Scene
-        const auto& pos = World::get<Position>( entity );
-        const auto& img = World::get<Image>( entity );
-        auto xRelToCamera = pos.x - camPos.x;
-        auto yRelToCamera = pos.y - camPos.y;
-        setAttr ( COLOR_PAIR( img.getColor() ) );
-        mvprint( yRelToCamera, xRelToCamera, img.getSymbol() );
-        unsetAttr ( COLOR_PAIR( img.getColor() ) );
-      }
+    switch ( layer.type ) {
+      case Layer::Type::STATIC:
+        renderStaticLayer( layer, camRect );
+        break;
+      case Layer::Type::PARALLAX:
+        break;
+      case Layer::Type::AUTOLOOP:
+        break;
     }
   }
 }
 
 void Scene::onInput( const InputState& input ) {
-  // auto focus = _camera.getFocus();  // TODO
-  // focus->onInput( input );  TODO entities no longer have built-in functions
+  Trigger::onTrigger( _focus, input );
 }
 
+void Scene::setFocus( Entity entity ) {
+  auto layerIdx = _grid.getLayer( entity ); 
+  if ( layerIdx.has_value() ) {
+    _focus = entity;
+    _grid.setFocusedLayerIdx( *layerIdx );
+  }
+}

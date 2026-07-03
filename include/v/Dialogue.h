@@ -2,11 +2,7 @@
 #include <string>
 #include <vector>
 #include "Window.h"
-
-// Variables
-struct LineLimits {
-  unsigned start{}, len{};  // i just KNOW the len is gonna be mistaken for end at some point
-};
+#include "LineLimits.h"
 
 class Dialogue : public Window {
   public:

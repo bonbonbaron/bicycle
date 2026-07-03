@@ -4,7 +4,7 @@
 #include "c/Timer.h"
 #include "m/Entity.h"
 #include "m/Personality.h"
-#include "m/Activity.h"
+// #include "m/Activity.h"
 #include "m/Blackboard.h"
 #include "c/WindowManager.h"
 
@@ -15,30 +15,35 @@
 // Once a behavior starts that needs to happen on a regular basis, it's given a timer to repeat
 // it at a given frequency for a specified number of reps (which can be infinite).
 
-class TriggerRegistry : public std::map<std::string, ActCallback> {
-  public:
-    // Allows you to more easily make an event mapping
-    static auto get( const std::string& name ) -> ActCallback;
-    // Allows you to more easily make an event mapping
-    static void add( const TriggerRegistry::value_type& val );
-
-  private:
-    static auto getInstance() -> TriggerRegistry&;
-    TriggerRegistry() = default;
-    TriggerRegistry( const TriggerRegistry& rhs ) = delete;
-    TriggerRegistry& operator=( const TriggerRegistry& ) = delete;
-};
-
 // TODO wait till core Trigger takes shape before you worry about orchestrating stopping components.
 class Trigger {
   public:
     static auto getInstance() -> Trigger&;
-    void run();
 
     // Le trifecta
     static void onInput( const InputState& input );  // straightforward feeding to whatever holds context
     static void onTimer( const TimeoutMsg& timeoutMsg );  // TODO: timer ID should map to a quirk.
     static void onCollision( const int collisionType );  // TODO
+
+    // General trigger of input, timer, and collision actions
+    template<typename T>
+      static void onTrigger( const Entity entity, T& t ) {
+        // Get the entity's personality.
+        auto& trigger = getInstance();
+        auto personality = trigger.getPersonality( entity );
+        auto quirk = personality[ getTypeTag<T>() ];
+        // Get triggered action and current activity to see whether the former overrides the latter.
+        auto& triggeredAction = std::get<Cb<T>>( quirk );
+        // auto& bb = trigger.getBlackboard( entity );   // TODO leave this out until absolutely necessary
+        triggeredAction( entity, t );         // Call current activity's action.
+      } // onTrigger()
+
+    auto getPersonality( Entity entity ) -> Personality;
+    void setPersonality( Entity entity, const Personality& personality );
+    auto getBlackboard( Entity entity ) -> Blackboard;
+    // auto getActiveTimer( Entity entity ) -> Blackboard;
+
+    // TODO whatever the above needs to be static, make accessor here.
   private:
     Trigger() = default;
     Trigger(const Trigger&) = delete;
@@ -47,12 +52,11 @@ class Trigger {
     Trigger operator=(const Trigger&&) = delete;
 
     std::shared_ptr<Window> _context{};  // The context receives inputs.
-    std::map<Entity, Personality> _personalityMap{};
     // timeout ID gives entity; timeout type gives entity's quirk
     // Entities don't have to implement "onTimeout "ANIMATION_TIMEOUT" or anything basic like that.
     std::array<Entity, MAX_NUM_TIMERS> activeTimers{};
     std::array<Personality, NUM_SUPPORTED_ENTITIES> _personalities{};
-    std::array<Activity, NUM_SUPPORTED_ENTITIES> _activities{};
+    // std::array<Activity, NUM_SUPPORTED_ENTITIES> _activities{};  // TODO this'll be overwritten with Orchestra
     std::array<Blackboard, NUM_SUPPORTED_ENTITIES> _blackboards{};
     /* 
      * TIMER: timer ID goes off, asks Trigger whose it was and gets the entity.
@@ -82,50 +86,6 @@ class Trigger {
      *  
      */
 
-    // General trigger of input, timer, and collision actions
-    template<typename T>
-      void onTrigger( const std::string&& stimulus, const Entity entity, T& t ) {
-        // Get the entity's personality.
-        auto& trigger = getInstance();
-        auto personality = trigger._personalityMap.find( entity );
-        if ( personality == trigger._personalityMap.end() ) {
-          std::cout << "Trigger's personality map doesn't have entity " << entity << '\n';
-          return;
-        }
-
-        // Get entity's triggered quirk from its personality.
-        auto quirkPair = personality->second.find( stimulus );  // TODO does this need to be an orchestra instead?
-        if ( quirkPair == personality->second.end() ) {
-          return;
-        }
-        auto& quirk = quirkPair->second;
-
-        // Get triggered action and current activity to see whether the former overrides the latter.
-        // TODO if triggered action is the same as one already ongoing (do quirks need IDs to know that?), 
-        auto& currActivity = _activities.at( entity );
-        auto& triggeredAction = std::get<Cb<T>>( quirk.action );
-        auto& bb = _blackboards.at( entity );
-        if ( currActivity.state == ActionState::IN_PROGRESS || 
-            currActivity.priority > quirk.priority ) {
-          // TODO does this mean we call the current activity's action again and decrement its nRepsRemaining?
-        }
-        else {
-          // Initialize and start overriding activity.
-          currActivity = quirk;
-        }
-
-        // Talk to timer if this is a periodic activity.
-        if ( currActivity.nRepsRemaining > 0 ) {
-          --currActivity.nRepsRemaining;
-          auto& timer = Timer::getInstance();
-          constexpr unsigned REGULAR_TIMER_TYPE{0};
-          // (30/s * 1s/1000ms)^-1
-          auto timerId = timer.start( static_cast<unsigned>( 1e3 / currActivity.freq ), REGULAR_TIMER_TYPE, "REGULAR_REPEAT" );
-          // TODO map timer ID to an entity, orchestra, or something so at least one action can be paused/stopped
-        }
-        // Call current activity's action.
-        currActivity.state = triggeredAction( bb, t );
-      }  // onTrigger()
     /* Input goals:
        ============
        \0. make it build (excluding things you don't need atm)

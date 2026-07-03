@@ -10,7 +10,7 @@ void delEntityId( const Entity entity ) {
 
 auto newEntityId() -> Entity {
   const auto idx = _availableEntityIds._Find_first();  // _Find_first() is a g++ extension. Lucky me.
-  std::cout << _availableEntityIds << '\n';
+  // std::cout << _availableEntityIds << '\n';
   _availableEntityIds.set( idx, false );
   return idx;
 }
