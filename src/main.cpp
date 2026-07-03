@@ -5,6 +5,12 @@
 #include <vector>
 #include "v/Dialogue.h"
 
+/*
+ * TODO
+ *  1) first try to do Battle in C++
+ *  2) then see what it's like to do it in Lua
+ */
+
 struct Character {
   Character( const std::string&& name ) : name(name) {}
   std::string name;
