@@ -19,19 +19,19 @@
 
   TIMER
   =====
-    start/stop/pause/unpause whole action group
-    tick individual elements within group (maybe this is where activity can do either parent or child)
-    interrupt lower priority groups
-    Support timer IDs pointing to which BG tile to animate next 
+    \ timers flow through Trigger to callback
 
   COLLISION
   =========
-    any entity, doesn't have to be in top window
+    \any entity, doesn't have to be in top window
     notify uncollisions as well
 
   ORCHESTRA
   =========
     Timer needs pointer to activity for group-wide management.
+    start/stop/pause/unpause whole action group
+    tick individual elements within group (maybe this is where activity can do either parent or child)
+    interrupt lower priority groups
     Input needs redirecting to a top-level window (some of which can redirect it, in turn, to an entity)
     Collision only needs to 
     Activities need children. 
@@ -44,6 +44,9 @@
         
       };
 
+  MISC
+  ====
+    Support timer IDs pointing to which BG tile to animate next 
   SCRIPTING
   =========
     can we make this world easier to build with Lua?
