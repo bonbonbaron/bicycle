@@ -1,0 +1,43 @@
+#include "v/Scene.h"
+#include "m/World.h"
+#include <cursesw.h>
+#include <algorithm>
+
+Scene::Scene( const Grid& grid ) : Window( 0, 0, COLS, LINES ), _grid(grid) {}
+Scene::Scene( const int x, const int y, const int w, const int h ) : Window( x, y, w, h ) {}
+
+// This makes this class hard to classify: This is DEFINITELY the "view" portion.
+// May be a good idea later to split the GUI-specific mechanisms out to another class.
+void Scene::render() {
+  // For each layer..
+  for ( const auto& layer : _grid.getLayers() ) {
+    // Background
+    const auto& layerPos = World::get<Position>( layer.id );
+    const auto& layerSize = World::get<Size>( layer.id );
+    auto lastRow = std::min<unsigned>( getHeight() - WINDOW_PADDING, layerPos.y + layerSize.h );
+    for ( unsigned row = layerPos.y; row <= lastRow; ++row ) {
+      int startPos =  ( _camera.getY() + row ) * layerSize.w + _camera.getX();
+      int stringLength =  getWidth() - WINDOW_PADDING;
+      auto rowStr = std::string( layer.bgStr, startPos, stringLength );
+      mvprint( row + 1, 1, rowStr );  // row + 1 to skip the stop border 
+    }
+    // Foreground
+    for ( const auto& entity : layer.fg ) {
+      if ( _camera.canSee( entity ) ) {  // TODO let camera track what it sees via onCollision(), not Scene
+        const auto& pos = World::get<Position>( entity );
+        const auto& img = World::get<Image>( entity );
+        auto xRelToCamera = pos.x - _camera.getX();
+        auto yRelToCamera = pos.y - _camera.getY();
+        setAttr ( COLOR_PAIR( img.getColor() ) );
+        mvprint( yRelToCamera, xRelToCamera, img.getSymbol() );
+        unsetAttr ( COLOR_PAIR( img.getColor() ) );
+      }
+    }
+  }
+}
+
+void Scene::onInput( const InputState& input ) {
+  // auto focus = _camera.getFocus();  // TODO
+  // focus->onInput( input );  TODO entities no longer have built-in functions
+}
+

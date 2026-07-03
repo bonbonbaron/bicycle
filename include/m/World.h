@@ -6,12 +6,13 @@
 #include <cassert>
 
 #include "m/Entity.h"
-#include "v/Image.h"
 #include "m/Position.h"
-
+#include "m/Size.h"
+#include "v/Image.h"
 
 using ArrayVar = std::variant<
   std::array<Position, NUM_SUPPORTED_ENTITIES>,
+  std::array<Size, NUM_SUPPORTED_ENTITIES>,
   std::array<Image, NUM_SUPPORTED_ENTITIES>
 >;
 
@@ -73,7 +74,7 @@ class World {
 
     // Convenience: initialize all known types in one call
     void initialize_all() {
-      initialize<Position, Image>();
+      initialize<Position, Size, Image>();
     }
 
     // Optional: check whether a type is already initialized  // TODO delete if unneeded

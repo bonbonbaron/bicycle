@@ -11,7 +11,8 @@
         inherit menu to entity menu (later w/ grid)
       Grid back in working order
         z-layers (just use vectors. It'll be okay, nobody GAF. Only change it when you absolutely need to.)
-          each layer can have a BG (potentially with animated tiles) and FG.
+          each layer can have a BG and FG
+          Support timer IDs pointing to which BG tile to animate next 
           i'd like for it to have a list of tiles that change on the next timeout to minimize drawing.
         parallax (ditto)
         camera 

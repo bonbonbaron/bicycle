@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include "v/Dialogue.h"
+#include "v/Scene.h"
 
 /*
  * TODO
@@ -16,42 +17,19 @@ struct Character {
   std::string name;
 };
 
-
 class Battle {
   public:
     Battle() = default;
     void init();
-  private:
-    void pushMenu();
-    void doNothing();
-    std::vector<Character> chars;
-    int charnum{};
 };
 
-static int j{0};
-void Battle::pushMenu() {
-  
-  std::vector<Menu::MenuItem> v {
-    { { "itemA", 0 }, "yell", [&]{ 
-                                   charnum = ( charnum + 1 ) % chars.size();
-                                   auto c = chars.at( charnum ); 
-                                   bicycle::push<Dialogue>( "YARGGGHH!!! MY NAME IS " + c.name ); } 
-    },
-    //{ { "itemB", 1 }, "whisper", [&]{ std::cout << "pssst! my name is " << c.name << '\n'; bicycle::pop(); } },
-  };
-  bicycle::push<TextMenu>( "some text menu", v, 5 + j*2, 5 + j*2, 10, 15 );
-  ++j;
-}
-
 void Battle::init() {
-  chars.emplace_back( "Bohemond" );
-  chars.emplace_back( "Redmond" );
-  chars.emplace_back( "Teddymond" );
-  pushMenu();
-}
-  
-void Battle::doNothing() {}
+  Layer l{ "idkidkidcidcidbidb" };
+  Grid g{};
+  g.addLayer( l );
 
+  bicycle::push<Scene>( g );
+}
 
 int main( int argc, char** argv ) {
   if ( argc != 2 ) {
