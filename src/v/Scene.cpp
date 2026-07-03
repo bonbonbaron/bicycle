@@ -31,7 +31,7 @@ Layer::Layer( const std::string bgStr, const std::string& bgCollStr, Layer::Type
   }
   // Even though we're not right-padding the shorter lines with spaces, we'll treat
   // the grid as a rectangle for easier collision detection.
-  World::set<Size>( id, { static_cast<unsigned>( lineLimits.size() ), maxLineWidth } );
+  World::set<Rect>( id, { { 0, 0 }, { static_cast<unsigned>( lineLimits.size() ), maxLineWidth } } );
 }
 
 
@@ -75,7 +75,7 @@ Scene::Scene( const int x, const int y, const int w, const int h ) : Window( x, 
 }
 
 void Scene::renderStaticLayer( const Layer& layer, const Rect& camRect ) {
-  const auto& layerRect = Rect( World::get<Position>( layer.id ), World::get<Size>( layer.id ) );
+  const auto& layerRect = World::get<Rect>( layer.id );
   // Background
   auto croppedRect = camRect.crop( layerRect );
   auto layerRowIdx = std::max( 0, camRect.pos.y - layerRect.pos.y );
@@ -89,9 +89,9 @@ void Scene::renderStaticLayer( const Layer& layer, const Rect& camRect ) {
   // Foreground
   for ( const auto& entity : layer.fg ) {
     if ( _camera.canSee( entity ) ) {  // TODO let camera track what it sees via onCollision(), not Scene
-      const auto& entityPos = World::get<Position>( entity );
+      const auto& entityRect = World::get<Rect>( entity );
       const auto& entityImg = World::get<Image>( entity );
-      auto posWrtCamera = entityPos + layerRect.pos - camRect.pos;
+      auto posWrtCamera = entityRect.pos + layerRect.pos - camRect.pos;
       setAttr ( COLOR_PAIR( entityImg.getColor() ) );
       mvprint( posWrtCamera.y, posWrtCamera.x, entityImg.getSymbol() );
       unsetAttr ( COLOR_PAIR( entityImg.getColor() ) );
@@ -101,7 +101,7 @@ void Scene::renderStaticLayer( const Layer& layer, const Rect& camRect ) {
 
 void Scene::render() {
   // Camera variables
-  const auto& camRect = Rect( World::get<Position>( _camera.getId() ), World::get<Size>( _camera.getId() ) );
+  const auto& camRect = World::get<Rect>( _camera.getId() );
   // For each layer..
   for ( const auto& layer : _grid.getLayers() ) {
     // Background
@@ -110,8 +110,10 @@ void Scene::render() {
         renderStaticLayer( layer, camRect );
         break;
       case Layer::Type::PARALLAX:
+        // TODO
         break;
       case Layer::Type::AUTOLOOP:
+        // TODO
         break;
     }
   }

@@ -1,10 +1,7 @@
 #include "c/Timer.h"
 #include "Constants.h"
 #include "c/Trigger.h"
-
-#include <iostream> // TODO delete
 #include <thread>
-
 
 Timer::Timer() : frameStartTime( std::chrono::steady_clock::now() ) {}
 
@@ -47,20 +44,13 @@ void Timer::unpause( const unsigned timerId ) {
   _decrementers.at(timerId) = 1;
 }
 
-auto Timer::start( const unsigned timeMs, const unsigned timerType, const std::string& timeoutMsg ) -> unsigned {
+auto Timer::start( const unsigned timeMs, Entity entity, const unsigned timerType, const std::string& msg ) -> unsigned {
   auto timerId = findAvailableTimer();
   if ( timerId < MAX_NUM_TIMERS )  {
-    // float mult faster than div
-    //TODO: figure out which performs better on each  machine
-#if 0
-    unsigned nFrames{static_cast<unsigned>(timeMs * FRAMES_PER_MILLISECOND)};
-#else
-    // frames/sec * sec/msec * msec = frames
     unsigned nFrames{ (Constants::FRAMES_PER_SECOND * timeMs) / 1000 };
-#endif
     _times.at( timerId ) = nFrames;
     _decrementers.at(timerId) = 1;
-    _msgs.at(timerId)  = TimeoutMsg{ timerId, timerType, timeoutMsg };
+    _msgs.at(timerId)  = Timeout{ timerId, entity, timerType, msg };
   }
   return timerId;
 }

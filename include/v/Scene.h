@@ -11,8 +11,6 @@
 #include "m/Camera.h"
 #include "m/Rect.h"
 #include "m/Entity.h"
-#include "m/Position.h"
-#include "m/Size.h"
 #include "m/World.h"
 
 #include "v/Window.h"
@@ -34,7 +32,6 @@ struct Layer {
   //   * position (if PARALLAX or AUTOLOOP)
   //   * velocity (if AUTOLOOP)
   // Backgrounds can have positions other than (0,0) for parallax or auto-looping
-  // That implies they need to give a Position and potentially a Velocity to World.
   // They may need to pass an Image in too.
   Type type{};
   std::vector<Entity> fg{};  // entities in the foreground

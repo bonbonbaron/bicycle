@@ -10,9 +10,8 @@
         \inherit menu to text menu
         inherit menu to entity menu (later w/ grid)
       Grid back in working order
-        z-layers (just use vectors. It'll be okay, nobody GAF. Only change it when you absolutely need to.)
-          each layer can have a BG and FG
-          Support timer IDs pointing to which BG tile to animate next 
+        \z-layers (just use vectors. It'll be okay, nobody GAF. Only change it when you absolutely need to.)
+          \each layer can have a BG and FG
           i'd like for it to have a list of tiles that change on the next timeout to minimize drawing.
         parallax (ditto)
         camera 
@@ -23,10 +22,12 @@
     start/stop/pause/unpause whole action group
     tick individual elements within group (maybe this is where activity can do either parent or child)
     interrupt lower priority groups
+    Support timer IDs pointing to which BG tile to animate next 
 
   COLLISION
   =========
     any entity, doesn't have to be in top window
+    notify uncollisions as well
 
   ORCHESTRA
   =========
@@ -52,6 +53,7 @@
 ================
   motion system (velocities in world)
   animation system (velocities, rects, and collision types in world)
+  tilebased animation system (tiles on a BG or complicated sprite)
   collision & motion system 
   sound system
 

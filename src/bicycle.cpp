@@ -8,6 +8,7 @@
 #include "m/World.h"
 #include "c/Trigger.h"
 #include "c/SshInput.h"
+#include "c/CollisionDetector.h"
 
 namespace bicycle {
 
@@ -58,6 +59,7 @@ namespace bicycle {
     while ( wm.size() > 0 ) {
       Timer::run();
       SshInput::listen();
+      CollisionDetector::check();
       wm.render();   // TODO make this internally only change dirty windows
       Timer::sleepFrame();
     }

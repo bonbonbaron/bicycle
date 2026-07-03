@@ -1,10 +1,9 @@
 #pragma once
 #include <map>
-#include "c/InputData.h"  // TODO: Shouldn't this be m/InputData?
-#include "c/Timer.h"
-#include "m/Entity.h"
+#include "c/InputData.h"
+#include "c/Timeout.h"
+#include "c/Collision.h"
 #include "m/Personality.h"
-// #include "m/Activity.h"
 #include "m/Blackboard.h"
 #include "c/WindowManager.h"
 
@@ -22,28 +21,23 @@ class Trigger {
 
     // Le trifecta
     static void onInput( const InputState& input );  // straightforward feeding to whatever holds context
-    static void onTimer( const TimeoutMsg& timeoutMsg );  // TODO: timer ID should map to a quirk.
-    static void onCollision( const int collisionType );  // TODO
+    static void onTimer( const Timeout& timeout );  
+    static void onCollision( const Collision& collision );  // TODO
 
     // General trigger of input, timer, and collision actions
     template<typename T>
-      static void onTrigger( const Entity entity, T& t ) {
-        // Get the entity's personality.
+      static void onTrigger( const Entity entity, const T& t ) {
         auto& trigger = getInstance();
-        auto personality = trigger.getPersonality( entity );
-        auto quirk = personality[ getTypeTag<T>() ];
-        // Get triggered action and current activity to see whether the former overrides the latter.
+        auto  personality = trigger.getPersonality( entity );
+        auto  quirk = personality[ getTypeTag<T>() ];
         auto& triggeredAction = std::get<Cb<T>>( quirk );
-        // auto& bb = trigger.getBlackboard( entity );   // TODO leave this out until absolutely necessary
-        triggeredAction( entity, t );         // Call current activity's action.
-      } // onTrigger()
+        triggeredAction( entity, t );
+      } 
 
     auto getPersonality( Entity entity ) -> Personality;
     void setPersonality( Entity entity, const Personality& personality );
     auto getBlackboard( Entity entity ) -> Blackboard;
-    // auto getActiveTimer( Entity entity ) -> Blackboard;
 
-    // TODO whatever the above needs to be static, make accessor here.
   private:
     Trigger() = default;
     Trigger(const Trigger&) = delete;
@@ -85,13 +79,5 @@ class Trigger {
      *  The Trigger::onTimer() interface needs a bit of work to distinguish between timer ports and root-level interrupts.
      *  
      */
-
-    /* Input goals:
-       ============
-       \0. make it build (excluding things you don't need atm)
-       \1. receive Input... print here (see if you can hack it to not need game data for now)
-       2. have a top-level window... direct input to it.
-       3. pretend to trigger an action on that context by getting its personality (key-quirk mapping, right?)
-       */
 
 };  // class Trigger

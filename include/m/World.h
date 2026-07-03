@@ -5,15 +5,16 @@
 #include <unordered_map>
 #include <cassert>
 
-#include "m/Entity.h"
-#include "m/Position.h"
-#include "m/Size.h"
-#include "v/Image.h"
 #include "m/TypeTag.h"
+#include "m/Entity.h"
+
+#include "m/Rect.h"
+#include "c/Collision.h"
+#include "v/Image.h"
 
 using ArrayVar = std::variant<
-  std::array<Position, NUM_SUPPORTED_ENTITIES>,
-  std::array<Size, NUM_SUPPORTED_ENTITIES>,
+  std::array<Rect, NUM_SUPPORTED_ENTITIES>,
+  std::array<CollRect, NUM_SUPPORTED_ENTITIES>,
   std::array<Image, NUM_SUPPORTED_ENTITIES>
 >;
 
@@ -33,6 +34,12 @@ class World {
       auto& arr = world.get( getTypeTag<T>() );
       auto& t_arr = std::get< std::array< T, NUM_SUPPORTED_ENTITIES > >( arr );
       t_arr.at( entity ) = val;
+    }
+
+    // set-wrapper setting a value in a component array
+    template <typename T>
+    static void set( const Entity entity, const T&& val ) {
+      set( entity, val );
     }
 
     // get-wrapper returning component array allowing users to not have to get World's instance every time
@@ -65,7 +72,7 @@ class World {
 
     // Convenience: initialize all known types in one call
     void initialize_all() {
-      initialize<Position, Size, Image>();
+      initialize<Rect, CollRect, Image>();
     }
 
     // Optional: check whether a type is already initialized  // TODO delete if unneeded
