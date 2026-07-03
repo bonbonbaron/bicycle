@@ -24,7 +24,7 @@ class Battle {
 };
 
 void Battle::init() {
-  Layer l{ "idkidkidcidcidbidb" };
+  Layer l{ "idk\nidk\nidc\nidc\nidb\nidb" };
   Grid g{};
   g.addLayer( l );
 

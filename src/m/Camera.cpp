@@ -3,13 +3,19 @@
 #include <algorithm>
 #include "m/World.h"
 
-Camera::Camera( const int x, const int y, const int margin ) : _x(x), _y(y), _margin(margin) {}
+Camera::Camera() : _id( newEntityId() ) {}
+
+Camera::Camera( const int x, const int y, const int margin ) : _id( newEntityId() ), _margin(margin) {
+  World::set<Position>( _id, { x, y } );
+  // World::set<Size>( _id, { x, y } );  // TODO size cannot be set from this information alone.
+}
 
 void Camera::pan( const int dy, const int dx ) {
-  _x += dx;
-  _y += dy;
-  _x = std::clamp<int>( _x, 0, _maxX );
-  _y = std::clamp<int>( _y, 0, _maxY );
+  auto& pos = World::get<Position>( _id );
+  pos.x += dx;
+  pos.y += dy;
+  pos.x = std::clamp<int>( pos.x, 0, _maxX );
+  pos.y = std::clamp<int>( pos.y, 0, _maxY );
 }
 
 void Camera::followFocus() {
@@ -34,12 +40,14 @@ void Camera::followFocus() {
 
 // TODO this assumes single-character symbols. Handle multi-char later.
 auto Camera::canSee( const Entity entity ) const -> bool {
-  auto& pos = World::get<Position>( entity );  // entity->body.getPosition();
+  const auto& entityPos = World::get<Position>( entity );  // entity->body.getPosition();
+  const auto& camPos = World::get<Position>( _id );  // entity->body.getPosition();
+  auto& camSize = World::get<Size>( _id );
   return 
-    pos.x >= _x && 
-    pos.x <= _x + _w &&
-    pos.y >= _y && 
-    pos.y <= _y + _h;
+    entityPos.x >= static_cast<decltype(Position::x)>( camPos.x ) && 
+    entityPos.x <= static_cast<decltype(Position::x)>( camPos.x + camSize.w ) &&
+    entityPos.y >= static_cast<decltype(Position::y)>( camPos.y ) && 
+    entityPos.y <= static_cast<decltype(Position::y)>( camPos.y + camSize.h );
 }
 
 void Camera::focusOn( const Entity entity ) {
@@ -50,9 +58,8 @@ auto Camera::getFocus() const -> Entity {
   return _focus;
 }
 
-void Camera::setDims( const int h, const int w) {
-  _h = h;
-  _w = w;
+void Camera::setDims( const unsigned h, const unsigned w) {
+  World::set<Size>( _id, {w, h} );
 }
 
 void Camera::setLims( const int y, const int x) {
@@ -60,28 +67,30 @@ void Camera::setLims( const int y, const int x) {
   _maxX = x;
 }
 
-auto Camera::getX() const -> int {
-  return _x;
-}
-
-auto Camera::getY() const -> int {
-  return _y;
-}
-
 auto Camera::getLxMargin() const -> int {
-  return _x + _margin;
+  const auto& camPos = World::get<Position>( _id );  // entity->body.getPosition();
+  return camPos.x + _margin;
 }
 
 auto Camera::getHxMargin() const -> int {
-  return _x + _w - _margin + (WINDOW_PADDING/2);
+  const auto& camPos = World::get<Position>( _id );  // entity->body.getPosition();
+  const auto& camSize = World::get<Size>( _id );
+  return camPos.x + camSize.w - _margin + (WINDOW_PADDING/2);
 }
 
 auto Camera::getLyMargin() const -> int {
-  return _y + _margin;
+  const auto& camPos = World::get<Position>( _id );  // entity->body.getPosition();
+  return camPos.y + _margin;
 }
 
 auto Camera::getHyMargin() const -> int {
-  return _y + _h - _margin + (WINDOW_PADDING/2);
+  const auto& camPos = World::get<Position>( _id );  // entity->body.getPosition();
+  const auto& camSize = World::get<Size>( _id );
+  return camPos.y + camSize.h - _margin + (WINDOW_PADDING/2);
+}
+
+auto Camera::getId() const -> Entity {
+  return _id;
 }
 
 // TODO write onCollide() to handle entities coming onto and off of the screen

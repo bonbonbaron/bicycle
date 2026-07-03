@@ -1,9 +1,11 @@
 #pragma once
 #include <string>
 #include <vector>
+#include <algorithm>
 #include "m/Entity.h"
 #include "m/Position.h"
 #include "m/Size.h"
+#include "m/World.h"
 
 struct Layer {
   enum Type { STATIC, PARALLAX, AUTOLOOP };
@@ -15,7 +17,23 @@ struct Layer {
       bgCollStr( bgCollStr ),
       type( type ) {
         // TODO register size to World
-  }
+        unsigned maxLineWidth{}, currNumLines{};
+        signed lineWidth{};
+        bool continueLooking{ true };
+        const char ENDROW{ '\n' };
+        for ( unsigned currStart{}; continueLooking; ++currNumLines ) {
+          lineWidth = bgStr.find( "\n", currStart, 1 ) - currStart;
+          if ( lineWidth < 0 ) {
+            lineWidth = bgStr.size() - currStart;
+            continueLooking = false;
+          }
+          maxLineWidth = std::max( maxLineWidth, static_cast<unsigned>( lineWidth ) );
+          currStart += lineWidth + 1;  // "+1" includes the newline character.
+        }
+        this->bgStr.erase(std::remove(this->bgStr.begin(), this->bgStr.end(), ENDROW), this->bgStr.end());
+        this->bgCollStr.erase(std::remove(this->bgCollStr.begin(), this->bgCollStr.end(), ENDROW), this->bgCollStr.end());
+        World::set<Size>( id, { currNumLines, maxLineWidth } );
+      }
 
   Entity id{};
   std::string bgStr;

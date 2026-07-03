@@ -1,16 +1,15 @@
 #include <iostream>
-#include <list>
-#include <vector>
+#include <string>
+#include <algorithm> // Required for std::remove
 
-using namespace std;
+int main() {
+    std::string str = "Hello, World!";
+    char char_to_remove = 'l';
 
+    // Erase-remove idiom
+    str.erase(std::remove(str.begin(), str.end(), char_to_remove), str.end());
 
-int main( int argc, char** argv) {
-  list<int> a{ 1, 2, 3};
-  list<int> b{ 5, 8, 4};
-  a.merge(b);
-
-  for ( auto& aa : a ) cout << aa << '\n';
-  for ( auto& bb : b ) cout << bb << '\n';
-  return 0;
+    std::cout << str << std::endl; // Outputs: Heo, Word!
+    return 0;
 }
+
