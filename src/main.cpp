@@ -47,7 +47,7 @@ T(t2) {
   auto& rect = World::get<Rect>( entity );
   rect.pos += { 1, 1 };
   auto& timer = Timer::getInstance();
-  timer.start( 500, entity, 0, "do it again" );
+  timer.start( 500, entity, 0, 0 );
 }
 
 C(c1) {

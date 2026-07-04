@@ -1,5 +1,6 @@
 #pragma once
 #include <bitset>
+#include "c/Priority.h"
 
 // A bunch of stuff used by both controller types (physical keyboard and SSH key events)
   enum class LogicalKey : uint8_t {
@@ -125,7 +126,7 @@ constexpr auto MASK_RCTRL  = getbs( LogicalKey::RightCtrl);
 constexpr auto MASK_RSHIFT = getbs( LogicalKey::RightShift);
 constexpr auto MASK_RMETA  = getbs( LogicalKey::RightMeta);
 
-struct InputState {
+struct InputState : public Priority {
   Bitset currKeysPressed{};
   Bitset deltaKeysPressed{};
   int millisSinceLast{};  // i don't like making input dependent on Timer.

@@ -24,6 +24,31 @@
 
   ORCHESTRA
   =========
+
+    fresh thinking:
+      this'll be easier to do if everything has to pass through Trigger.
+      Trigger can be like airport customs logging everythign that happens.
+      Because everything must be done by one of three kickoff types, the type + Entity can mark some kind of group ID.
+      So, while the callback *may* tell the entity to move, Trigger knows subsequent events like this correspond to the last kickoff.
+      Therefore, nobody has direct access to anything besides Trigger. ( "I am the way... Nobody comes to the Father except through me." -John 14:6 )
+      Individual elements need a key to correspond to a system. Motion, collision, animation, timers, 
+      How can sub-timers be recognized as such? New boolean.
+      Should timers be smart enough to correspond to a system instead of a callback? 
+      Group should have priority, as should every collision, input, and timer. Interruption is guaged this way.
+      We need to be able to do the following things through Trigger:
+        + START (g)roup or (i)ndividual element
+          - g: 
+          - i:
+        + STOP (g)roup or (i)ndividual element
+          - g: 
+          - i:
+        + PAUSE (g)roup or (i)ndividual element
+          - g: 
+          - i:
+        + UNPAUse (g)roup or (i)ndividual element
+          - g: 
+          - i:
+
     Timer needs pointer to activity for group-wide management.
     start/stop/pause/unpause whole action group
     tick individual elements within group (maybe this is where activity can do either parent or child)
@@ -74,7 +99,7 @@
     bump allocator
     in-memory resources
     *my* map
-    graph traversal; seems clearer now that each scene appears to be an entity in itself
+    graph-based scene traversal; seems clearer now that each scene appears to be an entity in itself
     bar
     dice
 

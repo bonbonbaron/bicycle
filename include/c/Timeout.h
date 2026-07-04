@@ -1,10 +1,11 @@
 #pragma once
 #include "m/Entity.h"
+#include "c/Priority.h"
 
-struct Timeout {
-  unsigned id{};  // An entity can have multiple timers running simulatneously. ID
+struct Timeout : public Priority {
   Entity entity{};
-  unsigned type{};  // B
-  std::string msg;  // TODO replace with a proper enum
+  unsigned id{};      // An entity can have multiple timers running simulatneously. ID
+  unsigned type{};    // I *think* this corresponds to the activity we want this to spark in recipient.
+  bool isSubtimer{};  // Subtimers don't kick off new activity groups.
 };
 

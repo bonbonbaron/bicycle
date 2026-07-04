@@ -44,13 +44,13 @@ void Timer::unpause( const unsigned timerId ) {
   _decrementers.at(timerId) = 1;
 }
 
-auto Timer::start( const unsigned timeMs, Entity entity, const unsigned timerType, const std::string& msg ) -> unsigned {
+auto Timer::start( const unsigned timeMs, Entity entity, const unsigned timerType, bool isSubtimer ) -> unsigned {
   auto timerId = findAvailableTimer();
   if ( timerId < MAX_NUM_TIMERS )  {
     unsigned nFrames{ (Constants::FRAMES_PER_SECOND * timeMs) / 1000 };
     _times.at( timerId ) = nFrames;
     _decrementers.at(timerId) = 1;
-    _msgs.at(timerId)  = Timeout{ timerId, entity, timerType, msg };
+    _msgs.at(timerId)  = Timeout{ timerId, entity, timerType, isSubtimer };
   }
   return timerId;
 }
