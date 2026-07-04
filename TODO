@@ -2,7 +2,7 @@
 |TRIGGER|
 +=======+
   \INPUT
-  =====
+  ======
     windows back in working order
       \ Dialogue back in working order
         \ Dialogue's update() needs to be moved a render() function
@@ -14,11 +14,11 @@
 
 
   \TIMER
-  =====
+  ======
     \ timers flow through Trigger to callback
 
   \COLLISION
-  =========
+  ==========
     \any entity, doesn't have to be in top window
     \flow through Trigger to callback
 
@@ -37,7 +37,6 @@
             collisions can be filtered individually.
       struct Activity {
         set<Timer> childTimers{};  // i like set better for no searching
-        
       };
 
 +=========+
