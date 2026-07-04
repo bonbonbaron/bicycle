@@ -1,27 +1,22 @@
 #pragma once
-#include <fstream>
 #include <string>
 #include <vector>
 #include <curses.h>
-#include <functional>
-#include <memory>
-#include <algorithm>
 #include <optional>
 
 #include "m/Camera.h"
 #include "m/Rect.h"
 #include "m/Entity.h"
-#include "m/World.h"
 
 #include "v/Window.h"
 
 #include "LineLimits.h"
 
 struct Layer {
-  enum Type { STATIC, PARALLAX, AUTOLOOP };
+  enum Type { FIXED, UNIFORM, PARALLAX, AUTOLOOP };
 
   Layer();
-  Layer( const std::string bgStr = "", const std::string& bgCollStr = "", Layer::Type type = Layer::Type::STATIC );
+  Layer( const std::string bgStr = "", const std::string& bgCollStr = "", Layer::Type type = Layer::Type::UNIFORM );
   Entity id{};
   std::string bgStr;
   std::string bgCollStr;

@@ -2,7 +2,6 @@
 #include "m/World.h"
 #include <cursesw.h>
 #include <algorithm>
-#include "m/Rect.h"
 #include "c/Trigger.h"
 
 Layer::Layer() : id( newEntityId() ) {}
@@ -106,13 +105,16 @@ void Scene::render() {
   for ( const auto& layer : _grid.getLayers() ) {
     // Background
     switch ( layer.type ) {
-      case Layer::Type::STATIC:
-        renderStaticLayer( layer, camRect );
-        break;
-      case Layer::Type::PARALLAX:
+      case Layer::Type::FIXED:     // Doesn't move with camera
         // TODO
         break;
-      case Layer::Type::AUTOLOOP:
+      case Layer::Type::UNIFORM:   // Moves same velocity as camera
+        renderStaticLayer( layer, camRect );
+        break;
+      case Layer::Type::PARALLAX:  // Moves parallax to camera's focused-on layer
+        // TODO
+        break;
+      case Layer::Type::AUTOLOOP:  // Moves in constant velocity and loops back
         // TODO
         break;
     }

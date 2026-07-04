@@ -26,7 +26,7 @@ class Camera {
     Entity _id{};  // the camera itself is an entity with an entity ID. This helps motion and collision systems track it.
     int _maxX{};
     int _maxY{};
-    int _margin{};
+    int _margin{};  // distance focused-on Entity can move from center before camera follows it
     Entity _focus{};  // input is forwarded to this guy
     std::vector<std::list<Entity>> onscreenEntities;  // each list element corresponds to a layer in the scene
 };

@@ -2,7 +2,7 @@ DBG=-g
 STD=-std=c++20
 
 BICREPO := $(shell git rev-parse --show-toplevel)
-BICSRCS := main bicycle Config m/Entity m/Rect c/Trigger c/Timer c/SshInput v/ColorPalette v/Window c/WindowManager v/Dialogue v/Menu v/TextMenu m/Blackboard v/Image m/Camera m/World v/Scene m/Personality c/CollisionDetector # m/Body c/Input v/Bar c/Dice c/MidiPlayer v/Graph 
+BICSRCS := main bicycle Config m/Entity m/Rect c/Trigger c/Timer c/SshInput v/ColorPalette v/Window c/WindowManager v/Dialogue v/Menu v/TextMenu m/Blackboard v/Image m/Camera m/World v/Scene m/Personality c/CollisionDetector # c/Input v/Bar c/Dice c/MidiPlayer v/Graph 
 BICINCS := $(BICINCS:%=$(BICREPO)/include/%.h)
 
 BICOBJS := $(BICSRCS:%=$(BICREPO)/build/%.o)

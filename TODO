@@ -1,30 +1,26 @@
 +=======+
 |TRIGGER|
 +=======+
-  INPUT
+  \INPUT
   =====
     windows back in working order
       \ Dialogue back in working order
         \ Dialogue's update() needs to be moved a render() function
       \Menu back in working order
         \inherit menu to text menu
-        inherit menu to entity menu (later w/ grid)
-      Grid back in working order
+      \Grid back in working order
         \z-layers (just use vectors. It'll be okay, nobody GAF. Only change it when you absolutely need to.)
           \each layer can have a BG and FG
-          i'd like for it to have a list of tiles that change on the next timeout to minimize drawing.
-        parallax (ditto)
-        camera 
 
 
-  TIMER
+  \TIMER
   =====
     \ timers flow through Trigger to callback
 
-  COLLISION
+  \COLLISION
   =========
     \any entity, doesn't have to be in top window
-    notify uncollisions as well
+    \flow through Trigger to callback
 
   ORCHESTRA
   =========
@@ -44,29 +40,45 @@
         
       };
 
-  MISC
-  ====
++=========+
+|SCRIPTING|
++=========+
+  two layers: 
+    1. C++-side to call Lua callbacks
+    2. Lau-side to call C++ functions
+  Can we make the world easier to build with Lua?
+
++====+
+|MISC|
++====+
+  - SYSTEMS:
+    --------
+    animation
+    motion + collision system
+    motion-only system (no rects needed maybe? idk...)
+      this might afford different sorts of motion in one system. With acceleration
+      will this be on a destination basis or raw kinematics?
+    sound system ( you can already *play* sound, but you need something to manage 
+
+  - FEATURES:
+    ---------
     Support timer IDs pointing to which BG tile to animate next 
-  SCRIPTING
-  =========
-    can we make this world easier to build with Lua?
+    tile-based animations w/ timers
+    parallax (ditto)
+    auto-looping bg
+    camera following entity, should be easy to switch
+    inherit menu to entity menu (later w/ grid)
+    notify uncollisions as well
+    lerping
+    place mobile entities at the front of collision system
+    Z-ordering-- use q-sorting, or some kind of built-in sorter
+    bump allocator
+    in-memory resources
+    *my* map
+    graph traversal; seems clearer now that each scene appears to be an entity in itself
+    bar
+    dice
 
-================
-|AFTER THAT....|
-================
-  motion system (velocities in world)
-  animation system (velocities, rects, and collision types in world)
-  tilebased animation system (tiles on a BG or complicated sprite)
-  collision & motion system 
-  sound system
-
-
-TODO; look into Lua language for a scriptable engine.
-
-
-Hate to be a perpetual dreamer-- all the more reason to expedite this engine's RE-completion-- but I cannot wait to
-design cities in my games. Bikable cities that fertilize happiness. I want to read more of that happy city book to
-understand how best to make my game's towns.
 
 ------------
 version 2.0:
