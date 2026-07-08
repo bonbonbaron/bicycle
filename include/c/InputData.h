@@ -127,8 +127,9 @@ constexpr auto MASK_RSHIFT = getbs( LogicalKey::RightShift);
 constexpr auto MASK_RMETA  = getbs( LogicalKey::RightMeta);
 
 struct InputState : public Priority {
+  LogicalKey lastPressed{};
+  int millisSinceLast{};  // i don't like making input dependent on Timer.
   Bitset currKeysPressed{};
   Bitset deltaKeysPressed{};
-  int millisSinceLast{};  // i don't like making input dependent on Timer.
 };
 

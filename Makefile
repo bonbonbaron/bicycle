@@ -15,10 +15,10 @@ $(BICTGT): $(BICOBJS)
 	g++ -Wall -fvisibility=default $(DBG) -levdev $(STD) $(BICOBJS) $(shell ncursesw6-config --libs) -lfluidsynth -o $@
 
 $(BICREPO)/build/%.o: $(BICREPO)/src/%.cpp $(BICREPO)/include/%.h 
-	g++ -Wall -fvisibility=default $(DBG) $(STD) -c $< -I$(BICREPO)/include $(shell ncursesw6-config --cflags ) -o $@
+	g++ -Wall -Wno-switch -fvisibility=default $(DBG) $(STD) -c $< -I$(BICREPO)/include $(shell ncursesw6-config --cflags ) -o $@
 
 $(BICREPO)/build/%.o: $(BICREPO)/src/%.cpp ${BICREPO}/build/m ${BICREPO}/build/v ${BICREPO}/build/c 
-	g++ -Wall -fvisibility=default $(DBG) $(STD) -c $< -I$(BICREPO)/include $(shell ncursesw6-config --cflags ) -o $@
+	g++ -Wall -Wno-switch -fvisibility=default $(DBG) $(STD) -c $< -I$(BICREPO)/include $(shell ncursesw6-config --cflags ) -o $@
 
 $(BICREPO)/build/m:
 	mkdir -p $(BICREPO)/build/m

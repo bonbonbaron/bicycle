@@ -3,6 +3,11 @@
 #include "c/Timer.h"
 #include "Constants.h"
 
+ /* "I am the way... Nobody comes to the Father except through me." -John 14:6 
+  *
+  * Trigger is the gateway through which every signal must pass in the game engine.
+  * This is designed to correlate tasks with each other.
+  */
 
 auto Trigger::getInstance() -> Trigger& {
   static Trigger trigger;

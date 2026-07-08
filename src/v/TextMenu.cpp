@@ -37,25 +37,27 @@ void TextMenu::onCursorMovement() {
 void TextMenu::onInput( const InputState& input ) {
   auto& wm = WindowManager::getInstance();
   const int NUM_ROWS_DISP = getHeight() - WINDOW_PADDING;
-  if ( (MASK_J & input.currKeysPressed).any() ) {
-    ++_cursor.currItemIdx;
-    _cursor.currItemIdx = std::clamp<int>( _cursor.currItemIdx, 0, _items.size() - 1 );
-    if ( ( _cursor.currItemIdx ) > ( _firstDispIdx + NUM_ROWS_DISP - 1 ) ) {
-      ++_firstDispIdx;
-    }
-  }
-  if ( (MASK_K & input.currKeysPressed).any() ) {
-    --_cursor.currItemIdx;
-    _cursor.currItemIdx = std::clamp<int>( _cursor.currItemIdx, 0, _items.size() - 1 );
-    if ( _cursor.currItemIdx < _firstDispIdx ) {
-      --_firstDispIdx;
-    }
-  }
-  if ( (MASK_B & input.currKeysPressed).any() ) {
-    wm.pop();
-  }
-  if ( (MASK_SPACE & input.currKeysPressed).any() ) {
-    auto item = getItem();
-    item.cb();
+  switch( input.lastPressed ) {
+    case LogicalKey::J:
+      ++_cursor.currItemIdx;
+      _cursor.currItemIdx = std::clamp<int>( _cursor.currItemIdx, 0, _items.size() - 1 );
+      if ( ( _cursor.currItemIdx ) > ( _firstDispIdx + NUM_ROWS_DISP - 1 ) ) {
+        ++_firstDispIdx;
+      }
+      break;
+    case LogicalKey::K:
+      --_cursor.currItemIdx;
+      _cursor.currItemIdx = std::clamp<int>( _cursor.currItemIdx, 0, _items.size() - 1 );
+      if ( _cursor.currItemIdx < _firstDispIdx ) {
+        --_firstDispIdx;
+      }
+      break;
+    case LogicalKey::B:
+      wm.pop();
+      break;
+    case LogicalKey::Space:
+      auto item = getItem();
+      item.cb();
+      break;
   }
 }
