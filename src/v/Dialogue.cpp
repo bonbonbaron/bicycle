@@ -33,28 +33,29 @@ void Dialogue::init() {
 // TODO provide dev-friendly key masks
 void Dialogue::onInput( const InputState& input ) {
   auto& wm = WindowManager::getInstance();
-  if ( (MASK_J & input.currKeysPressed).any() ) {
-    ++initLineNum;
-    initLineNum = std::clamp<unsigned>( initLineNum, 0, lineLimits.size()  - 4 );
-  }
-  else if ( (MASK_K & input.currKeysPressed).any() ) {
-    if ( initLineNum > 0 ) {
-      --initLineNum;
-    }
-    initLineNum = std::clamp<unsigned>( initLineNum, 0, lineLimits.size() );
-  }
-  else if ( (MASK_F & input.currKeysPressed).any() ) {
-    initLineNum = std::clamp<unsigned>( initLineNum + getHeight(), 0, lineLimits.size() - 1 );
-  }
-  else if ( (MASK_B & input.currKeysPressed).any() ) {
-    initLineNum -= std::min( initLineNum, getHeight() );
-    initLineNum = std::clamp<unsigned>( initLineNum, 0, lineLimits.size() - 1 );
-  }
-  else if ( (MASK_SPACE & input.currKeysPressed).any() ) {
-    wm.pop();
-  }
-  else {
-    Window::onInput( input );
+  switch( input.lastPressed ) {
+    case LogicalKey::J:
+      ++initLineNum;
+      initLineNum = std::clamp<unsigned>( initLineNum, 0, lineLimits.size()  - 4 );
+      break;
+    case LogicalKey::K:
+      if ( initLineNum > 0 ) {
+        --initLineNum;
+      }
+      initLineNum = std::clamp<unsigned>( initLineNum, 0, lineLimits.size() );
+      break;
+    case LogicalKey::F:
+      initLineNum = std::clamp<unsigned>( initLineNum + getHeight(), 0, lineLimits.size() - 1 );
+      break;
+    case LogicalKey::B:
+      initLineNum -= std::min( initLineNum, getHeight() );
+      initLineNum = std::clamp<unsigned>( initLineNum, 0, lineLimits.size() - 1 );
+      break;
+    case LogicalKey::Space:
+      wm.pop();
+      break;
+    default:
+      Window::onInput( input );
   }
   render();
 }
