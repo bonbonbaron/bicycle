@@ -1,6 +1,6 @@
 #pragma once
 #include <ncurses.h>
-#include <map>
+#include <unordered_map>
 #include <string>
 
 enum Color {
@@ -14,7 +14,7 @@ enum Color {
   WHITE   ,
 };
 
-const std::map<std::string, Color> strToColor {
+const std::unordered_map<std::string, Color> strToColor {
   {"BLACK",	 BLACK	  },
     {"RED",	   RED	    },
     {"GREEN",	 GREEN	  },

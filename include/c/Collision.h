@@ -2,9 +2,8 @@
 #include "m/Entity.h"
 #include "m/Rect.h"
 #include "c/CollisionDetector.h"
-#include "c/Priority.h"
 
-struct Collision : public Priority {
+struct Collision {
   Entity lhs{};  // think of this is "self"
   Entity rhs{};  // whom you collided with
   unsigned type{}; // their collision type

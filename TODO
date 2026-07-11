@@ -104,6 +104,9 @@
     dice
     resource-loading
 
+  - DESIGN:
+    -------
+    Split views up into M, V, and/or C components. Scene, for instance, should be flexible enough to keep its controller aspects across display types.
 ------------
 version 2.0:
 ------------

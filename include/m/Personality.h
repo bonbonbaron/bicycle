@@ -2,15 +2,13 @@
 #include <cursesw.h>
 #include <functional>
 #include <string>
-#include <map>
+#include <unordered_map>
 #include <memory>
 #include <variant>
 
 #include "bicycle.h"
 #include "m/TypeTag.h"
-#include "Config.h"
 #include "Constants.h"
-#include "m/Blackboard.h"
 #include "c/Timer.h"
 #include "c/InputData.h"
 #include "c/Timeout.h"
@@ -22,7 +20,6 @@
 
 // Function template
 template<typename T>
-// using Cb = std::function<void(Blackboard&, const T&)>;  // callback that returns a priority
 using Cb = std::function<void(Entity, const T&)>;  // callback that returns a priority
 using Quirk = std::variant< Cb<const InputState>, Cb<const Collision>, Cb<const Timeout> >;
 // TypeTag resolves to const void*.
@@ -38,5 +35,5 @@ class Personality {
     }
     Personality() = default;
   private:
-    std::map< const void*, Quirk > _quirks;
+    std::unordered_map< const void*, Quirk > _quirks;
 };

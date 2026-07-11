@@ -1,25 +1,23 @@
 #pragma once
-#include <map>
+#include <unordered_map>
 #include "c/InputData.h"
 #include "c/Timeout.h"
 #include "c/Collision.h"
 #include "m/Personality.h"
-#include "m/Blackboard.h"
 #include "c/WindowManager.h"
+#include "m/Position.h"
 
-// Wait,does input need to handle things differently from timer & collision?
+ /* "I am the way... Nobody comes to the Father except through me." -John 14:6 
+  *
+  * Trigger is the gateway through which every signal must pass in the game engine.
+  * This is designed to correlate tasks with each other.
+  */
 
-// Trigger will have a map of entities-to-personalities. We DON'T iterate through all of these every frame.
-// That would be dumb. Instead, we let events (collisions, timers, and input) drive it. 
-// Once a behavior starts that needs to happen on a regular basis, it's given a timer to repeat
-// it at a given frequency for a specified number of reps (which can be infinite).
-
-// TODO wait till core Trigger takes shape before you worry about orchestrating stopping components.
 class Trigger {
   public:
     static auto getInstance() -> Trigger&;
 
-    // Le trifecta
+    // Le trifecta... These wrap templatized calls to onTrigger() below.
     static void onInput( const InputState& input );  // straightforward feeding to whatever holds context
     static void onTimer( const Timeout& timeout );  
     static void onCollision( const Collision& collision );  // TODO
@@ -36,7 +34,6 @@ class Trigger {
 
     auto getPersonality( Entity entity ) -> Personality;
     void setPersonality( Entity entity, const Personality& personality );
-    auto getBlackboard( Entity entity ) -> Blackboard;
 
   private:
     Trigger() = default;
@@ -45,39 +42,13 @@ class Trigger {
     Trigger(const Trigger&&) = delete;
     Trigger operator=(const Trigger&&) = delete;
 
-    std::shared_ptr<Window> _context{};  // The context receives inputs.
-    // timeout ID gives entity; timeout type gives entity's quirk
-    // Entities don't have to implement "onTimeout "ANIMATION_TIMEOUT" or anything basic like that.
-    std::array<Entity, MAX_NUM_TIMERS> activeTimers{};
+    struct Activity {
+      Priority priority{};
+      TimerId animTimerId{};
+      TimerId cbTimerId{};
+    };
+
     std::array<Personality, NUM_SUPPORTED_ENTITIES> _personalities{};
-    // std::array<Activity, NUM_SUPPORTED_ENTITIES> _activities{};  // TODO this'll be overwritten with Orchestra
-    std::array<Blackboard, NUM_SUPPORTED_ENTITIES> _blackboards{};
-    /* 
-     * TIMER: timer ID goes off, asks Trigger whose it was and gets the entity.
-     *        timer type fishes out the quirk and triggers it. We pass in the timer information
-     *        for the hell of it; whether or not the game actually uses it is none of our concern rn.
-     */
-    /*
-     * But if i want timer -> animation to... 
-     *  1. not stop the larger action that animation belongs to (such as walking and thinking)
-     *  2. be pausable/stoppable along with the larger action
-     *
-     *  ... then we need to rethink quirks.
-     *  Quirks assume one piece of action only and inhibits multiple timers from triggering concurrent activities.
-     *  Maybe quirks need ports for various signals:
-     *    timerAnimType   -> animation sub-activity
-     *    timerMotionType -> motion sub-activity
-     *    timerCustomType -> thinking sub-activity
-     *
-     *  Let's say this group has priority 4. What happens if a collision prio 5 triggers in the middle of it?
-     *
-     *  Notice this whole problem is all about timers.
-     *  In the above ports idea, would there ever be a port for anything other than a timer?
-     *  Collision is concerned a root-level trigger as is input.
-     *  So I believe not.
-     *  But what if a timer of bigger priority happens? Can that be a root-level trigger overthrowing this overarching activity?
-     *  The Trigger::onTimer() interface needs a bit of work to distinguish between timer ports and root-level interrupts.
-     *  
-     */
+    std::array<Activity, NUM_SUPPORTED_ENTITIES>    _activities{};
 
 };  // class Trigger

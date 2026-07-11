@@ -1,7 +1,7 @@
 #pragma once
 
 #include <string>
-#include <map>
+#include <unordered_map>
 #include <memory>
 #include <mutex>
 #include <functional>
@@ -35,14 +35,14 @@ namespace bicycle {  // prevent clash with YAML::Node
       auto getName() const -> const std::string&;
       void setDesc( const std::string& );
       auto getDesc() const -> const std::string&;
-      void setEdges( const std::map<std::string, Edge>& edges );
-      auto getEdges() const -> const std::map<std::string, Edge>&;
+      void setEdges( const std::unordered_map<std::string, Edge>& edges );
+      auto getEdges() const -> const std::unordered_map<std::string, Edge>&;
       void setRootEntity( const Entity& entity );
       void run();
     private:
       std::string _name;
       std::string _desc;
-      std::map<std::string, Edge> _edges{};
+      std::unordered_map<std::string, Edge> _edges{};
       Entity _rootEntity;  // this entity usually encapsulates other entities; think of it as a scene
   };  // class Node
 }  // namespace bicycle

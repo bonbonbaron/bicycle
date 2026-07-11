@@ -3,7 +3,6 @@
 #include <thread>
 
 #include "bicycle.h"
-#include "Config.h"
 #include "Constants.h"
 #include "m/World.h"
 #include "c/Trigger.h"
@@ -27,9 +26,6 @@ namespace bicycle {
   }
 
   void init( const std::string& gameName ) {
-    // Configure game
-    // TODO config( gameName );
-
     // Init ncurses
     setlocale(LC_ALL, "");
     initscr();

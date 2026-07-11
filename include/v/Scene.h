@@ -3,6 +3,7 @@
 #include <vector>
 #include <curses.h>
 #include <optional>
+#include <unordered_map>
 
 #include "m/Camera.h"
 #include "m/Rect.h"
@@ -43,7 +44,7 @@ class Grid {
     auto getLayer( Entity entity ) -> std::optional<unsigned>;
   private:
     std::vector<Layer> _layers{};
-    std::map<Entity, unsigned> _entityToLayerMap{};
+    std::unordered_map<Entity, unsigned> _entityToLayerMap{};
     unsigned _focusedLayerIdx{};  // Whatever entity the camera focuses on, all other layers move in parallax wrt that layer.
 };
 

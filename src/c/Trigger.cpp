@@ -3,21 +3,13 @@
 #include "c/Timer.h"
 #include "Constants.h"
 
- /* "I am the way... Nobody comes to the Father except through me." -John 14:6 
-  *
-  * Trigger is the gateway through which every signal must pass in the game engine.
-  * This is designed to correlate tasks with each other.
-  */
-
 auto Trigger::getInstance() -> Trigger& {
   static Trigger trigger;
   return trigger;
 }
 
-
 // ONLY inputs are context-sensitive. Collisions and timers are transitive.
 void Trigger::onInput( const InputState& input ) {
-  // std::cout << "Triggered input response for input " << input.currKeysPressed << '\n';
   // If top window has sub-entities, get its inner context.
   const auto& wm = WindowManager::getInstance();
   const auto currWindow = wm.back();
@@ -38,10 +30,26 @@ auto Trigger::getPersonality( Entity entity ) -> Personality {
   return _personalities.at( entity );
 }
 
-auto Trigger::getBlackboard( Entity entity ) -> Blackboard {
-  return _blackboards.at( entity );
-}
-
 void Trigger::setPersonality( Entity entity, const Personality& personality ) {
   _personalities.at( entity ) = personality;
 }
+
+/*
+ * The following are results of a triggered action.
+ * Thus they enter into the latest spawned group.
+ *    Motion
+ *    Animation
+ *    Rendering
+ *    Sound
+ *    Subtimers
+ *
+ * The only implemented of those are sub-timers and rendering.
+ * So let's work with them first.
+ *            rendering | subtimers
+ *   start              |          
+ *   stop               |         
+ *   pause              |          
+ *   unpause            |            
+ *
+ * Actually, the only way I can test these things out truly is to make Lua scripting a thing. So let's shift priorities and go down that road first.
+ */

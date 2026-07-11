@@ -50,6 +50,15 @@ class World {
       return std::get< std::array< T, NUM_SUPPORTED_ENTITIES > >( arr );
     }
 
+    template <typename T>
+    static auto has( Entity entity ) -> bool {
+      static T t{};  // eternally zeroed-out struct
+      auto& world = getInstance();
+      auto& arr = world.get( getTypeTag<T>() );
+      auto& t_arr = std::get< std::array< T, NUM_SUPPORTED_ENTITIES > >( arr );
+      return t_arr.at( entity ) == t;
+    }
+
     // get-wrapper returning Entity allowing users to not have to get World's instance every time
     template <typename T>
     static auto get( const Entity entity ) -> T& {
