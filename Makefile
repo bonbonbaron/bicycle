@@ -2,7 +2,7 @@ DBG=-g
 STD=-std=c++20
 
 BICREPO := $(shell git rev-parse --show-toplevel)
-BICSRCS := main bicycle m/Entity m/Rect c/Trigger c/Timer c/SshInput v/ColorPalette v/Window c/WindowManager v/Dialogue v/Menu v/TextMenu v/Image m/Camera m/World v/Scene m/Personality c/CollisionDetector # c/Input v/Bar c/Dice c/MidiPlayer v/Graph 
+BICSRCS := main bicycle m/Entity m/Rect c/Trigger c/Timer c/SshInput v/ColorPalette v/Window c/WindowManager v/Dialogue v/Menu v/TextMenu v/Image m/Camera m/World v/Scene c/CollisionDetector # c/Input v/Bar c/Dice c/MidiPlayer v/Graph 
 BICINCS := $(BICINCS:%=$(BICREPO)/include/%.h)
 
 BICOBJS := $(BICSRCS:%=$(BICREPO)/build/%.o)
@@ -12,13 +12,13 @@ all: $(BICTGT)
 # Consider these compiler options when you're ready to hard-core optimize.
 # g++ -O3 -march=armv8-a -mcpu=cortex-a72 -mtune=cortex-a72 -mfpu=neon-fp-armv8 -mfloat-abi=hard ...
 $(BICTGT): $(BICOBJS)
-	g++ -Wall -fvisibility=default $(DBG) -levdev $(STD) $(BICOBJS) $(shell ncursesw6-config --libs) -lfluidsynth -o $@
+	g++ -Wall -fvisibility=default $(DBG) $(STD) $(BICOBJS) $(shell ncursesw6-config --libs) -levdev -llua5.4-c++ -lfluidsynth -o $@
 
 $(BICREPO)/build/%.o: $(BICREPO)/src/%.cpp $(BICREPO)/include/%.h 
-	g++ -Wall -Wno-switch -fvisibility=default $(DBG) $(STD) -c $< -I$(BICREPO)/include $(shell ncursesw6-config --cflags ) -o $@
+	g++ -Wall -Wno-switch -fvisibility=default $(DBG) $(STD) -c $< -I$(BICREPO)/include -I/usr/include/lua5.4 $(shell ncursesw6-config --cflags ) -o $@
 
 $(BICREPO)/build/%.o: $(BICREPO)/src/%.cpp ${BICREPO}/build/m ${BICREPO}/build/v ${BICREPO}/build/c 
-	g++ -Wall -Wno-switch -fvisibility=default $(DBG) $(STD) -c $< -I$(BICREPO)/include $(shell ncursesw6-config --cflags ) -o $@
+	g++ -Wall -Wno-switch -fvisibility=default $(DBG) $(STD) -c $< -I$(BICREPO)/include -I/usr/include/lua5.4 $(shell ncursesw6-config --cflags ) -o $@
 
 $(BICREPO)/build/m:
 	mkdir -p $(BICREPO)/build/m

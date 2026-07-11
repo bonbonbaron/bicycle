@@ -37,6 +37,9 @@ namespace bicycle {
 
     clear();
     refresh();
+
+    auto& trig = Trigger::getInstance();
+    trig.init();
   }
 
   void push( std::shared_ptr<Window> shared ) {

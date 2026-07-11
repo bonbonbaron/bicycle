@@ -2,54 +2,96 @@
 #include "m/Entity.h"
 #include "c/Timer.h"
 #include "Constants.h"
+#include <cassert>
+#include <iostream>
+#include "bicycle.h"
 
 auto Trigger::getInstance() -> Trigger& {
   static Trigger trigger;
   return trigger;
 }
 
-// ONLY inputs are context-sensitive. Collisions and timers are transitive.
+int Trigger::doAction( lua_State* luaState ) {
+  // Convert Lua-side args to proper bicycle args.
+	Trigger::Action action = static_cast<Trigger::Action>( luaL_checkinteger(luaState, 1) );
+	Trigger::System system = static_cast<Trigger::System> ( luaL_checkinteger(luaState, 2) );
+	Entity entity = static_cast<Entity>( luaL_checkinteger(luaState, 3) );
+
+	// TODO Get shared pointer to system that inherits interface.
+
+	switch ( action ) {
+		case Action::START:
+			std::cout << "I'm starting\n";
+			// TODO sys.start(...)
+			break;
+		case Action::STOP:
+			std::cout << "I'm stopping\n";
+			// TODO sys.stop(...)
+			break;
+		case Action::PAUSE:
+			std::cout << "I'm pausing\n";
+			// TODO sys.pause(...)
+			break;
+		case Action::UNPAUSE:
+			std::cout << "I'm unpausing\n";
+			// TODO sys.unpause(...)
+			break;
+	}
+
+	return 0;
+}
+
+void Trigger::init() {
+  luaState = luaL_newstate();
+
+	/**************
+   ** LUA-SIDE **
+	 **************/
+
+	// Expose Actions.
+	lua_newtable(luaState);
+	lua_pushinteger(luaState, static_cast<int>(Action::START));
+	lua_setfield(luaState, -2, "START");
+	lua_pushinteger(luaState, static_cast<int>(Action::STOP));
+	lua_setfield(luaState, -2, "STOP");
+	lua_pushinteger(luaState, static_cast<int>(Action::PAUSE));
+	lua_setfield(luaState, -2, "PAUSE");
+	lua_pushinteger(luaState, static_cast<int>(Action::UNPAUSE));
+	lua_setfield(luaState, -2, "UNPAUSE");
+	lua_setglobal(luaState, "Action");
+	lua_register(luaState, "dooody", doAction);
+
+  // Expose Systems.
+	lua_newtable(luaState);
+	lua_pushinteger(luaState, static_cast<int>(System::TIMER));
+	lua_setfield(luaState, -2, "TIMER");
+	lua_setglobal(luaState, "System");
+
+	// TODO expose bicycle's window-management functions
+	
+
+	// TODO Put Trigger functions here.
+
+	if (luaL_dofile(luaState, "./i.lua") != LUA_OK) {
+    auto errStr = std::string( lua_tostring(luaState, -1) );
+		lua_pop(luaState, 1);
+    bicycle::die( errStr );
+	}
+}
+
+
+
 void Trigger::onInput( const InputState& input ) {
-  // If top window has sub-entities, get its inner context.
-  const auto& wm = WindowManager::getInstance();
-  const auto currWindow = wm.back();
-  assert( currWindow != nullptr );
-  // Route input through top window so the appropriate entity or window responds.
-  currWindow->onInput( input );
+	const auto& wm = WindowManager::getInstance();
+	const auto currWindow = wm.back();
+	assert( currWindow != nullptr );
+	currWindow->onInput( input );
 }
 
 void Trigger::onTimer( const Timeout& timeout ) {
-  onTrigger( timeout.entity, timeout );
+	// onTrigger( timeout.entity, timeout );  // TODO replace with Lua bridge (try to make common) 
 }
 
 void Trigger::onCollision( const Collision& collision ) {
-  onTrigger( collision.lhs, collision );
+	// onTrigger( collision.lhs, collision );  // TODO replace with Lua bridge (try to make common) 
 }
-
-auto Trigger::getPersonality( Entity entity ) -> Personality {
-  return _personalities.at( entity );
-}
-
-void Trigger::setPersonality( Entity entity, const Personality& personality ) {
-  _personalities.at( entity ) = personality;
-}
-
-/*
- * The following are results of a triggered action.
- * Thus they enter into the latest spawned group.
- *    Motion
- *    Animation
- *    Rendering
- *    Sound
- *    Subtimers
- *
- * The only implemented of those are sub-timers and rendering.
- * So let's work with them first.
- *            rendering | subtimers
- *   start              |          
- *   stop               |         
- *   pause              |          
- *   unpause            |            
- *
- * Actually, the only way I can test these things out truly is to make Lua scripting a thing. So let's shift priorities and go down that road first.
- */
