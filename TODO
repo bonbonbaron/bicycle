@@ -8,11 +8,11 @@
       ---                   ---
   REGISTER
   ========
-  world set/get     <-  worldSet/Get  (WARNING: C++ side needs explicit wrappers for every World subtype)
-  push dialogue     <-  pushDialogue
-  push text menu    <-  pushTextMenu
-  push ent menu     <-  pushEntityMenu
-  push grid         <-  pushGrid
+  world set/get     <-  worldSet/Get    (WARNING: C++ side needs explicit wrappers for every World  subtype)
+  push dialogue     <-  pushDialogue    (WARNING: C++ side needs explicit wrappers for every Window subtype)
+  push text menu    <-  pushTextMenu    (WARNING: C++ side needs explicit wrappers for every Window subtype)
+  push ent menu     <-  pushEntityMenu  (WARNING: C++ side needs explicit wrappers for every Window subtype)
+  push grid         <-  pushGrid        (WARNING: C++ side needs explicit wrappers for every Window subtype)
   pop window        <-  popWindow
   strt/stop/ps/unps <-  sys  <- wrappers for easier calls (provided by bicycle)
      * timer
@@ -21,7 +21,7 @@
      * motion
      * sound
      * song
-  create timer      <-  newTimer (returns ID)
+  new/del time      <-  new/delTimer (returns ID)
   inflate genome    <-  inflateGenome (including scene; should automate window creation too, that'd be sweet)
 
                         FIND
@@ -30,7 +30,6 @@
   onTimeout          -> onTimeout
   onCollision        -> onCollision
 
-2. It seems like motion can have another function after normal pos += vel to see if entities with destinations have reached ( or passed ) them yet with edits for gone-pasts.
 +=======+
 |TRIGGER|
 +=======+
@@ -71,7 +70,17 @@
 
   BUMP ALLOCATOR
   ==============
-    * yeah baby... let's do this
+    * Is this even that helpful for this engine? I suspect not.
+
+  UNFINISHED SUBSYSTEMS
+  =====================
+    * motion: It seems like motion can have another function after normal pos += vel to see if entities with destinations have reached ( or passed ) them yet with edits for gone-pasts.
+    * animation
+    * rendering (maybe this shouldn't be a subsystem so much as a start/stop/pause/unpause of Image visibility
+    * motion
+    * sound
+    * song
+
 ------------------------
 
 
