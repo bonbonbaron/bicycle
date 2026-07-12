@@ -62,8 +62,8 @@ Battle::Battle() {
 
   // Push the scene window up
   bicycle::push<Scene>( g );
-  timer.start( 1000, e, 0, "whatever" );  // start a timer on entity just for fun
-  timer.start( 500, o, 0, "whatever" );  // start a timer on entity just for fun
+  auto tid1 = timer.create( 1000, e, 0, "whatever" );  // start a timer on entity just for fun
+  auto tid2 = timer.create( 500, o, 0, "whatever" );  // start a timer on entity just for fun
 
   // I see no reason why bicycle::<whatever> should have a function for the above.
 

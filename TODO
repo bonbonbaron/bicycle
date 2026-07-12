@@ -1,3 +1,7 @@
+offbeat thoughts
+================
+1. i Think at least start/stop/pause/unpause can be abstrated away. We can minimize the specifics such as createTimer, setVelocity, and setAnimation.
+2. It seems like motion can have another function after normal pos += vel to see if entities with destinations have reached ( or passed ) them yet with edits for gone-pasts.
 +=======+
 |TRIGGER|
 +=======+

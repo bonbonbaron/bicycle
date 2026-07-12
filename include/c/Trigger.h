@@ -29,6 +29,7 @@ class Trigger {
     static void onTimer( const Timeout& timeout );  
     static void onCollision( const Collision& collision );  // TODO
 
+    auto getTimer() -> Timer*;
 
   private:
     Trigger() = default;
@@ -36,6 +37,8 @@ class Trigger {
     Trigger operator=(const Trigger&) = delete;
     Trigger(const Trigger&&) = delete;
     Trigger operator=(const Trigger&&) = delete;
+
+    Timer* _timer;
 
     struct Activity {
       Priority priority{};

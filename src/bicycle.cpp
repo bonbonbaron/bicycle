@@ -55,6 +55,7 @@ namespace bicycle {
   int run() {
     auto& wm = WindowManager::getInstance();
 
+    getch();
     while ( wm.size() > 0 ) {
       Timer::run();
       SshInput::listen();

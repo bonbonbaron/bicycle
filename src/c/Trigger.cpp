@@ -12,29 +12,40 @@ auto Trigger::getInstance() -> Trigger& {
 }
 
 int Trigger::doAction( lua_State* luaState ) {
+  auto& trig = getInstance();
   // Convert Lua-side args to proper bicycle args.
 	Trigger::Action action = static_cast<Trigger::Action>( luaL_checkinteger(luaState, 1) );
 	Trigger::System system = static_cast<Trigger::System> ( luaL_checkinteger(luaState, 2) );
 	Entity entity = static_cast<Entity>( luaL_checkinteger(luaState, 3) );
+  auto* timer = trig.getTimer();
 
-	// TODO Get shared pointer to system that inherits interface.
+  Controllable* ctrl{};
+  switch ( system ) {
+    case System::TIMER:
+      assert(timer != nullptr );
+      ctrl = timer;
+      break;
+    default:
+      std::cout << "i haven't set up that system yet.\n";
+      return -1;
+  }
 
 	switch ( action ) {
 		case Action::START:
 			std::cout << "I'm starting\n";
-			// TODO sys.start(...)
+      ctrl->start( entity );
 			break;
 		case Action::STOP:
 			std::cout << "I'm stopping\n";
-			// TODO sys.stop(...)
+      ctrl->stop( entity );
 			break;
 		case Action::PAUSE:
 			std::cout << "I'm pausing\n";
-			// TODO sys.pause(...)
+      ctrl->pause( entity );
 			break;
 		case Action::UNPAUSE:
 			std::cout << "I'm unpausing\n";
-			// TODO sys.unpause(...)
+      ctrl->unpause( entity );
 			break;
 	}
 
@@ -44,9 +55,7 @@ int Trigger::doAction( lua_State* luaState ) {
 void Trigger::init() {
   luaState = luaL_newstate();
 
-	/**************
-   ** LUA-SIDE **
-	 **************/
+  _timer = &Timer::getInstance();
 
 	// Expose Actions.
 	lua_newtable(luaState);
@@ -79,8 +88,6 @@ void Trigger::init() {
 	}
 }
 
-
-
 void Trigger::onInput( const InputState& input ) {
 	const auto& wm = WindowManager::getInstance();
 	const auto currWindow = wm.back();
@@ -93,5 +100,9 @@ void Trigger::onTimer( const Timeout& timeout ) {
 }
 
 void Trigger::onCollision( const Collision& collision ) {
-	// onTrigger( collision.lhs, collision );  // TODO replace with Lua bridge (try to make common) 
+  // onTrigger( collision.lhs, collision );  // TODO replace with Lua bridge (try to make common) 
+}
+
+auto Trigger::getTimer() -> Timer* {
+  return _timer;
 }

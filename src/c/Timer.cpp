@@ -36,28 +36,34 @@ void Timer::_run() {
   }
 }
 
-void Timer::pause( const unsigned timerId ) {
-  _decrementers.at(timerId) = 0;
-}
-
-void Timer::unpause( const unsigned timerId ) {
-  _decrementers.at(timerId) = 1;
-}
-
-auto Timer::start( const unsigned timeMs, Entity entity, const unsigned timerType, bool isSubtimer ) -> unsigned {
-  auto timerId = findAvailableTimer();
-  if ( timerId < MAX_NUM_TIMERS )  {
-    unsigned nFrames{ (Constants::FRAMES_PER_SECOND * timeMs) / 1000 };
-    _times.at( timerId ) = nFrames;
-    _decrementers.at(timerId) = 1;
-    _msgs.at(timerId)  = Timeout{ timerId, entity, timerType, isSubtimer };
+void Timer::start( const TimerId timerId ) {
+  if ( timerId < MAX_NUM_TIMERS && _times.at( timerId ) > 0 )  {
+    _decrementers.at( timerId ) = 1;
   }
-  return timerId;
 }
 
 void Timer::stop( unsigned timerId ) {
   _decrementers.at(timerId) = 0;
   _availableTimers.set( timerId, true );
+}
+
+void Timer::pause( const TimerId timerId ) {
+  _decrementers.at(timerId) = 0;
+}
+
+void Timer::unpause( const TimerId timerId ) {
+  _decrementers.at(timerId) = 1;
+}
+
+auto Timer::create( const unsigned timeMs, Entity entity, const unsigned timeoutType, bool isSubtimer ) -> TimerId {
+  auto timerId = findAvailableTimer();
+  if ( timerId < MAX_NUM_TIMERS )  {
+    unsigned nFrames{ (Constants::FRAMES_PER_SECOND * timeMs) / 1000 };
+    _times.at( timerId ) = nFrames;
+    _decrementers.at(timerId) = 1;
+    _msgs.at(timerId)  = Timeout{ timerId, entity, timeoutType, isSubtimer };
+  }
+  return timerId;
 }
 
 auto Timer::findAvailableTimer() -> unsigned {

@@ -5,6 +5,7 @@
 #include <chrono>
 
 #include "Constants.h"
+#include "c/Controllable.h"
 #include "c/Timeout.h"
 
 constexpr unsigned long MAX_NUM_TIMERS{1024};
@@ -15,7 +16,7 @@ constexpr std::chrono::milliseconds INTERVAL(static_cast<int>(Constants::MILLISE
 
 using TimerId = unsigned;
 
-class Timer {
+class Timer : public Controllable {
   public:
     static auto getInstance() -> Timer&;
     static void run();
@@ -23,10 +24,12 @@ class Timer {
 
     // Timer-specific functions
     void _run();
-    auto start( const unsigned timeMs, Entity entity, const unsigned timerType, bool isSubtimer = false ) -> TimerId;  // returns the ID of the timer started for caller's future reference
-    void stop( TimerId timerId );
-    void pause( const TimerId timerId );
-    void unpause( const TimerId timerId );
+    auto create( const unsigned timeMs, Entity entity, const unsigned timerType, bool isSubtimer = false ) -> TimerId;  // returns the ID of the timer started for caller's future reference
+    void start( TimerId timerId) override;  // returns the ID of the timer started for caller's future reference
+    void stop( TimerId timerId ) override;
+    void pause( const TimerId timerId ) override;
+    void unpause( const TimerId timerId ) override;
+
     void setDuration( const TimerId timerId, const unsigned durMs );
     
   private:
