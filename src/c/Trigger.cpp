@@ -26,25 +26,20 @@ int Trigger::doAction( lua_State* luaState ) {
       ctrl = timer;
       break;
     default:
-      std::cout << "i haven't set up that system yet.\n";
       return -1;
   }
 
 	switch ( action ) {
 		case Action::START:
-			std::cout << "I'm starting\n";
       ctrl->start( entity );
 			break;
 		case Action::STOP:
-			std::cout << "I'm stopping\n";
       ctrl->stop( entity );
 			break;
 		case Action::PAUSE:
-			std::cout << "I'm pausing\n";
       ctrl->pause( entity );
 			break;
 		case Action::UNPAUSE:
-			std::cout << "I'm unpausing\n";
       ctrl->unpause( entity );
 			break;
 	}

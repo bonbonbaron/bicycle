@@ -1,6 +1,35 @@
-offbeat thoughts
-================
-1. i Think at least start/stop/pause/unpause can be abstrated away. We can minimize the specifics such as createTimer, setVelocity, and setAnimation.
+====================================
+*LINKAGES BETWEEN ENGINE AND SCRIPTS
+====================================
+
+  Eat the one-pound burger one bite at a time. Cross these off as you go.
+
+      C++                   LUA
+      ---                   ---
+  REGISTER
+  ========
+  world set/get     <-  worldSet/Get  (WARNING: C++ side needs explicit wrappers for every World subtype)
+  push dialogue     <-  pushDialogue
+  push text menu    <-  pushTextMenu
+  push ent menu     <-  pushEntityMenu
+  push grid         <-  pushGrid
+  pop window        <-  popWindow
+  strt/stop/ps/unps <-  sys  <- wrappers for easier calls (provided by bicycle)
+     * timer
+     * animation
+     * rendering
+     * motion
+     * sound
+     * song
+  create timer      <-  newTimer (returns ID)
+  inflate genome    <-  inflateGenome (including scene; should automate window creation too, that'd be sweet)
+
+                        FIND
+                        ====
+  onInput            -> onInput (global, shunts to entity-specific onInput map)
+  onTimeout          -> onTimeout
+  onCollision        -> onCollision
+
 2. It seems like motion can have another function after normal pos += vel to see if entities with destinations have reached ( or passed ) them yet with edits for gone-pasts.
 +=======+
 |TRIGGER|
@@ -16,7 +45,6 @@ offbeat thoughts
         \z-layers (just use vectors. It'll be okay, nobody GAF. Only change it when you absolutely need to.)
           \each layer can have a BG and FG
 
-
   \TIMER
   ======
     \ timers flow through Trigger to callback
@@ -26,54 +54,26 @@ offbeat thoughts
     \any entity, doesn't have to be in top window
     \flow through Trigger to callback
 
+  SCRIPTING
+  =========
+    implement all linkages*
+
   ORCHESTRA
   =========
-
-    fresh thinking:
-      this'll be easier to do if everything has to pass through Trigger.
-      Trigger can be like airport customs logging everythign that happens.
-      Because everything must be done by one of three kickoff types, the type + Entity can mark some kind of group ID.
-      So, while the callback *may* tell the entity to move, Trigger knows subsequent events like this correspond to the last kickoff.
-      Therefore, nobody has direct access to anything besides Trigger. ( "I am the way... Nobody comes to the Father except through me." -John 14:6 )
-      Individual elements need a key to correspond to a system. Motion, collision, animation, timers, 
-      \ How can sub-timers be recognized as such? New boolean.
-      Should timers be smart enough to correspond to a system instead of a callback? 
-      Group should have priority, as should every collision, input, and timer. Interruption is guaged this way.
-      We need to be able to do the following things through Trigger:
-        + START (g)roup or (i)ndividual element
-        + STOP (g)roup or (i)ndividual element
-        + PAUSE (g)roup or (i)ndividual element
-        + UNPAUse (g)roup or (i)ndividual element
-      
-      (i) Elements have IDs, and (g) 0 means all.
-      So that way, we can just have two layers of wrappers in lua:
-
-      From Lua to C++:
-          self:hide()  ->   stop( RENDER, entity )  ->  send(  STOP, RENDER, entity )
-          (T)echnical bridge deets
-              
-      From C++ to Lua:
-          onInput( )
-          onTimeout()
-          onCollision()
-          (T)echnical bridge deets
-
-      With such a limited set, I'm no longer convinced Personality is a necessary structure. That can be done in Lua.
+    everything flows through Trigger
+    TODO distinguish onInputWindow from onInput[Entity]
     
   LOADING
   =======
-    loading entities from genomes and passing their IDs to lua-side
-    hooking scenes together through graph
+    * GENOMES: loading entities from genomes and passing their IDs to lua-side
+    * INFLATE: reuse inflate() from jb
+    * GRAPHS:  hooking scenes together through graph
 
+  BUMP ALLOCATOR
+  ==============
+    * yeah baby... let's do this
 ------------------------
 
-+=========+
-|SCRIPTING|
-+=========+
-  two layers: 
-    1. C++-side to call Lua callbacks
-    2. Lau-side to call C++ functions
-  Can we make the world easier to build with Lua?
 
 +====+
 |MISC|
