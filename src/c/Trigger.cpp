@@ -53,29 +53,18 @@ void Trigger::init() {
   _timer = &Timer::getInstance();
 
 	// Expose Actions.
-  addTable<int>( "Action", {
-      { "START", Action::START },
-      { "STOP", Action::STOP },
-      { "PAUSE", Action::PAUSE },
-      { "UNPAUSE", Action::UNPAUSE } }
+  _bridge.addTable<int>( "Action", {
+    { "START", Action::START },
+    { "STOP", Action::STOP },
+    { "PAUSE", Action::PAUSE },
+    { "UNPAUSE", Action::UNPAUSE } }
   );
-	lua_register(luaState, "dooody", doAction);
+	// lua_register(_luaState, "dooody", doAction);
 
   // Expose Systems.
-	lua_newtable(luaState);
-  addKeyVal<int>( "TIMER", System::TIMER );
-	lua_setglobal(luaState, "System");
-
-	// TODO expose bicycle's window-management functions
-	
-
-	// TODO Put Trigger functions here.
-
-	if (luaL_dofile(luaState, "./i.lua") != LUA_OK) {
-    auto errStr = std::string( lua_tostring(luaState, -1) );
-		lua_pop(luaState, 1);
-    bicycle::die( errStr );
-	}
+  _bridge.addTable<int>( "System", {
+    { "TIMER", System::TIMER } }
+  );
 }
 
 void Trigger::onInput( const InputState& input ) {
@@ -83,14 +72,15 @@ void Trigger::onInput( const InputState& input ) {
 	const auto currWindow = wm.back();
 	assert( currWindow != nullptr );
 	currWindow->onInput( input );
+  // TODO may be better design to have window return an entityj
 }
 
 void Trigger::onTimer( const Timeout& timeout ) {
-	// onTrigger( timeout.entity, timeout );  // TODO replace with Lua bridge (try to make common) 
+	// TODO make Lua bridge
 }
 
 void Trigger::onCollision( const Collision& collision ) {
-  // onTrigger( collision.lhs, collision );  // TODO replace with Lua bridge (try to make common) 
+  // TODO make Lua bridge
 }
 
 auto Trigger::getTimer() -> Timer* {

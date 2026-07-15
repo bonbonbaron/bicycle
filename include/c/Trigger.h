@@ -6,7 +6,7 @@
 #include "c/WindowManager.h"
 #include "m/Position.h"
 #include "c/Timer.h"
-#include <lua.hpp>
+#include "Bridge.h"
 
  /* "I am the way... Nobody comes to the Father except through me." -John 14:6 
   *
@@ -16,15 +16,12 @@
 
 class Trigger {
   public:
-    enum Action { START, STOP, PAUSE, UNPAUSE };
-    enum System{ TIMER };
 
     static auto getInstance() -> Trigger&;
 		void init();
 		static int doAction( lua_State* luaState );
-		auto getLuaState() -> lua_State*;
 
-    // Le trifecta... These wrap templatized calls to onTrigger() below.
+    // Le trifecta
     static void onInput( const InputState& input );  // straightforward feeding to whatever holds context
     static void onTimer( const Timeout& timeout );  
     static void onCollision( const Collision& collision );  // TODO
@@ -38,36 +35,20 @@ class Trigger {
     Trigger(const Trigger&&) = delete;
     Trigger operator=(const Trigger&&) = delete;
 
+    // Generic system actions
+    enum Action { START, STOP, PAUSE, UNPAUSE };
+    enum System{ TIMER };
+
+    // Systems
     Timer* _timer;
 
+    // Orchestra (TODO)
     struct Activity {
       Priority priority{};
       TimerId animTimerId{};
       TimerId cbTimerId{};
     };
-
-    template<typename T>
-    void addKeyVal( const char* key, T val ) {
-      lua_pushinteger( luaState, static_cast<T>( val ) );
-      lua_setfield( luaState, -2, key );
-    }
-
-    template<typename T>
-    struct KeyVal {
-      const char* key;
-      T val;
-    };
-
-    template<typename T>
-    void addTable( const char* tblName, const std::vector<KeyVal<T>> rows ) {
-      lua_newtable(luaState);
-      for ( const auto& row : rows ) {
-        addKeyVal<int>( row.key, row.val );
-      }
-      lua_setglobal( luaState, tblName );
-    }
-
     std::array<Activity, NUM_SUPPORTED_ENTITIES>    _activities{};
-		lua_State* luaState{};
 
+    Bridge _bridge{};
 };  // class Trigger
