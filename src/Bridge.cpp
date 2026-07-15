@@ -18,3 +18,7 @@ Bridge::Bridge() : _luaState( luaL_newstate() ) {
     bicycle::die( errStr );
 	}
 }
+
+void Bridge::addFunction( const char* name, lua_CFunction f ) {
+  lua_register( _luaState, name, f );
+}

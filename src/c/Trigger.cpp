@@ -59,7 +59,8 @@ void Trigger::init() {
     { "PAUSE", Action::PAUSE },
     { "UNPAUSE", Action::UNPAUSE } }
   );
-	// lua_register(_luaState, "dooody", doAction);
+
+  _bridge.addFunction( "dooody", &doAction );
 
   // Expose Systems.
   _bridge.addTable<int>( "System", {

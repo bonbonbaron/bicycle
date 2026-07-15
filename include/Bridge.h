@@ -1,5 +1,6 @@
 #include <lua.hpp>
 #include <vector>
+#include <string>
 
 class Bridge {
   public:
@@ -26,6 +27,7 @@ class Bridge {
       lua_setglobal( _luaState, tblName );
     }
     
+    void addFunction( const char* name, lua_CFunction f );
     // TODO oninput, oncollision, ontimer
 
   private:
