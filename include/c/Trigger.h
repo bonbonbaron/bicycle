@@ -46,6 +46,27 @@ class Trigger {
       TimerId cbTimerId{};
     };
 
+    template<typename T>
+    void addKeyVal( const char* key, T val ) {
+      lua_pushinteger( luaState, static_cast<T>( val ) );
+      lua_setfield( luaState, -2, key );
+    }
+
+    template<typename T>
+    struct KeyVal {
+      const char* key;
+      T val;
+    };
+
+    template<typename T>
+    void addTable( const char* tblName, const std::vector<KeyVal<T>> rows ) {
+      lua_newtable(luaState);
+      for ( const auto& row : rows ) {
+        addKeyVal<int>( row.key, row.val );
+      }
+      lua_setglobal( luaState, tblName );
+    }
+
     std::array<Activity, NUM_SUPPORTED_ENTITIES>    _activities{};
 		lua_State* luaState{};
 

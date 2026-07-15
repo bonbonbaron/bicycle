@@ -47,28 +47,23 @@ int Trigger::doAction( lua_State* luaState ) {
 	return 0;
 }
 
-void Trigger::init() {
-  luaState = luaL_newstate();
+// int World
 
+void Trigger::init() {
   _timer = &Timer::getInstance();
 
 	// Expose Actions.
-	lua_newtable(luaState);
-	lua_pushinteger(luaState, static_cast<int>(Action::START));
-	lua_setfield(luaState, -2, "START");
-	lua_pushinteger(luaState, static_cast<int>(Action::STOP));
-	lua_setfield(luaState, -2, "STOP");
-	lua_pushinteger(luaState, static_cast<int>(Action::PAUSE));
-	lua_setfield(luaState, -2, "PAUSE");
-	lua_pushinteger(luaState, static_cast<int>(Action::UNPAUSE));
-	lua_setfield(luaState, -2, "UNPAUSE");
-	lua_setglobal(luaState, "Action");
+  addTable<int>( "Action", {
+      { "START", Action::START },
+      { "STOP", Action::STOP },
+      { "PAUSE", Action::PAUSE },
+      { "UNPAUSE", Action::UNPAUSE } }
+  );
 	lua_register(luaState, "dooody", doAction);
 
   // Expose Systems.
 	lua_newtable(luaState);
-	lua_pushinteger(luaState, static_cast<int>(System::TIMER));
-	lua_setfield(luaState, -2, "TIMER");
+  addKeyVal<int>( "TIMER", System::TIMER );
 	lua_setglobal(luaState, "System");
 
 	// TODO expose bicycle's window-management functions
