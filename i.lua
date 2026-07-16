@@ -58,3 +58,11 @@ print(bill)
 bill = bill - Stats.new( {hp = 90} )
 print("\nbill's final state:")
 print(bill)
+
+-- t = gets(45)
+-- print( "hp is " .. t.hp .. ", mp is " .. t.mp .. ", speed is " .. t.speed )
+
+sys( System.TIMER, Action.STOP, 1 )
+for k, v in pairs(Component) do print(k) end
+c = getComponent( Component.RECT, 1 )
+print( "c.x is " .. c.x )

@@ -11,11 +11,11 @@ auto Trigger::getInstance() -> Trigger& {
   return trigger;
 }
 
-int Trigger::doAction( lua_State* luaState ) {
+int Trigger::sys( lua_State* luaState ) {
   auto& trig = getInstance();
   // Convert Lua-side args to proper bicycle args.
-	Trigger::Action action = static_cast<Trigger::Action>( luaL_checkinteger(luaState, 1) );
-	Trigger::System system = static_cast<Trigger::System> ( luaL_checkinteger(luaState, 2) );
+	Trigger::Action action = static_cast<Action>( luaL_checkinteger(luaState, 1) );
+	Trigger::System system = static_cast<System> ( luaL_checkinteger(luaState, 2) );
 	Entity entity = static_cast<Entity>( luaL_checkinteger(luaState, 3) );
   auto* timer = trig.getTimer();
 
@@ -47,9 +47,33 @@ int Trigger::doAction( lua_State* luaState ) {
 	return 0;
 }
 
-// int World
+auto Trigger::getBridge() -> Bridge& {
+  return _bridge;
+}
 
-void Trigger::init() {
+int Trigger::getComponent( lua_State* luaState ) {
+  auto& trig = Trigger::getInstance();
+  auto& bridge = trig.getBridge();
+  Component compType = static_cast<Component>( luaL_checkinteger(luaState, 1) );
+  Entity entity = static_cast<Entity>( luaL_checkinteger(luaState, 2) );
+
+    if ( compType == Component::RECT ) {
+      auto& t = World::get<Rect>( entity );
+      bridge.pushStruct( t );
+    }
+    else if ( compType == Component::COLLRECT ) {
+      auto& t = World::get<CollRect>( entity );
+      bridge.pushStruct( t );
+    }
+    else if ( compType == Component::IMAGE ) {
+      auto& t = World::get<Image>( entity );
+      bridge.pushStruct( t );
+    }
+  // TODO maybe addTable needs a local counterpart here.
+  return 0;
+}
+
+void Trigger::init( const std::string& gameName ) {
   _timer = &Timer::getInstance();
 
 	// Expose Actions.
@@ -60,12 +84,26 @@ void Trigger::init() {
     { "UNPAUSE", Action::UNPAUSE } }
   );
 
-  _bridge.addFunction( "dooody", &doAction );
+  addFunction( sys );
 
   // Expose Systems.
   _bridge.addTable<int>( "System", {
     { "TIMER", System::TIMER } }
   );
+
+	// Expose Components.
+  _bridge.addTable<int>( "Component", {
+      { "RECT", Component::RECT }, 
+      { "COLLRECT", Component::COLLRECT }, 
+      { "IMAGE", Component::IMAGE }, }
+  );
+  addFunction( getComponent );
+
+	if (luaL_dofile(_bridge.getState(), "./i.lua") != LUA_OK) {
+    auto errStr = std::string( lua_tostring(_bridge.getState(), -1) );
+		lua_pop(_bridge.getState(), 1);
+    bicycle::die( errStr );
+	}
 }
 
 void Trigger::onInput( const InputState& input ) {

@@ -39,7 +39,7 @@ namespace bicycle {
     refresh();
 
     auto& trig = Trigger::getInstance();
-    trig.init();
+    trig.init( gameName );
   }
 
   void push( std::shared_ptr<Window> shared ) {

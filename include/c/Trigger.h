@@ -7,6 +7,8 @@
 #include "m/Position.h"
 #include "c/Timer.h"
 #include "Bridge.h"
+#include "m/World.h"
+#include <lua.hpp>
 
  /* "I am the way... Nobody comes to the Father except through me." -John 14:6 
   *
@@ -18,8 +20,7 @@ class Trigger {
   public:
 
     static auto getInstance() -> Trigger&;
-		void init();
-		static int doAction( lua_State* luaState );
+		void init( const std::string& gameName );
 
     // Le trifecta
     static void onInput( const InputState& input );  // straightforward feeding to whatever holds context
@@ -27,6 +28,8 @@ class Trigger {
     static void onCollision( const Collision& collision );  // TODO
 
     auto getTimer() -> Timer*;
+
+    auto getBridge() -> Bridge&;
 
   private:
     Trigger() = default;
@@ -37,8 +40,11 @@ class Trigger {
 
     // Generic system actions
     enum Action { START, STOP, PAUSE, UNPAUSE };
+    enum Component { RECT, COLLRECT, IMAGE };
     enum System{ TIMER };
 
+		static int sys( lua_State* luaState );
+    static int getComponent( lua_State* luaState );
     // Systems
     Timer* _timer;
 

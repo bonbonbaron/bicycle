@@ -1,6 +1,7 @@
 #pragma once
 #include "m/Position.h"
 #include "m/Size.h"
+#include "Bridge.h"
 
 struct Rect {
   Rect() = default;
@@ -18,3 +19,5 @@ struct Rect {
   auto crop( const Rect& rhs ) const -> Rect;
 };
 
+//BEGIN_REFLECT( Rect )
+  //REFLECT_FIELD( Rect, pos
