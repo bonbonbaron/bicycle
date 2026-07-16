@@ -64,5 +64,9 @@ print(bill)
 
 sys( System.TIMER, Action.STOP, 1 )
 for k, v in pairs(Component) do print(k) end
-c = getComponent( Component.RECT, 1 )
-print( "c.x is " .. c.x )
+c = getComponent( Component.COLLRECT, 2 )
+print( "c.pos.x is " .. c.pos.x )
+print( "c.pos.y is " .. c.pos.y )
+print( "c.pos.x is " .. c.size.w )
+print( "c.pos.y is " .. c.size.h )
+print( "c.pos.y is " .. c.type )

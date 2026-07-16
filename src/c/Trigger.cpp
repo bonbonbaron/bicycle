@@ -11,12 +11,12 @@ auto Trigger::getInstance() -> Trigger& {
   return trigger;
 }
 
-int Trigger::sys( lua_State* luaState ) {
+int Trigger::sys( lua_State* L ) {
   auto& trig = getInstance();
   // Convert Lua-side args to proper bicycle args.
-	Trigger::Action action = static_cast<Action>( luaL_checkinteger(luaState, 1) );
-	Trigger::System system = static_cast<System> ( luaL_checkinteger(luaState, 2) );
-	Entity entity = static_cast<Entity>( luaL_checkinteger(luaState, 3) );
+	Trigger::Action action = static_cast<Action>( luaL_checkinteger(L, 1) );
+	Trigger::System system = static_cast<System> ( luaL_checkinteger(L, 2) );
+	Entity entity = static_cast<Entity>( luaL_checkinteger(L, 3) );
   auto* timer = trig.getTimer();
 
   Controllable* ctrl{};
@@ -51,26 +51,25 @@ auto Trigger::getBridge() -> Bridge& {
   return _bridge;
 }
 
-int Trigger::getComponent( lua_State* luaState ) {
+int Trigger::getComponent( lua_State* L ) {
   auto& trig = Trigger::getInstance();
   auto& bridge = trig.getBridge();
-  Component compType = static_cast<Component>( luaL_checkinteger(luaState, 1) );
-  Entity entity = static_cast<Entity>( luaL_checkinteger(luaState, 2) );
+  Component compType = static_cast<Component>( luaL_checkinteger(L, 1) );
+  Entity entity = static_cast<Entity>( luaL_checkinteger(L, 2) );
 
     if ( compType == Component::RECT ) {
-      auto& t = World::get<Rect>( entity );
-      bridge.pushStruct( t );
+      auto& t = World::get<Rect>( entity );  // Hey LUA, thanks for forcing me to be explicit so that nothing can be elegant.
+      t.push( L );
     }
     else if ( compType == Component::COLLRECT ) {
       auto& t = World::get<CollRect>( entity );
-      bridge.pushStruct( t );
+      t.push( L );
     }
     else if ( compType == Component::IMAGE ) {
       auto& t = World::get<Image>( entity );
-      bridge.pushStruct( t );
+      // t.push( L );
     }
-  // TODO maybe addTable needs a local counterpart here.
-  return 0;
+  return 1;
 }
 
 void Trigger::init( const std::string& gameName ) {

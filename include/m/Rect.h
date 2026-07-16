@@ -1,7 +1,7 @@
 #pragma once
 #include "m/Position.h"
 #include "m/Size.h"
-#include "Bridge.h"
+#include <lua.hpp>
 
 struct Rect {
   Rect() = default;
@@ -17,7 +17,15 @@ struct Rect {
 
   auto overlaps( const Rect& rhs ) const -> bool;
   auto crop( const Rect& rhs ) const -> Rect;
+
+  void push( lua_State* L ) {
+    // Position
+    lua_newtable(L);
+    pos.push(L);
+    lua_setfield( L, -2, "pos" );
+    size.push(L);
+    lua_setfield( L, -2, "size" );
+  }
+
 };
 
-//BEGIN_REFLECT( Rect )
-  //REFLECT_FIELD( Rect, pos
