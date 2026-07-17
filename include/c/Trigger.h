@@ -16,6 +16,10 @@
   * This is designed to correlate tasks with each other.
   */
 
+#ifndef LUA_OK
+#define LUA_OK (0)
+#endif
+
 class Trigger {
   public:
 

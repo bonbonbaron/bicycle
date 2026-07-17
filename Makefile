@@ -9,7 +9,7 @@ BICOBJS := $(BICSRCS:%=$(BICREPO)/build/%.o)
 BICTGT := o  # for now
 all: $(BICTGT)
 
-PKGS=lua54 fluidsynth 
+PKGS=lua51 curses fluidsynth 
 # Consider these compiler options when you're ready to hard-core optimize.
 # g++ -O3 -march=armv8-a -mcpu=cortex-a72 -mtune=cortex-a72 -mfpu=neon-fp-armv8 -mfloat-abi=hard ...
 $(BICTGT): $(BICOBJS)
