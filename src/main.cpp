@@ -18,6 +18,8 @@
  *  2) then see what it's like to do it in Lua
  */
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-variable"
 struct Character {
   Character( const std::string&& name ) : name(name) {}
   std::string name;
@@ -88,3 +90,4 @@ int main( int argc, char** argv ) {
 	return 0;
 #endif
 }
+#pragma GCC diagnostic pop

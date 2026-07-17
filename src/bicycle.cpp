@@ -4,10 +4,10 @@
 
 #include "bicycle.h"
 #include "Constants.h"
-#include "m/World.h"
 #include "c/Trigger.h"
 #include "c/SshInput.h"
 #include "c/CollisionDetector.h"
+#include "v/Dialogue.h"
 
 namespace bicycle {
 
@@ -47,6 +47,18 @@ namespace bicycle {
     wm.push( shared );
   }
 
+  extern "C" {
+    void pushDialogue( const char* text, int x, int y, int w, int h ) {
+      push<Dialogue>( text, x, y, w, h ); 
+    }
+  }
+
+  extern "C" {
+    void pushMenu( const char* text, int x, int y, int w, int h ) {
+      push<Dialogue>( text, x, y, w, h ); 
+    }
+  }
+
   void pop() {
     auto& wm = WindowManager::getInstance();
     wm.pop();
@@ -55,7 +67,6 @@ namespace bicycle {
   int run() {
     auto& wm = WindowManager::getInstance();
 
-    getch();
     while ( wm.size() > 0 ) {
       Timer::run();
       SshInput::listen();

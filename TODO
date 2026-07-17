@@ -8,12 +8,10 @@
       ---                   ---
   REGISTER
   ========
-  world set/get     <-  worldSet/Get    (WARNING: C++ side needs explicit wrappers for every World  subtype)
-  push dialogue     <-  pushDialogue    (WARNING: C++ side needs explicit wrappers for every Window subtype)
+  \world set/get     <-  worldSet/Get    (WARNING: C++ side needs explicit wrappers for every World  subtype)
+  \push dialogue     <-  pushDialogue    (WARNING: C++ side needs explicit wrappers for every Window subtype)
   push text menu    <-  pushTextMenu    (WARNING: C++ side needs explicit wrappers for every Window subtype)
-  push ent menu     <-  pushEntityMenu  (WARNING: C++ side needs explicit wrappers for every Window subtype)
   push grid         <-  pushGrid        (WARNING: C++ side needs explicit wrappers for every Window subtype)
-  push bar          <-  pushBar
   pop window        <-  popWindow
   strt/stop/ps/unps <-  sys  <- wrappers for easier calls (provided by bicycle)
      * timer

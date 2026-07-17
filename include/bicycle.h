@@ -4,6 +4,10 @@
 
 #include "c/WindowManager.h"
 
+#define EXPORT_API \
+  __attribute__((used))\
+  __attribute__((visibility("default")))
+
 namespace bicycle {
   auto isInit() -> bool;
   void init( const std::string& gameName );

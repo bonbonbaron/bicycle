@@ -45,9 +45,8 @@ class Trigger {
     enum Component { RECT, COLLRECT, IMAGE };
     enum System{ TIMER };
 
-		static int sys( lua_State* luaState );
-    // static int getComponent( lua_State* luaState );
-    static int getComponent();
+    static void sys(const Action action, const System system, Entity entity);
+
     // Systems
     Timer* _timer;
 
@@ -58,4 +57,5 @@ class Trigger {
       TimerId cbTimerId{};
     };
     std::array<Activity, NUM_SUPPORTED_ENTITIES>    _activities{};
+    lua_State *L{};
 };  // class Trigger

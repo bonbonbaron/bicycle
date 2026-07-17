@@ -11,13 +11,11 @@
 #include "m/Rect.h"
 #include "c/Collision.h"
 #include "v/Image.h"
-#include "m/Velocity.h"
 
 using ArrayVar = std::variant<
   std::array<Rect, NUM_SUPPORTED_ENTITIES>,
   std::array<CollRect, NUM_SUPPORTED_ENTITIES>,
-  std::array<Image, NUM_SUPPORTED_ENTITIES>,
-  std::array<Velocity, NUM_SUPPORTED_ENTITIES>
+  std::array<Image, NUM_SUPPORTED_ENTITIES>
 >;
 
 class World {
@@ -83,7 +81,7 @@ class World {
 
     // Convenience: initialize all known types in one call
     void initialize_all() {
-      initialize<Rect, CollRect, Image, Velocity>();
+      initialize<Rect, CollRect, Image>();
     }
 
     // Optional: check whether a type is already initialized  // TODO delete if unneeded
@@ -116,7 +114,7 @@ class World {
 // It's like, "How can I ruin bicycle's beautiful design?"
 
 #pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-function"
+#pragma GCC diagnostic ignored "-Wunused-function-Wunused-function"
 template<typename T>
 struct LWorldArr {
   T* arr;
@@ -130,10 +128,9 @@ LWorldArr<T> World_getArr() {
 }
 
 extern "C" {
-  LWorldArr<Rect> World_getRects();
-  LWorldArr<CollRect> World_getCollRects();
-  LWorldArr<Image> World_getImages();
-  LWorldArr<Velocity> World_getVels();
+  static LWorldArr<Rect> World_getRects() { return World_getArr<Rect>(); }
+  static LWorldArr<CollRect> World_getCollRects() { return World_getArr<CollRect>(); }
+  static LWorldArr<Image> World_getImages() { return World_getArr<Image>(); }
 }
 
 #pragma GCC diagnostic pop

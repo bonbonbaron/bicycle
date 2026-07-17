@@ -1,4 +1,4 @@
-DBG=-g
+DBG=
 STD=-std=c++20
 
 BICREPO := $(shell git rev-parse --show-toplevel)
@@ -10,16 +10,19 @@ BICTGT := o  # for now
 all: $(BICTGT)
 
 PKGS=luajit ncurses fluidsynth 
+CFLAGS=$(shell pkg-config --cflags $(PKGS))
+LFLAGS=$(shell pkg-config --libs $(PKGS))
 # Consider these compiler options when you're ready to hard-core optimize.
 # g++ -O3 -march=armv8-a -mcpu=cortex-a72 -mtune=cortex-a72 -mfpu=neon-fp-armv8 -mfloat-abi=hard ...
+# TODO figure out how to only avoid removal of symbols in specific files.
 $(BICTGT): $(BICOBJS)
-	g++ -Wall -fvisibility=default $(DBG) $(STD) $(BICOBJS) $(shell ncursesw6-config --libs) -levdev $(shell pkg-config $(PKGS) --libs) -o $@
+	g++ -Wall -rdynamic $(DBG) $(STD) $(BICOBJS) -levdev $(LFLAGS) -o $@
 
 $(BICREPO)/build/%.o: $(BICREPO)/src/%.cpp $(BICREPO)/include/%.h 
-	g++ -Wall -Wno-switch -fvisibility=default $(DBG) $(STD) -c $< -I$(BICREPO)/include $(shell pkg-config $(PKGS) --cflags) $(shell ncursesw6-config --cflags) -o $@
+	g++ -Wall $(DBG) $(STD) -c $< -I$(BICREPO)/include $(CFLAGS)  -o $@
 
 $(BICREPO)/build/%.o: $(BICREPO)/src/%.cpp ${BICREPO}/build/m ${BICREPO}/build/v ${BICREPO}/build/c 
-	g++ -Wall -Wno-switch -fvisibility=default $(DBG) $(STD) -c $< -I$(BICREPO)/include $(shell pkg-config $(PKGS) --cflags) $(shell ncursesw6-config --cflags ) -o $@
+	g++ -Wall $(DBG) $(STD) -c $< -I$(BICREPO)/include $(CFLAGS)  -o $@
 
 $(BICREPO)/build/m:
 	mkdir -p $(BICREPO)/build/m

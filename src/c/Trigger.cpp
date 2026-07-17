@@ -11,12 +11,9 @@ auto Trigger::getInstance() -> Trigger& {
   return trigger;
 }
 
-int Trigger::sys( ) {
+// This function eases exposure of generic system manipulations.
+void Trigger::sys(const Action action, const System system, Entity entity) {
   auto& trig = getInstance();
-  // Convert Lua-side args to proper bicycle args.
-  Trigger::Action action = static_cast<Action>( luaL_checkinteger(L, 1) );
-  Trigger::System system = static_cast<System> ( luaL_checkinteger(L, 2) );
-  Entity entity = static_cast<Entity>( luaL_checkinteger(L, 3) );
   auto* timer = trig.getTimer();
 
   Controllable* ctrl{};
@@ -25,8 +22,6 @@ int Trigger::sys( ) {
       assert(timer != nullptr );
       ctrl = timer;
       break;
-    default:
-      return -1;
   }
 
   switch ( action ) {
@@ -43,25 +38,18 @@ int Trigger::sys( ) {
       ctrl->unpause( entity );
       break;
   }
-
-  return 0;
-}
-
-// int Trigger::getComponent( lua_State* L ) {
-extern "C" {
-  int Trigger::getComponent( Entity entiy ) {
-    return World::get<Rect>( entity );
-  }
 }
 
 void Trigger::init( const std::string& gameName ) {
+  L = luaL_newstate();
+  luaL_openlibs(L);
   _timer = &Timer::getInstance();
 
   // TODO move this elswehre and open the base bicycle.lua file here instead.
   std::string gamePath{"./" + gameName + ".lua"};
-  if (luaL_dofile( _bridge.getState(), gamePath.c_str() ) != LUA_OK) {
-    auto errStr = std::string( lua_tostring(_bridge.getState(), -1) );
-    lua_pop(_bridge.getState(), 1);
+  if (luaL_dofile( L, gamePath.c_str() ) != LUA_OK) {
+    auto errStr = std::string( lua_tostring(L, -1) );
+    lua_pop(L, 1);
     bicycle::die( errStr );
   }
 }
