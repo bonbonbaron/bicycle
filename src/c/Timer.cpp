@@ -69,7 +69,7 @@ auto Timer::create( const unsigned timeMs, Entity entity, const unsigned timeout
 }
 
 auto Timer::findAvailableTimer() -> unsigned {
-  const auto idx = find_first( _availableTimers );
+  const auto idx = find_first_set( _availableTimers );
   // const auto idx = _availableTimers._Find_first();  // _Find_first() is a g++ extension. Lucky me.
   _availableTimers.set( idx, false );
   return idx;

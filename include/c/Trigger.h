@@ -6,7 +6,6 @@
 #include "c/WindowManager.h"
 #include "m/Position.h"
 #include "c/Timer.h"
-#include "Bridge.h"
 #include "m/World.h"
 #include <lua.hpp>
 
@@ -16,6 +15,7 @@
   * This is designed to correlate tasks with each other.
   */
 
+// This is needed for older Lua versions.
 #ifndef LUA_OK
 #define LUA_OK (0)
 #endif
@@ -33,8 +33,6 @@ class Trigger {
 
     auto getTimer() -> Timer*;
 
-    auto getBridge() -> Bridge&;
-
   private:
     Trigger() = default;
     Trigger(const Trigger&) = delete;
@@ -48,7 +46,8 @@ class Trigger {
     enum System{ TIMER };
 
 		static int sys( lua_State* luaState );
-    static int getComponent( lua_State* luaState );
+    // static int getComponent( lua_State* luaState );
+    static int getComponent();
     // Systems
     Timer* _timer;
 
@@ -59,6 +58,4 @@ class Trigger {
       TimerId cbTimerId{};
     };
     std::array<Activity, NUM_SUPPORTED_ENTITIES>    _activities{};
-
-    Bridge _bridge{};
 };  // class Trigger

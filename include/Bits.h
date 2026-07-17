@@ -1,5 +1,5 @@
 #include <bitset>
-
+#include <cstddef>
 #include <cstdint>
 
 #if defined(__GNUC__) || defined(__clang__)
@@ -29,10 +29,6 @@ inline size_t find_first_set(uint64_t word) noexcept {
     if (word == 0) return ~size_t(0);  // or appropriate sentinel like bitset size
     return PORTABLE_CTZ(word);
 }
-
-#include <bitset>
-#include <cstdint>
-#include <cstddef>
 
 template <size_t N>
 class BitsetWordView {
@@ -71,12 +67,3 @@ size_t find_first_set(const std::bitset<N>& bs) {
     return N;  // no bits set
 }
 
-template <size_t N>
-size_t find_first(const std::bitset<N>& bs) {
-    // Iterate over 64-bit words for high performance
-    for (size_t i = 0; i < N; i += 64) {
-        uint64_t word = (bs >> i).to_ullong();  // or manual word extraction if needed
-        if (word) return i + find_first_set(word);
-    }
-    return N;  // none set
-}

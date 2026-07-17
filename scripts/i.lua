@@ -59,12 +59,25 @@ bill = bill - Stats.new( {hp = 90} )
 print("\nbill's final state:")
 print(bill)
 
--- t = gets(45)
--- print( "hp is " .. t.hp .. ", mp is " .. t.mp .. ", speed is " .. t.speed )
+if System == nil then
+  error("System doesn't exist")
+elseif Action == nil then
+  error("Actio doesn't exist")
+elseif Component == nil then
+  error("Component doesn't exist")
+elseif sys == nil then
+  print("sys() doesn't exist")
+elseif getComponent == nil then
+  print("getComponent() doesn't exist")
+end
 
-sys( System.TIMER, Action.STOP, 1 )
+print("sys")
+whatever = sys( System.TIMER, Action.START, 1 )
+print('pairs')
 for k, v in pairs(Component) do print(k) end
+print("getting component")
 c = getComponent( Component.COLLRECT, 2 )
+print("showing x")
 print( "c.pos.x is " .. c.pos.x )
 print( "c.pos.y is " .. c.pos.y )
 print( "c.pos.x is " .. c.size.w )

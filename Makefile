@@ -2,14 +2,14 @@ DBG=-g
 STD=-std=c++20
 
 BICREPO := $(shell git rev-parse --show-toplevel)
-BICSRCS := main bicycle Bridge m/Entity m/Rect c/Trigger c/Timer c/SshInput v/ColorPalette v/Window c/WindowManager v/Dialogue v/Menu v/TextMenu v/Image m/Camera m/World v/Scene c/CollisionDetector # c/Input v/Bar c/Dice c/MidiPlayer v/Graph 
+BICSRCS := main bicycle m/Entity m/Rect c/Trigger c/Timer c/SshInput v/ColorPalette v/Window c/WindowManager v/Dialogue v/Menu v/TextMenu v/Image m/Camera m/World v/Scene c/CollisionDetector # c/Input v/Bar c/Dice c/MidiPlayer v/Graph 
 BICINCS := $(BICINCS:%=$(BICREPO)/include/%.h)
 
 BICOBJS := $(BICSRCS:%=$(BICREPO)/build/%.o)
 BICTGT := o  # for now
 all: $(BICTGT)
 
-PKGS=lua51 curses fluidsynth 
+PKGS=luajit ncurses fluidsynth 
 # Consider these compiler options when you're ready to hard-core optimize.
 # g++ -O3 -march=armv8-a -mcpu=cortex-a72 -mtune=cortex-a72 -mfpu=neon-fp-armv8 -mfloat-abi=hard ...
 $(BICTGT): $(BICOBJS)
