@@ -26,9 +26,10 @@
 
                         FIND
                         ====
-  onInput            -> onInput (global, shunts to entity-specific onInput map)
-  onTimeout          -> onTimeout
-  onCollision        -> onCollision
+  onUpdate           -> onUpdate
+                        * onInput (global, shunts to entity-specific onInput map)
+                        * onTimeout
+                        * onCollision
 
 +=======+
 |TRIGGER|

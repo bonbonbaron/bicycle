@@ -43,6 +43,7 @@ ffi.cdef([[
 
 
   void pushDialogue( const char* text, int x, int y, int w, int h );
+  void pushTextMenu( const char* text, int x, int y, int w, int h );
 ]])
 
 rects = ffi.C.World_getRects();

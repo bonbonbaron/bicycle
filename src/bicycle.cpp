@@ -8,6 +8,7 @@
 #include "c/SshInput.h"
 #include "c/CollisionDetector.h"
 #include "v/Dialogue.h"
+#include "v/TextMenu.h"
 
 namespace bicycle {
 
@@ -51,11 +52,9 @@ namespace bicycle {
     void pushDialogue( const char* text, int x, int y, int w, int h ) {
       push<Dialogue>( text, x, y, w, h ); 
     }
-  }
 
-  extern "C" {
-    void pushMenu( const char* text, int x, int y, int w, int h ) {
-      push<Dialogue>( text, x, y, w, h ); 
+    void pushTextMenu( const char* text, int x, int y, int w, int h ) {
+      push<TextMenu>( text, x, y, w, h ); 
     }
   }
 
