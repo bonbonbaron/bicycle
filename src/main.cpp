@@ -5,7 +5,7 @@
 #include <vector>
 #include "v/Dialogue.h"
 #include "v/Scene.h"
-#include <lua5.2/lua.hpp>
+#include <lua.hpp>
 #include "v/ColorPalette.h"
 #include "c/WindowManager.h"
 #include "c/Trigger.h"
