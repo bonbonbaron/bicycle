@@ -26,10 +26,12 @@
 
                         FIND
                         ====
-  onUpdate           -> onUpdate
-                        * onInput (global, shunts to entity-specific onInput map)
-                        * onTimeout
-                        * onCollision
+  onTrigger         -> onTrigger()
+                        ----------
+                        Shunts to individual entities' metamethods:
+                          * onInput (global, shunts to entity-specific onInput map)
+                          * onTimeout
+                          * onCollision
 
 +=======+
 |TRIGGER|
