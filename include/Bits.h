@@ -30,6 +30,47 @@ inline size_t find_first_set(uint64_t word) noexcept {
     return PORTABLE_CTZ(word);
 }
 
+#include <bitset>
+#include <cstdint>
+#include <cstddef>
+
+template <size_t N>
+class BitsetWordView {
+public:
+    explicit BitsetWordView(const std::bitset<N>& bs) : bs_(bs) {}
+
+    uint64_t operator[](size_t word_index) const {
+        if (word_index * 64 >= N) return 0;
+
+        uint64_t word = 0;
+        size_t start_bit = word_index * 64;
+        size_t bits_to_take = std::min<size_t>(64, N - start_bit);
+
+        for (size_t i = 0; i < bits_to_take; ++i) {
+            if (bs_[start_bit + i]) {
+                word |= (uint64_t{1} << i);
+            }
+        }
+        return word;
+    }
+
+private:
+    const std::bitset<N>& bs_;
+};
+
+template <size_t N>
+size_t find_first_set(const std::bitset<N>& bs) {
+    BitsetWordView<N> words(bs);
+
+    for (size_t w = 0; w * 64 < N; ++w) {
+        uint64_t word = words[w];
+        if (word != 0) {
+            return w * 64 + find_first_set(word);  // your portable countr_zero
+        }
+    }
+    return N;  // no bits set
+}
+
 template <size_t N>
 size_t find_first(const std::bitset<N>& bs) {
     // Iterate over 64-bit words for high performance
