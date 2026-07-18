@@ -6,6 +6,15 @@
 #include <iostream>
 #include "bicycle.h"
 
+extern "C" {
+  Bridge bridge;
+}
+
+Trigger::Trigger() {
+  bridge.collisions.set( _collisions );
+  bridge.timeouts.set( _timeouts );
+}
+
 auto Trigger::getInstance() -> Trigger& {
   static Trigger trigger;
   return trigger;
@@ -52,24 +61,53 @@ void Trigger::init( const std::string& gameName ) {
     lua_pop(L, 1);
     bicycle::die( errStr );
   }
+
+	lua_getglobal(L, "initBridge");
+	if (lua_isfunction(L, -1)) {
+		lua_pushlightuserdata(L, (void*) &bridge);
+		if (lua_pcall(L, 1, 0, 0) != LUA_OK) {
+			const char* err = lua_tostring(L, -1);
+			lua_pop(L, 1);
+      bicycle::die(err);
+		}
+	} 
+  else {
+		lua_pop(L, 1); // pop the non-function
+	}
 }
 
-void Trigger::onInput( const InputState& input ) {
+void Trigger::sendInput( Input& input ) {
   const auto& wm = WindowManager::getInstance();
   const auto currWindow = wm.back();
   assert( currWindow != nullptr );
   currWindow->onInput( input );
-  // TODO may be better design to have window return an entityj
+  bridge.input = input;
 }
 
-void Trigger::onTimer( const Timeout& timeout ) {
-  // TODO make Lua bridge
+void Trigger::sendTimeout( const Timeout& timeout ) {
+  bridge.timeouts.add( timeout );
 }
 
-void Trigger::onCollision( const Collision& collision ) {
-  // TODO make Lua bridge
+void Trigger::sendCollision( const Collision& collision ) {
+  bridge.collisions.add( collision );
+}
+
+void Trigger::send() {
+	lua_getglobal(L, "getUpdates");
+	if (lua_isfunction(L, -1)) {
+		if (lua_pcall(L, 0, 0, 0) != LUA_OK) {
+			const char* err = lua_tostring(L, -1);
+			lua_pop(L, 1);
+      bicycle::die(err);
+		}
+	} 
+  else {
+		lua_pop(L, 1); // pop the non-function
+	}
+  // Reset callback ref.
+  bridge.input.triggeredCallbackRef = 0;
 }
 
 auto Trigger::getTimer() -> Timer* {
-  return _timer;
+	return _timer;
 }

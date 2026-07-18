@@ -33,7 +33,7 @@ void Window::clear() {
   werase( _win );
 }
 
-void Window::onInput( const InputState& input ) {
+void Window::onInput( Input& input ) {
 }
 
 auto Window::getX() const -> int{

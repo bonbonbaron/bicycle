@@ -1,7 +1,7 @@
 #pragma once
 #include <string>
 #include "ColorPalette.h"
-#include "c/InputData.h"
+#include "c/Input.h"
 #include "m/Entity.h"
 
 static constexpr int WINDOW_PADDING{2};
@@ -19,7 +19,7 @@ class Window {
     void clear();
     void move( int y, int x );
     virtual void render() = 0;
-    virtual void onInput( const InputState& input ) = 0;
+    virtual void onInput( Input& input ) = 0;
     void repaint();
     const char* getCurrItemName() const;
     const char* getCurrItemDesc() const;

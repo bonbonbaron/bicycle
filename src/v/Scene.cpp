@@ -121,8 +121,8 @@ void Scene::render() {
   }
 }
 
-void Scene::onInput( const InputState& input ) {
-  // Trigger::onTrigger( _focus, input );  // TODO here is where you put your Lua bridge for your specific entity.
+void Scene::onInput( Input& input ) {
+  input.focus = _focus;
 }
 
 void Scene::setFocus( Entity entity ) {

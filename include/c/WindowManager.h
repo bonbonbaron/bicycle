@@ -3,7 +3,7 @@
 #include <array>
 #include <memory>
 #include <mutex>
-#include "c/InputData.h"
+#include "c/Input.h"
 
 constexpr int MAX_NUM_WINDOWS{50};
 

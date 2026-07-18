@@ -31,7 +31,7 @@ void Dialogue::init() {
 }
 
 // TODO provide dev-friendly key masks
-void Dialogue::onInput( const InputState& input ) {
+void Dialogue::onInput( Input& input ) {
   auto& wm = WindowManager::getInstance();
   switch( input.lastPressed ) {
     case LogicalKey::J:

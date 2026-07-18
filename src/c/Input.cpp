@@ -1,4 +1,4 @@
-#include "c/Input.h"
+#include "c/InputListener.h"
 #include "c/Trigger.h"
 
 // ────────────────────────────────────────────────
@@ -7,12 +7,12 @@
 // ────────────────────────────────────────────────
 
 // Get singleton
-auto Input::getInstance() -> Input& {
-  static Input kbListener;
+auto InputListener::getInstance() -> InputListener& {
+  static InputListener kbListener;
   return kbListener;
 }
 
-void Input::discoverPotentialKeyboards()
+void InputListener::discoverPotentialKeyboards()
 {
   // close_all();  // TODO is this needed?
 
@@ -58,12 +58,12 @@ void Input::discoverPotentialKeyboards()
 }
 
 // Constructor
-Input::Input() {
+InputListener::InputListener() {
   discoverPotentialKeyboards();
 }
 
 // Check dev file for keyboard events
-void Input::listen() {
+void InputListener::listen() {
   // Constants
   constexpr unsigned VAL_KEY_UP{0};
   constexpr unsigned VAL_KEY_DOWN{1};
@@ -112,9 +112,9 @@ void Input::listen() {
   // Send new events, bundled up in a single bitset, to Trigger SYSTEM.
   if ( _state.deltaKeysPressed.any() ) {
     // We don't have to know who has focus. Trigger should know.
-    Trigger::onInput( _keyState );  
+    Trigger::sendInput( _keyState );  
   }
-}  // Input::listen()
+}  // InputListener::listen()
 
 // ────────────────────────────────────────────────
 // Platform implementations (mapping native → LogicalKey)
@@ -122,7 +122,7 @@ void Input::listen() {
 
 
 // Linux evdev / input-event-codes.h uses its own set (often close to USB HID)
-auto Input::convertCodeToLogicalInt(int code) -> LogicalKey {
+auto InputListener::convertCodeToLogicalInt(int code) -> LogicalKey {
   switch (code)
   {
     case KEY_A: return LogicalKey::A;

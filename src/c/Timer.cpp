@@ -33,7 +33,7 @@ void Timer::_run() {
   for ( unsigned timerId = 0; timerId < MAX_NUM_TIMERS; ++timerId ) {
     _times.at(timerId) -= _decrementers.at(timerId);
     if ( _decrementers.at(timerId) > 0 && _times.at(timerId) == 0 ) {
-      Trigger::onTimer( _msgs.at(timerId) );
+      Trigger::sendTimeout( _msgs.at(timerId) );
     }
   }
 }

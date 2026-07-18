@@ -1,5 +1,5 @@
 #include <fcntl.h>
-#include "c/SshInput.h"
+#include "c/SshInputListener.h"
 #include "c/Trigger.h"
 
 using namespace std;
@@ -102,13 +102,14 @@ void SshInput::_listen() {
   // for now, i'm happy with actually only working wiht one byte
   // Reads 1 byte from fd 0 into a buffer.
   read( STDIN_FILENO, buffer, 1 );
+  _inputState.triggeredCallbackRef = 0;  // reset triggered callback ref so Windows can re-handle it.
   if ( buffer[0] != '\0' ) {
     auto lkey = convertCodeToLogicalInt( buffer[0] );
     _inputState.currKeysPressed.reset(); // SSH mode doesn't support key press/release distinctions. Press-detections only.
     if ( lkey != LogicalKey::COUNT ) {
       _inputState.currKeysPressed.set( static_cast<unsigned>( lkey ) );
       _inputState.lastPressed = lkey;
-      Trigger::onInput( _inputState );
+      Trigger::sendInput( _inputState );
     }
   }
 }
@@ -118,6 +119,6 @@ void SshInput::listen() {
   input._listen();
 }
 
-auto SshInput::getState() const -> const InputState& {
+auto SshInput::getState() const -> const Input& {
   return _inputState;
 }

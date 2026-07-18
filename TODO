@@ -1,3 +1,10 @@
+TODAY:
+  \make 3 triggers send data for Trigger.cpp to fill 2 arrays with 
+  share that array with FFI in bicycle.lua
+  make a guy move around the screen
+  make an NPC move at random
+  make them collide and react
+
 ====================================
 *LINKAGES BETWEEN ENGINE AND SCRIPTS
 ====================================

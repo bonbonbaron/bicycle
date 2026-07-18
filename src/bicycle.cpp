@@ -5,10 +5,11 @@
 #include "bicycle.h"
 #include "Constants.h"
 #include "c/Trigger.h"
-#include "c/SshInput.h"
+#include "c/SshInputListener.h"
 #include "c/CollisionDetector.h"
 #include "v/Dialogue.h"
 #include "v/TextMenu.h"
+#include "c/Trigger.h"
 
 namespace bicycle {
 
@@ -53,8 +54,18 @@ namespace bicycle {
       push<Dialogue>( text, x, y, w, h ); 
     }
 
-    void pushTextMenu( const char* text, int x, int y, int w, int h ) {
-      push<TextMenu>( text, x, y, w, h ); 
+    void pushTextMenu( int x, int y, int w, int h ) {
+      push<TextMenu>( x, y, w, h ); 
+    }
+
+    void addItem( const char* text, int cbRef ) {
+      auto& wm = WindowManager::getInstance();
+      auto menu = dynamic_pointer_cast<Menu>( wm.back() );
+      menu->addItem( text, cbRef );
+    }
+
+    void popWindow() {
+      pop();
     }
   }
 
@@ -65,11 +76,13 @@ namespace bicycle {
 
   int run() {
     auto& wm = WindowManager::getInstance();
+    auto& trigger = Trigger::getInstance();
 
     while ( wm.size() > 0 ) {
       Timer::run();
       SshInput::listen();
       CollisionDetector::check();
+      trigger.send();
       wm.render();   // TODO make this internally only change dirty windows
       Timer::sleepFrame();
     }

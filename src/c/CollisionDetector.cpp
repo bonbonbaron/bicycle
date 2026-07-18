@@ -29,8 +29,8 @@ void CollisionDetector::check() {
         f2.pos += r2.pos;
         if ( r1.overlaps( r2 ) ) {
           if ( !wereCollided ) {
-            trig.onCollision( { *e1, *e2, f2.type } );
-            trig.onCollision( { *e2, *e1, f1.type } );
+            trig.sendCollision( { *e1, *e2, f2.type } );
+            trig.sendCollision( { *e2, *e1, f1.type } );
             cd.recordCollision( *e1, *e2 );
           }
         }

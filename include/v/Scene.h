@@ -54,7 +54,7 @@ class Scene : public Window {
     Scene( const int x, const int y, const int w, const int h );
 
     void render() override;
-    void onInput( const InputState& input ) override;
+    void onInput( Input& input ) override;
     void setFocus( Entity entity );
 
   private:
