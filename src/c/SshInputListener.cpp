@@ -102,7 +102,6 @@ void SshInput::_listen() {
   // for now, i'm happy with actually only working wiht one byte
   // Reads 1 byte from fd 0 into a buffer.
   read( STDIN_FILENO, buffer, 1 );
-  _inputState.triggeredCallbackRef = 0;  // reset triggered callback ref so Windows can re-handle it.
   if ( buffer[0] != '\0' ) {
     auto lkey = convertCodeToLogicalInt( buffer[0] );
     _inputState.currKeysPressed.reset(); // SSH mode doesn't support key press/release distinctions. Press-detections only.

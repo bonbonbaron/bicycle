@@ -9,7 +9,7 @@ static constexpr int WINDOW_PADDING{2};
 class Window {
   public:
     // i know this doesn't align with ncurses' paramter order, but I like my order better :)
-    Window() = default;
+    Window();
     Window( const int w, const int h );
     Window( const int x, const int y, const int w, const int h );
     ~Window();
@@ -45,6 +45,7 @@ class Window {
     void print( const std::string& s ) const;
 
     auto getContext() const -> Entity; // window's an entity now
+    auto getId() const -> Entity;
   private:
     WINDOW* _win;
     chtype _colorPair;
@@ -54,5 +55,6 @@ class Window {
     int _h{};
     int _x{};
     int _y{};
+    const Entity _id{};
     const Entity _context{};
 };

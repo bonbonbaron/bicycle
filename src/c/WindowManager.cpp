@@ -7,15 +7,17 @@ auto WindowManager::back() const -> const std::shared_ptr<Window> {
   return {};
 }
 
-void WindowManager::push( const std::shared_ptr<Window> win ) {
+Entity WindowManager::push( const std::shared_ptr<Window> win ) {
   std::unique_lock<std::mutex> l( _mut );  // This lets both timers and the controller trigger rendering.
   win->setBorder(true);
   if ( _population < _windows.size() ) {
     _windows.at(_population++) = win;
   }
+  return win->getId();
 }
 
-void WindowManager::pop() {
+Entity WindowManager::pop() {
+  Entity nextWindowId{};
   std::unique_lock<std::mutex> l( _mut );  // This lets both timers and the controller trigger rendering.
   if ( _population > 0 ) {
     back()->clear();
@@ -23,6 +25,10 @@ void WindowManager::pop() {
     back()->repaint();
     _windows.at(--_population) = nullptr;
   }
+  if ( _population > 0 ) {
+    nextWindowId = back()->getId();
+  }
+  return nextWindowId;
 }
 
 void WindowManager::refreshAll() {

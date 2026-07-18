@@ -2,19 +2,22 @@
 #include "bicycle.h"
 #include <cassert>
 
-Window::Window( const int w, const int h ) : _win( newwin( h, w, LINES / 2 - h/2 - 2, COLS / 2 - w / 2 ) ), _w(w), _h(h) {
+Window::Window( const int w, const int h ) :  _win( newwin( h, w, LINES / 2 - h/2 - 2, COLS / 2 - w / 2 ) ), _w(w), _h(h), _id( newEntityId() ) {
   assert( LINES / 2 - h/2 - 2 > 0 );
   assert( COLS / 2 - w / 2 > 0 );
   assert( _win != nullptr );
 }
 
-Window::Window( const int x, const int y, const int w, const int h ) : _win( newwin( h, w, y, x ) ), _w(w), _h(h) {
+Window::Window( const int x, const int y, const int w, const int h ) : _win( newwin( h, w, y, x ) ), _w(w), _h(h), _id( newEntityId() ) {
   assert( _win );
   // const auto& cp = ColorPalette::getInstance();
 }
 
+Window::Window() : _id( newEntityId() ) {}
+
 Window::~Window(){
   delwin( _win );
+  delEntityId( _id );
 }
 
 void Window::create() {
@@ -122,4 +125,8 @@ void Window::unsetAttr( const int attr ) {
 
 auto Window::getContext() const -> Entity {
   return _context;
+}
+
+auto Window::getId() const -> Entity {
+  return _id;
 }

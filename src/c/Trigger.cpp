@@ -54,7 +54,7 @@ void Trigger::init( const std::string& gameName ) {
   luaL_openlibs(L);
   _timer = &Timer::getInstance();
 
-  // TODO move this elswehre and open the base bicycle.lua file here instead.
+  // Start the game
   std::string gamePath{"./" + gameName + ".lua"};
   if (luaL_dofile( L, gamePath.c_str() ) != LUA_OK) {
     auto errStr = std::string( lua_tostring(L, -1) );
@@ -78,10 +78,19 @@ void Trigger::init( const std::string& gameName ) {
 
 void Trigger::sendInput( Input& input ) {
   const auto& wm = WindowManager::getInstance();
-  const auto currWindow = wm.back();
+  auto currWindow = wm.back();
   assert( currWindow != nullptr );
+  auto oldId = currWindow->getId();
   currWindow->onInput( input );
   bridge.input = input;
+  // If the above window popped during onInput(), we need to replenish the focus (if not game over).
+  currWindow = wm.back();
+  if ( currWindow != nullptr ) {
+    auto newId = currWindow->getId();
+    if ( newId != oldId ) {
+      input.focus = newId;
+    }
+  }
 }
 
 void Trigger::sendTimeout( const Timeout& timeout ) {
@@ -104,8 +113,6 @@ void Trigger::send() {
   else {
 		lua_pop(L, 1); // pop the non-function
 	}
-  // Reset callback ref.
-  bridge.input.triggeredCallbackRef = 0;
 }
 
 auto Trigger::getTimer() -> Timer* {

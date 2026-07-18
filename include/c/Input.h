@@ -6,7 +6,8 @@
 // A bunch of stuff used by both controller types (physical keyboard and SSH key events)
   enum class LogicalKey : uint8_t {
       // Letters (HID 0x04–0x1D)  <-- these will be treated as case-insensitive
-      A ,
+      NOTHING = 0,
+      A = 1,
       B ,
       C ,
       D ,
@@ -129,7 +130,6 @@ constexpr auto MASK_RMETA  = getbs( LogicalKey::RightMeta);
 
 struct Input {
   Entity focus{};
-  int triggeredCallbackRef{};
   LogicalKey lastPressed{};
   int millisSinceLast{};  // i don't like making input dependent on Timer.
   Bitset currKeysPressed{};

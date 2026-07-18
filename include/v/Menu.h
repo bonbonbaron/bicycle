@@ -14,14 +14,9 @@ class Menu : public Window {
   public:
     using MenuItemBody = std::variant<Entity, std::string>;
 
-    struct MenuItem {
-      std::string text;
-      int cbRef;
-    };
-
-    auto getItem() const -> MenuItem;
     void setOnCursorMovement( int cbRef );
-    void addItem( const char* text, int cbRef );  // call after menu creation
+    void addItem( const char* text );  // call after menu creation
+    const unsigned getSelection() const;
 
     Menu( 
       const int x,
@@ -36,11 +31,9 @@ class Menu : public Window {
       int currItemIdx{};
     };
 
-    const MenuItem& getCurrMenuItem() const;
     void moveCursor( int amt );
     void cancel();
-    std::vector< MenuItem > _items{};
+    std::vector<std::string> _items{};
     Cursor _cursor{ { " > ", Color::WHITE }, {0, 0}, 0 };
     std::string _id;
-    int _onCursorMovementCbRef;
 };

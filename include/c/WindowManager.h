@@ -18,8 +18,8 @@ class WindowManager {
     void render();
     auto size() const -> int;
     auto back() const -> const std::shared_ptr<Window>;
-    void push( const std::shared_ptr<Window> win );
-    void pop();
+    Entity push( const std::shared_ptr<Window> win );
+    Entity pop();
 
   private:
     void refreshAll();

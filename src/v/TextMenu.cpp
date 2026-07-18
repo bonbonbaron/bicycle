@@ -1,5 +1,4 @@
 #include "v/TextMenu.h"
-#include "c/WindowManager.h"
 #include <algorithm>
 #include "bicycle.h"
 #include "Constants.h"
@@ -20,7 +19,7 @@ void TextMenu::render() {
       setAttr( A_STANDOUT );
     }
 
-    mvprint( currRow++, WINDOW_PADDING/2 + CURSOR_WIDTH, _items.at( dispIdx ).text );  
+    mvprint( currRow++, WINDOW_PADDING/2 + CURSOR_WIDTH, _items.at( dispIdx ) );  
     unsetAttr( A_STANDOUT );
   }
   mvprint( _cursor.currItemIdx - _firstDispIdx + WINDOW_PADDING / 2, WINDOW_PADDING / 2, _cursor.img.getSymbol()  );
@@ -30,7 +29,6 @@ void TextMenu::render() {
 // TODO and i think cursor movement ought to be moved to Menu.cpp.
 // TODO Handle the selection-filling/passing/processing here.
 void TextMenu::onInput( Input& input ) {
-  auto& wm = WindowManager::getInstance();
   const int NUM_ROWS_DISP = getHeight() - WINDOW_PADDING;
   switch( input.lastPressed ) {
     case LogicalKey::J:
@@ -39,7 +37,6 @@ void TextMenu::onInput( Input& input ) {
       if ( ( _cursor.currItemIdx ) > ( _firstDispIdx + NUM_ROWS_DISP - 1 ) ) {
         ++_firstDispIdx;
       }
-      input.triggeredCallbackRef = _onCursorMovementCbRef;
       break;
     case LogicalKey::K:
       --_cursor.currItemIdx;
@@ -47,14 +44,7 @@ void TextMenu::onInput( Input& input ) {
       if ( _cursor.currItemIdx < _firstDispIdx ) {
         --_firstDispIdx;
       }
-      input.triggeredCallbackRef = _onCursorMovementCbRef;
-      break;
-    case LogicalKey::B:
-      wm.pop();
-      break;
-    case LogicalKey::Space:
-      auto item = getItem();
-      input.triggeredCallbackRef = item.cbRef;
       break;
   }
+  input.focus = getId();
 }

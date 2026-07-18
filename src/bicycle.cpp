@@ -1,7 +1,4 @@
 #include <iostream> // TODO: delete when you're done debugging
-#include <chrono>
-#include <thread>
-
 #include "bicycle.h"
 #include "Constants.h"
 #include "c/Trigger.h"
@@ -9,7 +6,7 @@
 #include "c/CollisionDetector.h"
 #include "v/Dialogue.h"
 #include "v/TextMenu.h"
-#include "c/Trigger.h"
+#include "v/Scene.h"
 
 namespace bicycle {
 
@@ -44,34 +41,50 @@ namespace bicycle {
     trig.init( gameName );
   }
 
-  void push( std::shared_ptr<Window> shared ) {
+  Entity push( std::shared_ptr<Window> shared ) {
     auto& wm = WindowManager::getInstance();
-    wm.push( shared );
+    return wm.push( shared );
   }
 
   extern "C" {
-    void pushDialogue( const char* text, int x, int y, int w, int h ) {
-      push<Dialogue>( text, x, y, w, h ); 
+    Entity pushDialogue( const char* text, int x, int y, int w, int h ) {
+      return push<Dialogue>( text, x, y, w, h ); 
     }
 
-    void pushTextMenu( int x, int y, int w, int h ) {
-      push<TextMenu>( x, y, w, h ); 
+    Entity pushTextMenu( int x, int y, int w, int h ) {
+      return push<TextMenu>( x, y, w, h ); 
     }
 
-    void addItem( const char* text, int cbRef ) {
+    void addItem( const char* text ) {
       auto& wm = WindowManager::getInstance();
       auto menu = dynamic_pointer_cast<Menu>( wm.back() );
-      menu->addItem( text, cbRef );
+      if ( menu != nullptr ) {
+        menu->addItem( text );
+      }
     }
 
-    void popWindow() {
-      pop();
+    Entity pushScene() {
+      return push<Scene>();
     }
+
+    Entity popWindow() {
+      return pop();
+    }
+
+    unsigned getSelection() {
+      auto& wm = WindowManager::getInstance();
+      auto menu = dynamic_pointer_cast<Menu>( wm.back() );
+      if ( menu != nullptr ) {
+        return menu->getSelection();
+      }
+      return 0;  // i'm tired, i'll make this -1 (int, not unsigned) later
+    }
+      
   }
 
-  void pop() {
+  Entity pop() {
     auto& wm = WindowManager::getInstance();
-    wm.pop();
+    return wm.pop();
   }
 
   int run() {

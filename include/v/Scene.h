@@ -23,7 +23,7 @@ struct Layer {
   std::string bgCollStr;
   std::vector<LineLimits> lineLimits{};
   // Things Layer needs to have in World:
-  //   * entity ID
+  //   * \ entity ID
   //   * image
   //   * position (if PARALLAX or AUTOLOOP)
   //   * velocity (if AUTOLOOP)
@@ -50,8 +50,9 @@ class Grid {
 
 class Scene : public Window {
   public:
-    Scene( const Grid& grid );
+    Scene();
     Scene( const int x, const int y, const int w, const int h );
+    // TODO make addGrid() or something to replace Scene( const Grid& grid );
 
     void render() override;
     void onInput( Input& input ) override;

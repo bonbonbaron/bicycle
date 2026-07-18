@@ -51,12 +51,10 @@ void Dialogue::onInput( Input& input ) {
       initLineNum -= std::min( initLineNum, getHeight() );
       initLineNum = std::clamp<unsigned>( initLineNum, 0, lineLimits.size() - 1 );
       break;
-    case LogicalKey::Space:
-      wm.pop();
-      break;
     default:
       Window::onInput( input );
   }
+  input.focus = getId();
   render();
 }
 

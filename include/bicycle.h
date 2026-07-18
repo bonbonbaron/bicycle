@@ -13,18 +13,18 @@ namespace bicycle {
   void init( const std::string& gameName );
   void die( const std::string& s );
 
-  void push( std::shared_ptr<Window> shared );
-  void pop();
+  Entity push( std::shared_ptr<Window> shared );
+  Entity pop();
   int run();
 
   static std::mutex bike_mtx;
 
   template<typename T, typename... Args>
-    void push( Args&&... args ) {
+    Entity push( Args&&... args ) {
       // Ensure the developer remembered to initialize ncurses before adding anything to the window manager.
       // Any windows created before initialization disappear.
       auto& wm = WindowManager::getInstance();
       auto shared = std::make_shared<T>( args... );
-      wm.push( shared );
+      return wm.push( shared );  // returns new window's entity ID
     }
 }  // namespace bicycle

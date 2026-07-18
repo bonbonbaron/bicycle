@@ -1,6 +1,8 @@
 TODAY:
   \make 3 triggers send data for Trigger.cpp to fill 2 arrays with 
-  share that array with FFI in bicycle.lua
+  \share that array with FFI in bicycle.lua
+  timers next
+  Grids next
   make a guy move around the screen
   make an NPC move at random
   make them collide and react
@@ -17,9 +19,9 @@ TODAY:
   ========
   \world set/get     <-  worldSet/Get    (WARNING: C++ side needs explicit wrappers for every World  subtype)
   \push dialogue     <-  pushDialogue    (WARNING: C++ side needs explicit wrappers for every Window subtype)
-  push text menu    <-  pushTextMenu    (WARNING: C++ side needs explicit wrappers for every Window subtype)
+  \push text menu    <-  pushTextMenu    (WARNING: C++ side needs explicit wrappers for every Window subtype)
   push grid         <-  pushGrid        (WARNING: C++ side needs explicit wrappers for every Window subtype)
-  pop window        <-  popWindow
+  \pop window        <-  popWindow
   strt/stop/ps/unps <-  sys  <- wrappers for easier calls (provided by bicycle)
      * timer
      * animation
@@ -33,10 +35,10 @@ TODAY:
 
                         FIND
                         ====
-  onTrigger         -> onTrigger()
+  \Trigger::send     -> getUpdates( Bridge* )
                         ----------
                         Shunts to individual entities' metamethods:
-                          * onInput (global, shunts to entity-specific onInput map)
+                          \ * onInput (global, shunts to entity-specific onInput map)
                           * onTimeout
                           * onCollision
 
