@@ -1,6 +1,7 @@
 ffi = require("ffi")
 require("table")
 require("io")
+require("debug")
 
 ffi.cdef([[
   typedef enum {
@@ -103,6 +104,11 @@ ffi.cdef([[
   } WorldVelArr;
 
   WorldRectArr World_getRects();
+  WorldRectArr World_getCollRects();
+  WorldRectArr World_getImages();
+  WorldRectArr World_getRects();
+  WorldRectArr World_getVels();
+  WorldRectArr World_getAnims();
 
   typedef unsigned Entity;
 
@@ -153,10 +159,21 @@ ffi.cdef([[
   Entity popWindow();
 
   enum LayerType { FIXED, GLUED, PARALLAX, AUTOLOOP };
-  void addLayer( const char* bgStr );
+  Entity newEntity();
+  Entity delEntity();
+  void addBgLayer( const char* bgStr );
+  void addFgEntity( Entity entity, const unsigned layerIdx );
+
 
 ]])
--- TODO load entities from genomes
+
+function checkType( arg, expType )
+  if type(arg) ~= expType then 
+    error( debug.traceback().."\n\nUnexpected arg type: "..expType ) 
+	end
+end
+
+gameName = ""
 
 local entities = {}  -- maps entity ID to callbackID-to-callback maps
 local focus = 0
@@ -175,6 +192,8 @@ end
 function focusOn( entity )
   focus = entity
 end
+
+  
 
 -------------------------------------
 

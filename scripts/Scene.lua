@@ -1,4 +1,5 @@
 require("Window")
+require("Genome")
 require("io")
 require("table")
 
@@ -17,48 +18,37 @@ function Scene:getFileIter(path)
   return handle
 end
 
-function Scene:readBgs()
-  handle = self:getFileIter( "./test/scene/"..self.name.."/bg/*.bg" )
-  -- Put the files found above into a list.
-  numFiles = 0
-  for fp in handle:lines() do
-    local file = io.open( fp, "r" )
-    local bgStr = file:read("*a")
-    file:close()
-    numFiles = numFiles + 1
-    ffi.C.addLayer( bgStr )
-  end
-  handle:close()
-  if numFiles == 0 then error("Found no *.l files in ./test/scene/"..self.name.."/bg") end
-end
-
--- Lua is how I'm going to do everything I ever dreamed of that was nightmarish in all other directions:
---    1. position genome multiple times in the layer
---    2. indicate the animation they start with
---    3. complicated logic when loading a scene (where you start, tileset, song, etc based on global game state)
-
-function Scene:readFgs()
-  handle = self:getFileIter( "./test/scene/"..self.name.."/fg/*.lua" )
-  -- Put the files found above into a list.
+function Scene:process( path, processFunction )
+  checkType(path ,"string")
+  checkType(processFunction, "function")
+  handle = self:getFileIter( path )
+  -- Process each file found above with callback argument.
   numFiles = 0
   for fp in handle:lines() do
     local file = io.open( fp, "r" )
     local contents = file:read("*a")
     file:close()
     numFiles = numFiles + 1
-    ffi.C.addLayer( contents )
+    processFunction( self, contents )
   end
   handle:close()
-  if numFiles == 0 then error("Found no *.l files in ./test/scene/"..self.name.."/fg") end
+  if numFiles == 0 then error("Found no [0-9].l files in ./"..gameName.."/scene/"..self.name.."/bg") end
+end
+
+function Scene:addBg( bgStr )
+	checkType( bgStr, "string" )
+  ffi.C.addBgLayer( bgStr )
 end
 
 function Scene:readLayers()
-  self:readBgs()
-  self:readFgs()
+  -- TODO express genomes, which returns a list of entities. Determine the format.
+  --
+  self:process("./"..gameName.."/scene/"..self.name.."/bg/*.bg", self.addBg )
+  -- self:process("./"..gameName.."/scene/"..self.name.."/fg/*.lua", self.a)
 end
 
 function Scene.new( name )
-  if type(name) ~= "string" then error( "Scene needs a name bro." ) end
+	checkType(name, "string")
   local id = ffi.C.pushScene()
   local instance = { name=name, id=id, cbs = {} }
   setmetatable( instance, Scene )
@@ -66,14 +56,6 @@ function Scene.new( name )
   Window.push(id, instance)
   instance:readLayers()
   return instance
-end
-
-
-function Scene:add( str, cb )
-  if type(cb) == "function" then
-    ffi.C.addItem( str )
-    table.insert( self.cbs, cb )  -- index of cursor corresponds to selection
-  end
 end
 
 -- TODO function Scene::remove(), good for item menus in RPGs

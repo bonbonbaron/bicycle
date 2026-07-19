@@ -137,10 +137,3 @@ auto Scene::getGrid() -> Grid& {
   return _grid;
 }
 
-auto Scene::getBackLayer() -> std::optional<Layer> {
-  auto layers = _grid.getLayers();
-  if ( layers.size() > 0 ) {
-    return {layers.back()};
-  }
-  return {};
-}

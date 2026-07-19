@@ -43,7 +43,6 @@ class Grid {
     void setFocusedLayerIdx( const unsigned layerIdx );
     auto getFocusedLayerIdx() -> unsigned;
     auto getLayer( Entity entity ) -> std::optional<unsigned>;
-    auto getBackLayer() -> std::optional<Layer>;
   private:
     std::vector<Layer> _layers{};
     std::unordered_map<Entity, unsigned> _entityToLayerMap{};

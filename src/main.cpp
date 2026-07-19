@@ -10,7 +10,6 @@
 #include "c/WindowManager.h"
 #include "c/Trigger.h"
 #include "m/World.h"
-#include "TypeInfo.h"
 
 int main( int argc, char** argv ) {
   if ( argc != 2 ) {

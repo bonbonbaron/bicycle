@@ -45,9 +45,13 @@ namespace bicycle {
   }
 
   extern "C" {
+    // DIALOGUES
+
     Entity pushDialogue( const char* text, int x, int y, int w, int h ) {
       return push<Dialogue>( text, x, y, w, h ); 
     }
+
+    // MENUS
 
     Entity pushTextMenu( int x, int y, int w, int h ) {
       return push<TextMenu>( x, y, w, h ); 
@@ -61,23 +65,6 @@ namespace bicycle {
       }
     }
 
-    Entity pushScene() {
-      return push<Scene>();
-    }
-
-    // TODO handle collision string and type later
-    void addLayer( const char* bgStr ) {
-      auto& wm = WindowManager::getInstance();
-      auto scene = dynamic_pointer_cast<Scene>( wm.back() );
-      auto& grid = scene->getGrid();
-      Layer layer{ std::string( bgStr ), "", LayerType::FIXED };  // TODO
-      grid.addLayer( layer );
-    }
-
-    Entity popWindow() {
-      return pop();
-    }
-
     unsigned getSelection() {
       auto& wm = WindowManager::getInstance();
       auto menu = dynamic_pointer_cast<Menu>( wm.back() );
@@ -85,6 +72,39 @@ namespace bicycle {
         return menu->getSelection();
       }
       return 0;  // i'm tired, i'll make this -1 (int, not unsigned) later
+    }
+
+    // SCENES
+
+    Entity pushScene() {
+      return push<Scene>();
+    }
+
+    // TODO handle collision string and type later
+    void addBgLayer( const char* bgStr ) {
+      auto& wm = WindowManager::getInstance();
+      auto scene = dynamic_pointer_cast<Scene>( wm.back() );
+      auto& grid = scene->getGrid();
+      Layer layer{ std::string( bgStr ), "", LayerType::FIXED };  // TODO
+      grid.addLayer( layer );
+    }
+
+    Entity newEntity() {
+      return newEntityId();
+    }
+
+    /* Really, we have access to all the world arrays and custom
+     * data from the front end. So there's no need to send any
+     * information other than entity ID. */
+    void addFgEntity( Entity entity, const unsigned layerIdx ) {
+      auto& wm = WindowManager::getInstance();
+      auto scene = dynamic_pointer_cast<Scene>( wm.back() );
+      auto& grid = scene->getGrid();
+      grid.addEntity( entity, layerIdx );
+    }
+
+    Entity popWindow() {
+      return pop();
     }
       
   }

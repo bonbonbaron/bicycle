@@ -30,4 +30,9 @@ extern "C" {
   LWorldArr<Velocity> World_getVels() { 
     return World_getArr<Velocity>(); 
   }
+
+  EXPORT_API
+  LWorldArr<Animation> World_getAnims() { 
+    return World_getArr<Animation>(); 
+  }
 }
