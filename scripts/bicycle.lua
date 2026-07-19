@@ -153,90 +153,12 @@ ffi.cdef([[
   Entity popWindow();
 
 ]])
-
-Window = {}
-Window = {}
-Window.__index = Window
-Window.__newindex = function() error( "You can't create new attributes for Window." ) end
-
-function Window.pop(id)
-  focusOn( ffi.C.popWindow() )  -- focuses on table before this one
-  unregister(id)
-end
-
-function Window.push(id, entity)
-  -- print("id: "..tostring(id).." entity: "..tostring(entity))
-  register(id, entity)
-  focusOn(id)
-end
-
----------------------------------------
-Dialogue = {}
-Dialogue.__index = Dialogue
-Dialogue.__newindex = function() error( "You can't create new attributes for Dialogue." ) end
-Dialogue.new = function( text, x, y, w, h )
-  local id = ffi.C.pushDialogue( text, x, y, w, h )
-  local instance = { id=id, x=x, y=y, w=w, h=h, cbs = {} }
-  setmetatable( instance, Dialogue )
-  setmetatable( Dialogue, Window )
-  Window.push(id, instance)
-  return instance
-end
-
-function Dialogue:onInput( input )
-  if input == ffi.C.Space or input == ffi.C.B then
-    Window.pop(self.id)
-  end
-end
-
-------------------------------------
-Menu = {}
-Menu.__index = Menu
-Menu.__newindex = function() error( "You can't create new attributes for Menu." ) end
-Menu.new = function( x, y, w, h )
-  local x = x or 0 
-  local y = y or 0
-  local w = w or 10
-  local h = h or 10
-  local id = ffi.C.pushTextMenu( x, y, w, h )
-  local instance = { id=id, x=x, y=y, w=w, h=h, cbs = {} }
-  setmetatable( instance, Menu )
-  setmetatable( Menu, Window )
-  Window.push(id, instance)
-  return instance
-end
-
-function Menu:add( str, cb )
-  if type(cb) == "function" then
-    ffi.C.addItem( str )
-    table.insert( self.cbs, cb )  -- index of cursor corresponds to selection
-  end
-end
-
--- TODO function Menu::remove(), good for item menus in RPGs
-
-function Menu:onInput( input )
-  -- print("menu hears ya")
-  abc = io.read()
-  if input == ffi.C.Space then
-    selIdx = ffi.C.getSelection()
-    self.cbs[selIdx+1]()
-  elseif input == ffi.C.B then
-    self.pop(self.id)
-  else
-    -- print("do nothing")
-  end
-end
-
--------------------------------------
-
 -- TODO load entities from genomes
 
 local entities = {}  -- maps entity ID to callbackID-to-callback maps
 local focus = 0
 
 function register( entityId, entity )
-  print("regitering "..entityId)
   entities[entityId] = entity -- TODO check whether entity ID is already used in table later
 end
 
@@ -248,7 +170,6 @@ function unregister( id )
 end
 
 function focusOn( entity )
-  --print("focusing on ".. tostring(entity))
   focus = entity
 end
 
