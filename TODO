@@ -1,3 +1,9 @@
+BOOKMARK:
+  you were 
+  1) deciding foreground objs will be in [0-9].lua, and 
+  2) finishing getBackLayer() so you can add entities to it with an easy API call
+  3) thinking you need [0-9].coll for bg collision... OR... more efficiently, some kind of collision tilset that's color-sensitive.
+
 TODAY:
   \make 3 triggers send data for Trigger.cpp to fill 2 arrays with 
   \share that array with FFI in bicycle.lua
