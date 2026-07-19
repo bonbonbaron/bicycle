@@ -152,6 +152,9 @@ ffi.cdef([[
   Entity pushScene();
   Entity popWindow();
 
+  enum LayerType { FIXED, GLUED, PARALLAX, AUTOLOOP };
+  void addLayer( const char* bgStr );
+
 ]])
 -- TODO load entities from genomes
 

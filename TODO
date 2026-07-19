@@ -1,11 +1,25 @@
 TODAY:
   \make 3 triggers send data for Trigger.cpp to fill 2 arrays with 
   \share that array with FFI in bicycle.lua
-  timers next
-  Grids next
+  ~Grids next (making great progress! need to make it easy to add foreground objs, then collision fg/bg info)
   make a guy move around the screen
+  parallax, i'm not waiting anymore on this
+  looping bg
+  glued bg 
+  motion next
+  animated motion next
+  animated background next
+  dice next
   make an NPC move at random
+  make an NPC move based on random timers
   make them collide and react
+  make them collide with bg, fast and slow
+  play a sound when they collide
+  play a song
+  switch scenes when you collide with a staircase
+  Health bar
+  random RPG battle with music and everything, then back to normal scene
+  genome
 
 ====================================
 *LINKAGES BETWEEN ENGINE AND SCRIPTS
@@ -128,36 +142,8 @@ TODAY:
     dice
     resource-loading
 
-  - DESIGN:
-    -------
-    Split views up into M, V, and/or C components. Scene, for instance, should be flexible enough to keep its controller aspects across display types.
-------------
-version 2.0:
-------------
-features to add for v2.0:
-  scripting automation:
-    \- config file tree generation
-    - provide find, create, edit, delete, and list functions with tab-completion for the following,
-      including templates and auto-registry when necessary:
-        - custom types
-        - port set keys and types
-        - conditions
-        - node
-          - entity
-            - body
-            - personality
-              - tree
-                - functions
-            - bb
-        - dialogue
-        - menu
-        - grid
-    - making Makefile (and later, CMakeLists) automate port set generation from function definitions. Should bomb on clash.
-
 testing:
   remake Battle to test and refine engine
   go to Battle node on contact with enemy; return when done with enemy disappearing
   go from one room to the other
 
-
-eventualy, i'd like to make a function automatically check all the different combinations of inputs that can map to different behaviors.

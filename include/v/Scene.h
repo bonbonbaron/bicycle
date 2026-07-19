@@ -13,11 +13,12 @@
 
 #include "LineLimits.h"
 
-struct Layer {
-  enum Type { FIXED, UNIFORM, PARALLAX, AUTOLOOP };
+enum LayerType { FIXED, GLUED, PARALLAX, AUTOLOOP };
 
+struct Layer {
   Layer();
-  Layer( const std::string bgStr = "", const std::string& bgCollStr = "", Layer::Type type = Layer::Type::UNIFORM );
+  Layer( const std::string bgStr = "", const std::string& bgCollStr = "", LayerType type = LayerType::FIXED );
+
   Entity id{};
   std::string bgStr;
   std::string bgCollStr;
@@ -29,7 +30,7 @@ struct Layer {
   //   * velocity (if AUTOLOOP)
   // Backgrounds can have positions other than (0,0) for parallax or auto-looping
   // They may need to pass an Image in too.
-  Type type{};
+  LayerType type{};
   std::vector<Entity> fg{};  // entities in the foreground
   // TODO some timer tracker to know which BG tile to animate next
 };
@@ -42,6 +43,7 @@ class Grid {
     void setFocusedLayerIdx( const unsigned layerIdx );
     auto getFocusedLayerIdx() -> unsigned;
     auto getLayer( Entity entity ) -> std::optional<unsigned>;
+    auto getBackLayer() -> std::optional<Layer>;
   private:
     std::vector<Layer> _layers{};
     std::unordered_map<Entity, unsigned> _entityToLayerMap{};
@@ -58,9 +60,12 @@ class Scene : public Window {
     void onInput( Input& input ) override;
     void setFocus( Entity entity );
 
+    auto getBackLayer() -> std::optional<Layer>;
+    auto getGrid() -> Grid&;
+
   private:
     Grid _grid{};    // This has layers of BGs and FGs.
     Camera _camera{};  // TODO  when we have minimaps, the input needs to go to a window BELOW the top of WindowManager's stack.
-    void renderStaticLayer( const Layer& layer, const Rect& camRect );
+    void renderFixedLayer( const Layer& layer, const Rect& camRect );
     Entity _focus{};
 };

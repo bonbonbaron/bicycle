@@ -2,7 +2,7 @@ require("io")
 require("table")
 
 -- Open a pipe to read ("r") from the command
-local handle = io.popen("ls *.l")
+local handle = io.popen("ls ./test/scene/intro/bg/*.l")
 
 if not handle then
   error("failed to execute ls")
@@ -13,11 +13,6 @@ for line in handle:lines() do
   -- Insert each line into the end of our table
   table.insert(fileList, line)
 end
-
--- Read the entire output of the command
-local files = handle:read("*all")
-
--- Always close the handle
 handle:close()
 
 print(files)

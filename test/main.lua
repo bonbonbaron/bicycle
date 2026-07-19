@@ -3,7 +3,7 @@ require("Scene")
 require("Menu")
 require("Dialogue")
 
-local s = Scene.new()
+local s = Scene.new("intro")
 
 function a(name) Dialogue.new( "hi, i'm an "..name, 10, 10, 20, 3 ) end
 

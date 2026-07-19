@@ -3,7 +3,6 @@
 #include <vector>
 #include <list>
 
-// Camera can be moved in update().
 class Camera {
   public:
     Camera();

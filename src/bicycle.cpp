@@ -67,6 +67,15 @@ namespace bicycle {
       return push<Scene>();
     }
 
+    // TODO handle collision string and type later
+    void addLayer( const char* bgStr ) {
+      auto& wm = WindowManager::getInstance();
+      auto scene = dynamic_pointer_cast<Scene>( wm.back() );
+      auto& grid = scene->getGrid();
+      Layer layer{ std::string( bgStr ), "", LayerType::FIXED };  // TODO
+      grid.addLayer( layer );
+    }
+
     Entity popWindow() {
       return pop();
     }

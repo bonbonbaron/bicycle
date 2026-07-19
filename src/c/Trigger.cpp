@@ -55,7 +55,7 @@ void Trigger::init( const std::string& gameName ) {
   _timer = &Timer::getInstance();
 
   // Start the game
-  std::string gamePath{"./" + gameName + ".lua"};
+  std::string gamePath{"./" + gameName + "/main.lua"};
   if (luaL_dofile( L, gamePath.c_str() ) != LUA_OK) {
     auto errStr = std::string( lua_tostring(L, -1) );
     lua_pop(L, 1);

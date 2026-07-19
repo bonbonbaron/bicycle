@@ -6,7 +6,7 @@
 
 Layer::Layer() : id( newEntityId() ) {}
 
-Layer::Layer( const std::string bgStr, const std::string& bgCollStr, Layer::Type type ) 
+Layer::Layer( const std::string bgStr, const std::string& bgCollStr, LayerType type ) 
   : id( newEntityId() ) ,
   bgStr( bgStr ),
   bgCollStr( bgCollStr ),
@@ -73,7 +73,7 @@ Scene::Scene( const int x, const int y, const int w, const int h ) : Window( x, 
   _camera.setDims( h, w );
 }
 
-void Scene::renderStaticLayer( const Layer& layer, const Rect& camRect ) {
+void Scene::renderFixedLayer( const Layer& layer, const Rect& camRect ) {
   const auto& layerRect = World::get<Rect>( layer.id );
   // Background
   auto croppedRect = camRect.crop( layerRect );
@@ -105,16 +105,16 @@ void Scene::render() {
   for ( const auto& layer : _grid.getLayers() ) {
     // Background
     switch ( layer.type ) {
-      case Layer::Type::FIXED:     // Doesn't move with camera
+      case LayerType::FIXED:     // Doesn't move with camera
+        renderFixedLayer( layer, camRect );
+        break;
+      case LayerType::GLUED:     // Moves same velocity as camera
         // TODO
         break;
-      case Layer::Type::UNIFORM:   // Moves same velocity as camera
-        renderStaticLayer( layer, camRect );
-        break;
-      case Layer::Type::PARALLAX:  // Moves parallax to camera's focused-on layer
+      case LayerType::PARALLAX:  // Moves parallax to camera's focused-on layer
         // TODO
         break;
-      case Layer::Type::AUTOLOOP:  // Moves in constant velocity and loops back
+      case LayerType::AUTOLOOP:  // Moves in constant velocity and loops back
         // TODO
         break;
     }
@@ -131,4 +131,16 @@ void Scene::setFocus( Entity entity ) {
     _focus = entity;
     _grid.setFocusedLayerIdx( *layerIdx );
   }
+}
+
+auto Scene::getGrid() -> Grid& {
+  return _grid;
+}
+
+auto Scene::getBackLayer() -> std::optional<Layer> {
+  auto layers = _grid.getLayers();
+  if ( layers.size() > 0 ) {
+    return {layers.back()};
+  }
+  return {};
 }
