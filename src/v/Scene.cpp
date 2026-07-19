@@ -65,8 +65,8 @@ auto Grid::getLayer( Entity entity ) -> std::optional<unsigned> {
 }
 
 
-Scene::Scene() : Window( 0, 0, COLS, LINES ) {
-  _camera.setDims( LINES, COLS );
+Scene::Scene() : Window( 0, 0, COLS - 2, LINES ) {
+  _camera.setDims( LINES, COLS - 2 );
 }
 
 Scene::Scene( const int x, const int y, const int w, const int h ) : Window( x, y, w, h ) {

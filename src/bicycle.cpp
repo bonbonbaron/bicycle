@@ -33,10 +33,8 @@ namespace bicycle {
     noecho();  // doesn't echo user's input back to them
     curs_set(0);
     ColorPalette::init();
-
     clear();
     refresh();
-
     auto& trig = Trigger::getInstance();
     trig.init( gameName );
   }

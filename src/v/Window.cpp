@@ -2,13 +2,13 @@
 #include "bicycle.h"
 #include <cassert>
 
-Window::Window( const int w, const int h ) :  _win( newwin( h, w, LINES / 2 - h/2 - 2, COLS / 2 - w / 2 ) ), _w(w), _h(h), _id( newEntityId() ) {
+Window::Window( const int w, const int h ) :  _win( newwin( h, w, LINES / 2 - h/2 - 2, COLS / 2 - w / 2 - 2 ) ), _w(w), _h(h), _id( newEntityId() ) {
   assert( LINES / 2 - h/2 - 2 > 0 );
   assert( COLS / 2 - w / 2 > 0 );
   assert( _win != nullptr );
 }
 
-Window::Window( const int x, const int y, const int w, const int h ) : _win( newwin( h, w, y, x ) ), _w(w), _h(h), _id( newEntityId() ) {
+Window::Window( const int x, const int y, const int w, const int h ) : _win( newwin( h, w - 2, y, x ) ), _w(w - 2), _h(h), _id( newEntityId() ) {
   assert( _win );
   // const auto& cp = ColorPalette::getInstance();
 }

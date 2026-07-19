@@ -1,5 +1,5 @@
 #pragma once
-#include <ncurses.h>
+#include <cursesw.h>
 #include <unordered_map>
 #include <string>
 

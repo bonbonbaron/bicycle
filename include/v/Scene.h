@@ -1,7 +1,7 @@
 #pragma once
 #include <string>
 #include <vector>
-#include <curses.h>
+#include <cursesw.h>
 #include <optional>
 #include <unordered_map>
 
