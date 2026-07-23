@@ -1,18 +1,24 @@
-THOUGHTS
--- Lua is how I'm going to do everything I ever dreamed of that was nightmarish in all other directions:
---    1. position genome multiple times in the layer
---    2. indicate the animation they start with
---    3. complicated logic when loading a scene (where you start, tileset, song, etc based on global game state)
-
-BOOKMARK:
-  1) deciding foreground objs will be in [0-9].lua, and 
-  2) finishing getBackLayer() so you can add entities to it with an easy API call
-  3) thinking you need [0-9].coll for bg collision... OR... more efficiently, some kind of collision tilset that's color-sensitive.
+BOOKMARK: gotta go back to sleep. but i left off at trying to ge tthe image loader in Genome.lua to work. A bad arg type error in loader.
 
 TODAY:
-  \make 3 triggers send data for Trigger.cpp to fill 2 arrays with 
-  \share that array with FFI in bicycle.lua
+  \  make 3 triggers send data for Trigger.cpp to fill 2 arrays with 
+  \  share that array with FFI in bicycle.lua
+  impl, test, and debug Image, all in C++
+    \ it compiles
+    \ genome img loader first draft
+    prove it's going into the world
+    get it to show up
   Genome (for foreground objects)
+    img
+    vel
+    pos (multiple, inject)
+    coll
+    personality (respond to ITC)
+    anim
+    sound
+    song
+    scene (fg, bg): impl, test, and debug all 3 types
+    custom
   fix the annoying window and hbad terminal closing state bugs
   ~Grids next (making great progress! need to make it easy to add foreground objs, then collision fg/bg info)
   make a guy move around the screen

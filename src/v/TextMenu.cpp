@@ -12,7 +12,7 @@ TextMenu::TextMenu(
 
 void TextMenu::render() {
   const int LAST_DISP_IDX = std::min<int>( _firstDispIdx + getHeight() - WINDOW_PADDING, _items.size() );
-  const auto CURSOR_WIDTH = _cursor.img.getSymbol().size();
+  const auto CURSOR_WIDTH = std::string( _cursor.img.string ).size();
   for ( int currRow = 1, dispIdx = _firstDispIdx; dispIdx < LAST_DISP_IDX; ++dispIdx ) {
     // CURSOR_WIDTH leaves room for cursor to the left of this menu item
     if ( dispIdx == _cursor.currItemIdx ) {
@@ -22,7 +22,7 @@ void TextMenu::render() {
     mvprint( currRow++, WINDOW_PADDING/2 + CURSOR_WIDTH, _items.at( dispIdx ) );  
     unsetAttr( A_STANDOUT );
   }
-  mvprint( _cursor.currItemIdx - _firstDispIdx + WINDOW_PADDING / 2, WINDOW_PADDING / 2, _cursor.img.getSymbol()  );
+  mvprint( _cursor.currItemIdx - _firstDispIdx + WINDOW_PADDING / 2, WINDOW_PADDING / 2, _cursor.img.string  );
 }
 
 // TODO I think we ought to split cursor logic from rendering logic

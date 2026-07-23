@@ -10,8 +10,7 @@
 #include "m/Entity.h"
 
 #include "v/Window.h"
-
-#include "LineLimits.h"
+#include "v/Image.h"
 
 enum LayerType { FIXED, GLUED, PARALLAX, AUTOLOOP };
 
@@ -20,7 +19,7 @@ struct Layer {
   Layer( const std::string bgStr = "", const std::string& bgCollStr = "", LayerType type = LayerType::FIXED );
 
   Entity id{};
-  std::string bgStr;
+  Image bgImg;
   std::string bgCollStr;
   std::vector<LineLimits> lineLimits{};
   // Things Layer needs to have in World:
@@ -65,6 +64,6 @@ class Scene : public Window {
   private:
     Grid _grid{};    // This has layers of BGs and FGs.
     Camera _camera{};  // TODO  when we have minimaps, the input needs to go to a window BELOW the top of WindowManager's stack.
-    void renderFixedLayer( const Layer& layer, const Rect& camRect );
+    void renderFixedLayer( const Layer& layer );
     Entity _focus{};
 };

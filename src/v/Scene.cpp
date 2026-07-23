@@ -3,34 +3,17 @@
 #include <cursesw.h>
 #include <algorithm>
 #include "c/Trigger.h"
+#include "v/Image.h"
 
 Layer::Layer() : id( newEntityId() ) {}
 
 Layer::Layer( const std::string bgStr, const std::string& bgCollStr, LayerType type ) 
   : id( newEntityId() ) ,
-  bgStr( bgStr ),
-  bgCollStr( bgCollStr ),
-  type( type ) 
+    bgImg( bgStr.c_str() ),
+    // Image( bgCollStr.c_str() ),
+    type( type ) 
 {
-  // Determine the widest row.
-  unsigned maxLineWidth{};
-  bool continueLooking{ true };
-  LineLimits currLineLims{};
-  while ( continueLooking ) {
-    currLineLims.len = bgStr.find( "\n", currLineLims.start, 1 ) - currLineLims.start;
-    // Stop looking when no newlines remain. Width of last line is from cursor to end of the string.
-    if ( currLineLims.len < 0 ) {
-      currLineLims.len = bgStr.size() - currLineLims.start;
-      continueLooking = false;
-    }
-    // Add to line limits vector and prepare for next one.
-    lineLimits.push_back( currLineLims );
-    maxLineWidth = std::max( maxLineWidth, static_cast<unsigned>( currLineLims.len ) );
-    currLineLims.start += currLineLims.len + 1;  // "+1" includes the newline character.
-  }
-  // Even though we're not right-padding the shorter lines with spaces, we'll treat
-  // the grid as a rectangle for easier collision detection.
-  World::set<Rect>( id, { { 0, 0 }, { static_cast<unsigned>( lineLimits.size() ), maxLineWidth } } );
+  World::set<Rect>( id, { { 0, 0, 0 }, bgImg.size } );
 }
 
 
@@ -73,40 +56,19 @@ Scene::Scene( const int x, const int y, const int w, const int h ) : Window( x, 
   _camera.setDims( h, w );
 }
 
-void Scene::renderFixedLayer( const Layer& layer, const Rect& camRect ) {
-  const auto& layerRect = World::get<Rect>( layer.id );
-  // Background
-  auto croppedRect = camRect.crop( layerRect );
-  auto layerRowIdx = std::max( 0, camRect.pos.y - layerRect.pos.y );
-  for ( unsigned croppedRectRowIdx{}; croppedRectRowIdx < croppedRect.size.h; ++croppedRectRowIdx, ++layerRowIdx ) {
-    const auto& lineLims = layer.lineLimits.at( layerRowIdx );
-    int stringStartIdx = lineLims.start;
-    int stringLength = std::min( static_cast<int>( croppedRect.size.w ), lineLims.len );
-    auto rowStr = std::string( layer.bgStr, stringStartIdx, stringLength );
-    mvprint( croppedRect.pos.y + croppedRectRowIdx, croppedRect.pos.x, rowStr );  // layerRow + 1 to skip the stop border 
-  }
-  // Foreground
+void Scene::renderFixedLayer( const Layer& layer ) {
   for ( const auto& entity : layer.fg ) {
-    if ( _camera.canSee( entity ) ) {  // TODO let camera track what it sees via onCollision(), not Scene
-      const auto& entityRect = World::get<Rect>( entity );
-      const auto& entityImg = World::get<Image>( entity );
-      auto posWrtCamera = entityRect.pos + layerRect.pos - camRect.pos;
-      setAttr ( COLOR_PAIR( entityImg.getColor() ) );
-      mvprint( posWrtCamera.y, posWrtCamera.x, entityImg.getSymbol() );
-      unsetAttr ( COLOR_PAIR( entityImg.getColor() ) );
-    }
+    _camera.draw( entity, *this );
   }
 }
 
 void Scene::render() {
-  // Camera variables
-  const auto& camRect = World::get<Rect>( _camera.getId() );
   // For each layer..
   for ( const auto& layer : _grid.getLayers() ) {
     // Background
     switch ( layer.type ) {
       case LayerType::FIXED:     // Doesn't move with camera
-        renderFixedLayer( layer, camRect );
+        renderFixedLayer( layer );
         break;
       case LayerType::GLUED:     // Moves same velocity as camera
         // TODO

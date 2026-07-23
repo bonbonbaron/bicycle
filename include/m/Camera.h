@@ -2,6 +2,8 @@
 #include "m/Entity.h"
 #include <vector>
 #include <list>
+#include "v/Window.h"
+#include "m/Rect.h"
 
 class Camera {
   public:
@@ -9,6 +11,14 @@ class Camera {
     Camera( const int x, const int y, const int margin );
     void pan( const int dx, const int dy );
     auto canSee( const Entity entity ) const -> bool;
+
+    inline auto _canSee( const Rect& camRect, const Rect& entityRect ) const -> bool {
+      return 
+        entityRect.pos.x >= static_cast<decltype(Position::x)>( camRect.pos.x ) && 
+        entityRect.pos.x <= static_cast<decltype(Position::x)>( camRect.pos.x + camRect.size.w ) &&
+        entityRect.pos.y >= static_cast<decltype(Position::y)>( camRect.pos.y ) && 
+        entityRect.pos.y <= static_cast<decltype(Position::y)>( camRect.pos.y + camRect.size.h ); 
+    }
     void focusOn( const Entity entity );
     auto getFocus() const -> Entity;
     void setDims( const unsigned h, const unsigned w);
@@ -21,6 +31,10 @@ class Camera {
     auto getHyMargin() const -> int;  // high y margin
     void followFocus();   // tracks the focus when it moves out of the center's margin
     auto getId() const -> Entity;
+    /* I choose "draw" instead of "render" since rendering doesn't
+     * actually happen till the last part of the game loop. I know,
+     * kind of a weird word choice for a camera. */
+    void draw( const Entity entity, Window& tgt );
   private:
     Entity _id{};  // the camera itself is an entity with an entity ID. This helps motion and collision systems track it.
     int _maxX{};

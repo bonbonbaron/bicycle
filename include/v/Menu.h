@@ -10,6 +10,8 @@
 #include "m/Entity.h"
 #include "v/Window.h"
 
+static std::string CURSOR{ " > " };
+
 class Menu : public Window {
   public:
     using MenuItemBody = std::variant<Entity, std::string>;
@@ -34,6 +36,7 @@ class Menu : public Window {
     void moveCursor( int amt );
     void cancel();
     std::vector<std::string> _items{};
-    Cursor _cursor{ { " > ", Color::WHITE }, {0, 0}, 0 };
+
+    Cursor _cursor{ { CURSOR.data(), Color::WHITE }, {0, 0, 0}, 0 };
     std::string _id;
 };

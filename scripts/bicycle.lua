@@ -83,32 +83,77 @@ ffi.cdef([[
     Size size;
   } Rect;
 
+  typedef enum {
+    BLACK	  ,
+    RED	    ,
+    GREEN	  ,
+    YELLOW  ,
+    BLUE	  ,
+    MAGENTA ,
+    CYAN	  ,
+    WHITE   ,
+  } Color;
+
+  typedef struct {
+    char* symbol;
+    Color color;
+    bool visible;
+  } Image;
+
   typedef struct {
     Rect rect;
     unsigned type;
   } CollRect;
 
   typedef struct {
-    Rect* arr;
-    unsigned len;
-  } WorldRectArr;
+    unsigned duration;
+    Rect srcRect;
+    CollRect collisionRect;
+  } AnimFrame;
+
+  typedef enum { LOOP, ONE_SHOT, PINGPONG } AnimType;
+
+  typedef struct {
+    unsigned nFrames;
+    AnimType type;
+    AnimFrame* frames;
+  } AnimStrip;
+
+  // world arrays
 
   typedef struct {
     Rect* arr;
     unsigned len;
   } WorldRectArr;
+
+  typedef struct {
+    CollRect* arr;
+    unsigned len;
+  } WorldCollRectArr;
+
+  typedef struct {
+    Velocity* arr;
+    unsigned len;
+  } WorldImgArr;
+
+  typedef struct {
+    AnimStrip* arr;
+    unsigned len;
+  } WorldAnimArr;
 
   typedef struct {
     Velocity* arr;
     unsigned len;
   } WorldVelArr;
 
+  // world array getters
+
   WorldRectArr World_getRects();
-  WorldRectArr World_getCollRects();
-  WorldRectArr World_getImages();
-  WorldRectArr World_getRects();
+  WorldCollRectArr World_getCollRects();
+  WorldImgArr  World_getImages();
+  WorldVelArr World_getVels();
   WorldRectArr World_getVels();
-  WorldRectArr World_getAnims();
+  WorldAnimArr World_getAnims();
 
   typedef unsigned Entity;
 
@@ -163,13 +208,14 @@ ffi.cdef([[
   Entity delEntity();
   void addBgLayer( const char* bgStr );
   void addFgEntity( Entity entity, const unsigned layerIdx );
+  void newImage( Entity entity, const char* imgStr );
 
 
 ]])
 
 function checkType( arg, expType )
   if type(arg) ~= expType then 
-    error( debug.traceback().."\n\nUnexpected arg type: "..expType ) 
+    error( debug.traceback().."\n\nExpected a "..expType..", got a "..type(arg) )
 	end
 end
 

@@ -1,14 +1,5 @@
 #include "bicycle.h"
 #include <iostream>
-#include "v/TextMenu.h" // TODO remov when done testing
-#include <string>
-#include <vector>
-#include "v/Dialogue.h"
-#include "v/Scene.h"
-#include <lua.hpp>
-#include "v/ColorPalette.h"
-#include "c/WindowManager.h"
-#include "c/Trigger.h"
 #include "m/World.h"
 
 int main( int argc, char** argv ) {

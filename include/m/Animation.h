@@ -1,4 +1,4 @@
-#include "c/Collision.h"
+#pragma once
 #include <vector>
 #include <string>
 #include <unordered_map>
@@ -17,4 +17,6 @@ struct AnimStrip {
   std::vector<AnimFrame> frames{};
 };
 
-using Animation = std::unordered_map<std::string, AnimStrip>;
+struct Animation : std::unordered_map<std::string, AnimStrip> {
+  Animation() = default;
+};

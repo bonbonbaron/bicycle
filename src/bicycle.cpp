@@ -103,6 +103,10 @@ namespace bicycle {
       grid.addEntity( entity, layerIdx );
     }
 
+    void newImage( Entity entity, const char* imgStr ) {
+      World::set<Image>( entity, imgStr );
+    }
+
     Entity popWindow() {
       return pop();
     }

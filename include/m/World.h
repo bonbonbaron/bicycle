@@ -136,6 +136,7 @@ extern "C" {
   LWorldArr<CollRect> World_getCollRects();
   LWorldArr<Image> World_getImages();
   LWorldArr<Velocity> World_getVels();
+  LWorldArr<Animation> World_getAnims();
 }
 
 #pragma GCC diagnostic pop

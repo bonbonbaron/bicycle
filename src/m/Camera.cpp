@@ -41,11 +41,7 @@ void Camera::followFocus() {
 auto Camera::canSee( const Entity entity ) const -> bool {
   const auto& entityRect = World::get<Rect>( entity );  // entity->body.getPosition();
   const auto& camRect = World::get<Rect>( _id );  // entity->body.getPosition();
-  return 
-    entityRect.pos.x >= static_cast<decltype(Position::x)>( camRect.pos.x ) && 
-    entityRect.pos.x <= static_cast<decltype(Position::x)>( camRect.pos.x + camRect.size.w ) &&
-    entityRect.pos.y >= static_cast<decltype(Position::y)>( camRect.pos.y ) && 
-    entityRect.pos.y <= static_cast<decltype(Position::y)>( camRect.pos.y + camRect.size.h );
+  return _canSee( camRect, entityRect );
 }
 
 void Camera::focusOn( const Entity entity ) {
@@ -91,4 +87,28 @@ auto Camera::getId() const -> Entity {
   return _id;
 }
 
-// TODO write onCollide() to handle entities coming onto and off of the screen
+// Images don't own rects because motion system needs those to be separate.
+// So instead we access those via entity ID.
+void Camera::draw( const Entity entity, Window& tgt ) {
+  // TODO Consider making a pointer to this.
+  const auto& camRect = World::get<Rect>( _id );  // entity->body.getPosition();
+  //TODO if rect and image sizes don't match, imge should scale to rect
+  const auto& entityRect = World::get<Rect>( entity );  
+  if ( ! _canSee( camRect, entityRect ) ) {  // TODO let camera track what it sees via onCollision(), not Scene
+    return;
+  }
+  const auto& entityImg = World::get<Image>( entity );
+  auto croppedRect = camRect.crop( entityRect );  // portion of entityRect in FOV
+  auto entityPosWrtCamera = entityRect.pos - camRect.pos;
+  // If the image's top row is out of FOV, then get the first row to draw.
+  // imgRowIdx is the row of the image itself we're drawing.
+  auto imgRowIdx = std::max( 0, entityPosWrtCamera.y );  
+  for ( unsigned croppedRectRowIdx{}; croppedRectRowIdx < croppedRect.size.h; ++croppedRectRowIdx, ++imgRowIdx ) {
+    const auto& lineLims = entityImg.lineLimits.at( imgRowIdx );
+    int stringStartIdx = lineLims.start 
+      + std::abs( std::min( entityPosWrtCamera.x, 0 ) );
+    int stringLength = std::min( static_cast<int>( croppedRect.size.w ), lineLims.len );
+    auto rowStr = std::string( entityImg.string, stringStartIdx, stringLength );
+    tgt.mvprint( croppedRect.pos.y + croppedRectRowIdx, croppedRect.pos.x, rowStr );  // layerRow + 1 to skip the stop border 
+  }
+}

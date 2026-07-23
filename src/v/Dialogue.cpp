@@ -2,7 +2,6 @@
 #include <cassert>
 #include <iostream>
 #include <algorithm>
-#include "c/WindowManager.h"
 
 // This constructor's meant for short strings since it prints it all on one row.
 Dialogue::Dialogue( const std::string&& s ) : Window( COLS / 2 - s.length() / 2, LINES / 2, s.length() + WINDOW_PADDING, WINDOW_PADDING + 1 ), _content( s ) {
@@ -32,7 +31,6 @@ void Dialogue::init() {
 
 // TODO provide dev-friendly key masks
 void Dialogue::onInput( Input& input ) {
-  auto& wm = WindowManager::getInstance();
   switch( input.lastPressed ) {
     case LogicalKey::J:
       ++initLineNum;
