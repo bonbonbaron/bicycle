@@ -1,3 +1,8 @@
+GOALS FOR THIS WEEKEND:
+  image drawing wherever i want, however many times i want it to
+  moving image around with keyboard
+  animating image
+
 BOOKMARK: gotta go back to sleep. but i left off at trying to ge tthe image loader in Genome.lua to work. A bad arg type error in loader.
 
 TODAY:
@@ -12,9 +17,9 @@ TODAY:
     img
     vel
     pos (multiple, inject)
-    coll
     personality (respond to ITC)
     anim
+    coll
     sound
     song
     scene (fg, bg): impl, test, and debug all 3 types

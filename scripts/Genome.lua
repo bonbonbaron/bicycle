@@ -19,29 +19,30 @@ end
 
 local Gene = {}
 Gene.__index = Gene
-Gene.new = function( type )
+Gene.new = function( type, val )
   local instance = {type=type, val=val}
   setmetatable( instance, Gene )
   return instance
 end
 
 function Gene.getAssetDir(assetType)
-  checkType(name, "string")
+  checkType(assetType, "string")
   return "./"..gameName.."/asset/"..assetType.."/"
 end
 
 function Gene.getLuaAsset( key, val )
   checkType( val, "string" )
-  local dir = getAssetDir( key )
+  local dir = Gene.getAssetDir( key )
   return require( dir..val )  -- returns rendered lua script
 end
 
 function Gene.getTxtAsset( key, val )
   checkType( key, "string" )
   checkType( val, "string" )
-  local dir = getAssetDir( key )
-  local file = io.open( dir..fp, "r" )
-  if not file then error("Couldn't open "..key.." file '"..val.."'.") end
+  local dir = Gene.getAssetDir( key )
+  local fp = dir..val..".txt"  -- TODO make this more generalizable
+  local file = io.open( fp, "r" )
+  if not file then error("Couldn't open "..key.." file '"..fp.."'.") end
   local contents = file:read("*a")
   file:close()
   return contents
@@ -62,7 +63,7 @@ Gene["GeneLoader"] = {
 
 -- gameSupportedGenes is expected to be a table mapping to true.
 -- Invalid keys both there and in the standard set are invalid altogether.
-function Gene:load()
+function Gene:load( entity )
   if gameSupportedGenes[self.type] then
     return  -- gene is game-specific; TODO consider making this a lua loader
   end
@@ -82,7 +83,7 @@ function Gene:load()
 
   -- Time to load the gene already. Geez!!
   -- TODO load processed gene straight into the entity's table. I think that table in turn should reside in global entities.
-  loader( entity, gene )
+  loader( entity, self )
 end
 
 

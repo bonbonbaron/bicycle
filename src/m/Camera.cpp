@@ -6,7 +6,7 @@
 Camera::Camera() : _id( newEntityId() ) {}
 
 Camera::Camera( const int x, const int y, const int margin ) : _id( newEntityId() ), _margin(margin) {
-  World::set<Rect>( _id, { { x, y }, { 0, 0 } } );
+  World::set<Rect>( _id, { { x, y }, { static_cast<unsigned>(COLS), static_cast<unsigned>(LINES) } } );
 }
 
 void Camera::pan( const int dy, const int dx ) {

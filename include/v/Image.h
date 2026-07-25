@@ -12,9 +12,9 @@ struct Image {
   Image( const char*, Color color );
   void strToImg( const char* str );
   const char* string;
-  Size size;
-  Color color;
-  bool visible;
+  Size size{};
+  Color color{Color::WHITE};
+  bool visible{true};
   // TODO unsigned scale{};  // this'll be fixed point arithmetic
   std::vector<LineLimits> lineLimits{};
 };
