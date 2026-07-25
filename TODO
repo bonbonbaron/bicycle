@@ -1,4 +1,5 @@
 GOALS FOR THIS WEEKEND:
+  make a proper scene loader so entities can be added to the scene class
   image drawing wherever i want, however many times i want it to
   moving image around with keyboard
   animating image

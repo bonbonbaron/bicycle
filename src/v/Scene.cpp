@@ -80,6 +80,8 @@ void Scene::render() {
         // TODO
         break;
     }
+    // Foreground
+    
   }
 }
 
