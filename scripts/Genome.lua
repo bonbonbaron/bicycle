@@ -25,9 +25,9 @@ Gene.new = function( type, val )
   return instance
 end
 
-function Gene.getAssetDir(assetType)
-  checkType(assetType, "string")
-  return "./"..gameName.."/asset/"..assetType.."/"
+function Gene.getAssetDir(geneType)
+  checkType(geneType, "string")
+  return "./"..gameName.."/genome/"..geneType.."/"
 end
 
 function Gene.getLuaAsset( key, val )

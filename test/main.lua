@@ -8,5 +8,5 @@ genome = Genome.new()
 a = { img = "abc" }
 genome:load(a)
 
-Scene.new("intro")
+Scene.new("level1")
 

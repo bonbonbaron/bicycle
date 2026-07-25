@@ -2,6 +2,7 @@ require("Window")
 require("Genome")
 require("io")
 require("table")
+require("debug")
 
 -- Layer etc. aren't going to be needed anywhere else, so I'll put them all in here.
 
@@ -32,28 +33,35 @@ function Scene:process( path, processFunction )
     processFunction( self, contents )
   end
   handle:close()
-  if numFiles == 0 then error("Found no [0-9].l files in ./"..gameName.."/scene/"..self.name.."/bg") end
+  if numFiles == 0 then error("Found no files in "..path) end
 end
 
+-- TODO revive BG
+-- TODO impl FG
 function Scene:addBg( bgStr )
 	checkType( bgStr, "string" )
   ffi.C.addBgLayer( bgStr )
 end
 
+-- This adds the genomes of all the kk
+function Scene:addFg(  )
+	checkType( bgStr, "string" )
+  ffi.C.addBgLayer( bgStr )
+end
+
 function Scene:readLayers()
-  -- TODO express genomes, which returns a list of entities. Determine the format.
-  --
-  self:process("./"..gameName.."/scene/"..self.name.."/bg/*.bg", self.addBg )
-  -- self:process("./"..gameName.."/scene/"..self.name.."/fg/*.lua", self.a)
+  self:process("./"..gameName.."/genome/scene/bg/"..self.name.."/*.txt", self.addBg )
+  --self:process("./"..gameName.."/genome/"..self.name.."*.lua", self.addFg )
 end
 
 function Scene.new( name )
 	checkType(name, "string")
-  local id = ffi.C.pushScene()
+  local id = ffi.C.pushScene()  -- bicycle::pushScene() returns an entity ID of that scene
   local instance = { name=name, id=id, cbs = {} }
-  setmetatable( instance, Scene )
-  setmetatable( Scene, Window )
-  Window.push(id, instance)
+  setmetatable( instance, Scene )  -- inherit Scene
+  setmetatable( Scene, Window )    -- have Scene in turn inherit Window (its supertype)
+  -- Push window to bicycle's internal stack of window
+  Window.register(id, instance)        -- 
   instance:readLayers()
   return instance
 end

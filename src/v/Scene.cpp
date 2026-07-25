@@ -9,11 +9,12 @@ Layer::Layer() : id( newEntityId() ) {}
 
 Layer::Layer( const std::string bgStr, const std::string& bgCollStr, LayerType type ) 
   : id( newEntityId() ) ,
-    bgImg( bgStr.c_str() ),
-    // Image( bgCollStr.c_str() ),
     type( type ) 
 {
+  World::set<Image>( id, bgStr.c_str() );
+  auto& bgImg = World::get<Image>( id );
   World::set<Rect>( id, { { 0, 0, 0 }, bgImg.size } );
+  // World::set<Image>( bgCollStr.c_str() ),
 }
 
 
@@ -57,6 +58,9 @@ Scene::Scene( const int x, const int y, const int w, const int h ) : Window( x, 
 }
 
 void Scene::renderFixedLayer( const Layer& layer ) {
+  // Background
+  _camera.draw( layer.id, *this );
+  // Foreground
   for ( const auto& entity : layer.fg ) {
     _camera.draw( entity, *this );
   }

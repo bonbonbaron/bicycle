@@ -11,7 +11,7 @@ struct Image {
   Image( const char* );
   Image( const char*, Color color );
   void strToImg( const char* str );
-  const char* string;
+  std::string string;
   Size size{};
   Color color{Color::WHITE};
   bool visible{true};

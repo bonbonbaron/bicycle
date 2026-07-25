@@ -239,8 +239,6 @@ function focusOn( entity )
   focus = entity
 end
 
-  
-
 -------------------------------------
 
 local bridge
