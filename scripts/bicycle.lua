@@ -183,7 +183,6 @@ ffi.cdef([[
   } CollisionArr;
 
   typedef struct {
-    Entity focus;
     LogicalKey lastPressed;
     // int millisSinceLast;  // i don't like making input dependent on Timer.
     // int currKeysPressed;
@@ -252,6 +251,7 @@ function getUpdates()
   -- Inputs
   if bridge.input.lastPressed ~= ffi.C.NOTHING then
     entity = entities[focus]
+    if not entity then error("We're focused on nonexistent entity "..tostring(focus)..".") end
     if entity and bridge.input.lastPressed then
       entity:onInput( bridge.input.lastPressed )
       bridge.input.lastPressed = ffi.C.NOTHING

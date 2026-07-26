@@ -93,7 +93,6 @@ void Scene::render() {
 }
 
 void Scene::onInput( Input& input ) {
-  input.focus = _focus;
 }
 
 void Scene::setFocus( Entity entity ) {

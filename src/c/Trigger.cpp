@@ -80,17 +80,8 @@ void Trigger::sendInput( Input& input ) {
   const auto& wm = WindowManager::getInstance();
   auto currWindow = wm.back();
   assert( currWindow != nullptr );
-  auto oldId = currWindow->getId();
   currWindow->onInput( input );
   bridge.input = input;
-  // If the above window popped during onInput(), we need to replenish the focus (if not game over).
-  currWindow = wm.back();
-  if ( currWindow != nullptr ) {
-    auto newId = currWindow->getId();
-    if ( newId != oldId ) {
-      input.focus = newId;
-    }
-  }
 }
 
 void Trigger::sendTimeout( const Timeout& timeout ) {

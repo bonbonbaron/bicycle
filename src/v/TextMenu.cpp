@@ -46,5 +46,4 @@ void TextMenu::onInput( Input& input ) {
       }
       break;
   }
-  input.focus = getId();
 }

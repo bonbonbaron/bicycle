@@ -52,7 +52,6 @@ void Dialogue::onInput( Input& input ) {
     default:
       Window::onInput( input );
   }
-  input.focus = getId();
   render();
 }
 

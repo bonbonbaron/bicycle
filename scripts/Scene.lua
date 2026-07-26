@@ -56,7 +56,19 @@ function Scene:addFg( Genome, fg )
     if instance.pos then
       local pos = ffi.new("Position", { x=instance.pos[1], y=instance.pos[2], z=instance.pos[3] or 0 } )
       ffi.C.setPos( genome.id, pos )
+      -- TODO keep a reference to the position in entity data for easy manipulation
+      local rects = ffi.C.World_getRects()
+      genome.tbl.pos = rects.arr[genome.id].pos -- hopefully this works
+      genome.tbl.size = rects.arr[genome.id].size
     end
+    if instance.focus then
+      focusOn( genome.id )
+    end
+    genome.tbl.id = genome.id
+
+    -- dbgp(genome.tbl)
+    -- if not instance.onInput then error("OOF") end
+    register( genome.id, genome.tbl )
   end
 end
 

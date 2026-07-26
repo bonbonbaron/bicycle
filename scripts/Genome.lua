@@ -55,6 +55,9 @@ Gene["GeneLoader"] = {
     --TODO insert into world vel array
   end,
   name = 0,  -- do nothing, just allow it to exist
+  onInput = function(entity, gene) end,  -- do nothing, just allow it to exist
+  onCollision = function(entity, gene) end,  -- do nothing, just allow it to exist
+  onTimer = function(entity, gene) end,  -- do nothing, just allow it to exist
 }
 
 -- gameSupportedGenes is expected to be a table mapping to true.
