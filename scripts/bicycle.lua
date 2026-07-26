@@ -68,6 +68,7 @@ ffi.cdef([[
   typedef struct { 
     unsigned h;
     unsigned w;
+    unsigned d;
   } Size;
 
   typedef struct {
@@ -157,11 +158,13 @@ ffi.cdef([[
 
   typedef unsigned Entity;
 
+  enum TimeoutAddr { BRIDGE, ANIMATION, RENDERING, MOTION };  // Notice how this only addresses outputs. Cool.
+
   typedef struct {
     Entity entity;
     unsigned id;      // An entity can have multiple timers running simulatneously. ID
     unsigned type;    // I *think* this corresponds to the activity we want this to spark in recipient.
-    bool isSubtimer;  // Subtimers don't kick off new activity groups.
+    TimeoutAddr addr;  // Subtimers don't kick off new activity groups.
   } Timeout;
 
   typedef struct {
@@ -209,6 +212,7 @@ ffi.cdef([[
   void addFgEntity( Entity entity );
   void newImage( Entity entity, const char* imgStr );
   void setPos( Entity entity, Position pos );
+  void focusCamOn( Entity entity );
 
 ]])
 
@@ -237,6 +241,8 @@ end
 function focusOn( entity )
   focus = entity
 end
+
+--TODO write wrappers for menu and dialogue that 1) don't require dimensions and 2) auto-focus on them, 3) send moveCursorUp/Down()
 
 -------------------------------------
 

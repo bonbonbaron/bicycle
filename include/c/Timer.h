@@ -24,7 +24,7 @@ class Timer : public Controllable {
 
     // Timer-specific functions
     void _run();
-    auto create( const unsigned timeMs, Entity entity, const unsigned timerType, bool isSubtimer = false ) -> TimerId;  // returns the ID of the timer started for caller's future reference
+    auto create( const unsigned timeMs, Entity entity, const unsigned timerType, const bool repeat, const TimeoutAddr addr = TimeoutAddr::BRIDGE) -> TimerId;  // returns the ID of the timer started for caller's future reference
     void start( TimerId timerId) override;  // returns the ID of the timer started for caller's future reference
     void stop( TimerId timerId ) override;
     void pause( const TimerId timerId ) override;
@@ -33,6 +33,10 @@ class Timer : public Controllable {
     void setDuration( const TimerId timerId, const unsigned durMs );
     
   private:
+    struct TimerConfig {
+      bool repeat{};
+      unsigned fullTimer{};
+    };
     Timer();
     Timer(const Timer&) = delete;
     Timer operator=(const Timer&) = delete;
@@ -41,6 +45,7 @@ class Timer : public Controllable {
     std::bitset<MAX_NUM_TIMERS> _availableTimers{ ~std::bitset<MAX_NUM_TIMERS>{} }; // 1 = unused
     std::array<unsigned, MAX_NUM_TIMERS> _decrementers{};
     std::array<Timeout, MAX_NUM_TIMERS> _msgs{};
+    std::array<TimerConfig, MAX_NUM_TIMERS> _cfgs{};  // separate this from timers since most loop iterations don't need both data together
     auto findAvailableTimer() -> unsigned;
     std::array<unsigned, MAX_NUM_TIMERS> _times{};
     std::chrono::time_point<std::chrono::steady_clock> frameStartTime{};

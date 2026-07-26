@@ -120,6 +120,12 @@ namespace bicycle {
       return pop();
     }
       
+    void focusCamOn( Entity entity ) {
+      auto& wm = WindowManager::getInstance();
+      auto scene = dynamic_pointer_cast<Scene>( wm.back() );
+      scene->setFocus( entity );
+    }
+
   }
 
   Entity pop() {

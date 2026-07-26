@@ -2,7 +2,6 @@
 #include "m/Entity.h"
 #include "m/Rect.h"
 #include "c/CollisionDetector.h"
-#include <lua.hpp>
 
 struct Collision {
   Entity lhs{};  // think of this is "self"

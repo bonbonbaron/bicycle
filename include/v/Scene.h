@@ -66,5 +66,4 @@ class Scene : public Window {
     Grid _grid{};    // This has layers of BGs and FGs.
     Camera _camera{};  // TODO  when we have minimaps, the input needs to go to a window BELOW the top of WindowManager's stack.
     void renderFixedLayer( const Layer& layer );
-    Entity _focus{};
 };

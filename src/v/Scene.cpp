@@ -70,6 +70,7 @@ void Scene::renderFixedLayer( const Layer& layer ) {
 }
 
 void Scene::render() {
+  _camera.followFocus();
   // For each layer..
   for ( const auto& layer : _grid.getLayers() ) {
     // Background
@@ -98,7 +99,7 @@ void Scene::onInput( Input& input ) {
 void Scene::setFocus( Entity entity ) {
   auto layerIdx = _grid.getLayer( entity ); 
   if ( layerIdx.has_value() ) {
-    _focus = entity;
+    _camera.focusOn( entity );
     _grid.setFocusedLayerIdx( *layerIdx );
   }
 }

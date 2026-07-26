@@ -11,7 +11,6 @@ class SshInput {
     static void listen();   // this is called by the SshInput instance itself
     void _listen();   // this is called by the SshInput instance itself
     auto getState() const -> const Input&;
-    ~SshInput();
   private:
     SshInput();
     SshInput(const SshInput&) = delete;

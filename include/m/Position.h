@@ -1,5 +1,4 @@
 #pragma once
-#include <lua.hpp>
 
 struct Position {
   Position() = default;
@@ -38,16 +37,6 @@ struct Position {
     pos.y = y - rhs.y;
     pos.z = z - rhs.z;
     return pos;
-  }
-
-  void push( lua_State* L ) {
-    lua_newtable(L);
-    lua_pushinteger( L, x );
-    lua_setfield( L, -2, "x" );
-    lua_pushinteger( L, y );
-    lua_setfield( L, -2, "y" );
-    lua_pushinteger( L, z );
-    lua_setfield( L, -2, "z" );
   }
 };
 

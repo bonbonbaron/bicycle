@@ -55,14 +55,22 @@ function Scene:addFg( Genome, fg )
     ffi.C.addFgEntity( genome.id )
     if instance.pos then
       local pos = ffi.new("Position", { x=instance.pos[1], y=instance.pos[2], z=instance.pos[3] or 0 } )
+      --print("setting x: "..pos.x..", y: "..pos.y)
       ffi.C.setPos( genome.id, pos )
       -- TODO keep a reference to the position in entity data for easy manipulation
       local rects = ffi.C.World_getRects()
+      --print("there are "..rects.len.." rects")
+      --for i = 0, 10 do
+        --rect = rects.arr[i]
+        --print("getting rects["..i.."] => x: "..rect.pos.x..", y: "..rect.pos.y..", z: "..rect.pos.z..", w: "..rect.size.w..", h: "..rect.size.h..", d: "..rect.size.d.."\r")
+      --end
+      --io.read()
       genome.tbl.pos = rects.arr[genome.id].pos -- hopefully this works
       genome.tbl.size = rects.arr[genome.id].size
     end
     if instance.focus then
       focusOn( genome.id )
+      ffi.C.focusCamOn( genome.id)
     end
     genome.tbl.id = genome.id
 

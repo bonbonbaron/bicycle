@@ -31,10 +31,6 @@ SshInput::SshInput() {
   fcntl( STDIN_FILENO, F_SETFL, flags | O_NONBLOCK );
 }
 
-SshInput::~SshInput() {
-  tcsetattr( 0, TCSANOW, &origTerm );
-}
-
 auto SshInput::convertCodeToLogicalInt(int code) -> LogicalKey {
   switch (code)
   {

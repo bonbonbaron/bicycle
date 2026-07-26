@@ -34,6 +34,10 @@ void Timer::_run() {
     _times.at(timerId) -= _decrementers.at(timerId);
     if ( _decrementers.at(timerId) > 0 && _times.at(timerId) == 0 ) {
       Trigger::sendTimeout( _msgs.at(timerId) );
+      const auto& cfg = _cfgs.at(timerId);
+      if ( cfg.repeat ) {
+        _times.at(timerId) = cfg.fullTimer;
+      }
     }
   }
 }
@@ -57,13 +61,14 @@ void Timer::unpause( const TimerId timerId ) {
   _decrementers.at(timerId) = 1;
 }
 
-auto Timer::create( const unsigned timeMs, Entity entity, const unsigned timeoutType, bool isSubtimer ) -> TimerId {
+auto Timer::create( const unsigned timeMs, Entity entity, const unsigned timeoutType, const bool repeat, const TimeoutAddr addr) -> TimerId {
   auto timerId = findAvailableTimer();
   if ( timerId < MAX_NUM_TIMERS )  {
     unsigned nFrames{ (Constants::FRAMES_PER_SECOND * timeMs) / 1000 };
     _times.at( timerId ) = nFrames;
     _decrementers.at(timerId) = 1;
-    _msgs.at(timerId)  = Timeout{ timerId, entity, timeoutType, isSubtimer };
+    _msgs.at(timerId)  = Timeout{ timerId, entity, timeoutType, addr };
+    _cfgs.at(timerId) = { repeat, nFrames };
   }
   return timerId;
 }

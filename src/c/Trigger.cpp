@@ -85,7 +85,17 @@ void Trigger::sendInput( Input& input ) {
 }
 
 void Trigger::sendTimeout( const Timeout& timeout ) {
-  bridge.timeouts.add( timeout );
+  switch( timeout.addr ) {
+    case TimeoutAddr::BRIDGE:
+      bridge.timeouts.add( timeout );
+      break;
+    case TimeoutAddr::ANIMATION:
+      break;
+    case TimeoutAddr::RENDERING:
+      break;
+    case TimeoutAddr::MOTION:
+      break;
+  }
 }
 
 void Trigger::sendCollision( const Collision& collision ) {

@@ -9,9 +9,12 @@ using Growth = Size;
 
 enum MotionType { LINEAR, ORBITAL };
 
-// Advantageous to use an AoS instead of SoA for vectorized additions.
-
-struct MotionConfig {
+// Maybe type will determine the final step of adding velocity to position. 
+struct Motion {
+  Velocity vel{};
+  Acceleration acc{};
+  Growth scaleVel{};
+  Growth scaleAcc{};
   MotionType type{};
   Entity tgt{};  // orbiting, tracking (e.g. missiles), or just general destination
 };
