@@ -1,8 +1,8 @@
 GOALS FOR THIS WEEKEND:
-  make a proper scene loader so entities can be added to the scene class
-  image drawing wherever i want, however many times i want it to
-  moving image around with keyboard
-  animating image
+  \ make a proper scene loader so entities can be added to the scene class
+  \ image drawing wherever i want, however many times i want it to
+  \ moving image around with keyboard
+  motion system ( triggerize it, make sys call available in lua, expose motion's more specialized funcs to lua)
 
 BOOKMARK: gotta go back to sleep. but i left off at trying to ge tthe image loader in Genome.lua to work. A bad arg type error in loader.
 
