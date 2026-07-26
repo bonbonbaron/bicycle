@@ -11,14 +11,12 @@
 #include "m/Rect.h"
 #include "c/Collision.h"
 #include "v/Image.h"
-#include "m/Velocity.h"
 #include "m/Animation.h"
 
 using ArrayVar = std::variant<
   std::array<Rect, NUM_SUPPORTED_ENTITIES>,
   std::array<CollRect, NUM_SUPPORTED_ENTITIES>,
   std::array<Image, NUM_SUPPORTED_ENTITIES>,
-  std::array<Velocity, NUM_SUPPORTED_ENTITIES>,
   std::array<Animation, NUM_SUPPORTED_ENTITIES>
 >;
 
@@ -85,7 +83,7 @@ class World {
 
     // Convenience: initialize all known types in one call
     void initialize_all() {
-      initialize<Rect, CollRect, Image, Velocity, Animation>();
+      initialize<Rect, CollRect, Image, Animation>();
     }
 
     // Optional: check whether a type is already initialized  // TODO delete if unneeded
@@ -135,7 +133,6 @@ extern "C" {
   LWorldArr<Rect> World_getRects();
   LWorldArr<CollRect> World_getCollRects();
   LWorldArr<Image> World_getImages();
-  LWorldArr<Velocity> World_getVels();
   LWorldArr<Animation> World_getAnims();
 }
 
