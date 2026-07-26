@@ -105,15 +105,15 @@ namespace bicycle {
 
     void newImage( Entity entity, const char* imgStr ) {
       World::set<Image>( entity, imgStr );
-      // Use image size to set rect size while we're at it.
+      // Use image size to set box size while we're at it.
       const auto& img = World::get<Image>( entity );
-      auto& rect = World::get<Rect>( entity );
-      rect.size = img.size;
+      auto& box = World::get<Box>( entity );
+      box.size = img.size;
     }
 
     void setPos( Entity entity, Position pos ) {
-      auto& rect = World::get<Rect>( entity );
-      rect.pos = pos;
+      auto& box = World::get<Box>( entity );
+      box.pos = pos << FIXEDPT_DEC_BITS;
     }
 
     Entity popWindow() {

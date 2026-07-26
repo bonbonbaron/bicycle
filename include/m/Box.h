@@ -2,27 +2,25 @@
 #include "m/Position.h"
 #include "m/Size.h"
 
-static constexpr decltype(Position::x) FIXEDPT_DEC_BITS{8};
-
-struct Rect {
-  Rect() = default;
-  //World::set<Rect>( id, 
+struct Box {
+  Box() = default;
+  //World::set<Box>( id, 
       //{ /* pos */ { 0, 0, 0 }, /* size */ { static_cast<unsigned>( lineLimits.size() ), bgImg.size, 0 } } );
-  Rect( const Position& pos, const Size& size ) : pos(pos), size(size) {}
-  Rect( const Position&& pos, const Size&& size ) : pos(pos), size(size) {}
-  Rect( const Rect& ) = default;
-  Rect( Rect&& ) = default;
+  Box( const Position& pos, const Size& size ) : pos(pos), size(size) {}
+  Box( const Position&& pos, const Size&& size ) : pos(pos), size(size) {}
+  Box( const Box& ) = default;
+  Box( Box&& ) = default;
 
-  Rect& operator=( const Rect& ) = default;
-  Rect& operator=( Rect&& ) = default;
+  Box& operator=( const Box& ) = default;
+  Box& operator=( Box&& ) = default;
 
   Position pos{};
   Size size{};
 
-  auto overlaps( const Rect& rhs ) const -> bool;
-  auto crop( const Rect& rhs ) const -> Rect;
+  auto overlaps( const Box& rhs ) const -> bool;
+  auto crop( const Box& rhs ) const -> Box;
 
-  void operator+=( const Rect& rhs ) {
+  void operator+=( const Box& rhs ) {
     pos.x += rhs.pos.x;
     pos.y += rhs.pos.y;
     pos.z += rhs.pos.z;
@@ -31,8 +29,8 @@ struct Rect {
     size.d += rhs.size.d;
   }
 
-  auto operator+( const Rect& rhs ) const -> Rect {
-    Rect output;
+  auto operator+( const Box& rhs ) const -> Box {
+    Box output;
     output.pos.x = pos.x + rhs.pos.x;
     output.pos.y = pos.y + rhs.pos.y;
     output.pos.z = pos.z + rhs.pos.z;
@@ -42,7 +40,7 @@ struct Rect {
     return output;
   }
 
-  void operator-=( const Rect& rhs ) {
+  void operator-=( const Box& rhs ) {
     pos.x -= rhs.pos.x;
     pos.y -= rhs.pos.y;
     pos.z -= rhs.pos.z;
@@ -51,8 +49,8 @@ struct Rect {
     size.d -= rhs.size.d;
   }
 
-  auto operator-( const Rect& rhs ) const -> Rect {
-    Rect output;
+  auto operator-( const Box& rhs ) const -> Box {
+    Box output;
     output.pos.x = pos.x - rhs.pos.x;
     output.pos.y = pos.y - rhs.pos.y;
     output.pos.z = pos.z - rhs.pos.z;
@@ -62,8 +60,8 @@ struct Rect {
     return output;
   }
 
-  auto operator>>( const unsigned n ) const -> Rect {
-    Rect output;
+  auto operator>>( const unsigned n ) const -> Box {
+    Box output;
     output.pos.x = pos.x >> n;
     output.pos.y = pos.y >> n;
     output.pos.z = pos.z >> n;

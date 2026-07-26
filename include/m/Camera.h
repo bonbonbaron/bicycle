@@ -3,7 +3,7 @@
 #include <vector>
 #include <list>
 #include "v/Window.h"
-#include "m/Rect.h"
+#include "m/Box.h"
 
 class Camera {
   public:
@@ -12,12 +12,12 @@ class Camera {
     void pan( const int dx, const int dy );
     auto canSee( const Entity entity ) const -> bool;
 
-    inline auto _canSee( const Rect& camRect, const Rect& entityRect ) const -> bool {
+    inline auto _canSee( const Box& camBox, const Box& entityBox ) const -> bool {
       return 
-        entityRect.pos.x >= static_cast<decltype(Position::x)>( camRect.pos.x ) && 
-        entityRect.pos.x <= static_cast<decltype(Position::x)>( camRect.pos.x + camRect.size.w ) &&
-        entityRect.pos.y >= static_cast<decltype(Position::y)>( camRect.pos.y ) && 
-        entityRect.pos.y <= static_cast<decltype(Position::y)>( camRect.pos.y + camRect.size.h ); 
+        entityBox.pos.x >= static_cast<decltype(Position::x)>( camBox.pos.x ) && 
+        entityBox.pos.x <= static_cast<decltype(Position::x)>( camBox.pos.x + camBox.size.w ) &&
+        entityBox.pos.y >= static_cast<decltype(Position::y)>( camBox.pos.y ) && 
+        entityBox.pos.y <= static_cast<decltype(Position::y)>( camBox.pos.y + camBox.size.h ); 
     }
     void focusOn( const Entity entity );
     auto getFocus() const -> Entity;
@@ -25,6 +25,7 @@ class Camera {
     void setLims( const int y, const int x);
     // Margins tell us how close the focused-on entity can come to the 
     // FOV's edge before the camera should be told to move.
+    void setMargin( const int margin );
     auto getLxMargin() const -> int;  // low x margin
     auto getLyMargin() const -> int;  // low y margin
     auto getHxMargin() const -> int;  // high x margin

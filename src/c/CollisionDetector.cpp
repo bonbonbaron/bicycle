@@ -17,14 +17,14 @@ void CollisionDetector::check() {
   auto collLayers = cd.getCollisionLayers();
   for ( const auto& collLayer : collLayers ) {
     for ( auto e1 = collLayer.begin(); e1 != collLayer.end(); ++e1 ) {
-      const auto& r1 = World::get<Rect>( *e1 );
-      auto& c1 = World::get<CollRect>( *e1 );
+      const auto& r1 = World::get<Box>( *e1 );
+      auto& c1 = World::get<CollBox>( *e1 );
       auto f1 = c1;
       f1.pos += r1.pos;
       for ( auto e2 = std::next(e1); e2 != collLayer.end(); ++e2 ) {
 				auto wereCollided = cd.recordedCollision( *e1, *e2 );
-        const auto& r2 = World::get<Rect>( *e2 );
-        auto& c2 = World::get<CollRect>( *e2 );
+        const auto& r2 = World::get<Box>( *e2 );
+        auto& c2 = World::get<CollBox>( *e2 );
         auto f2 = c2;
         f2.pos += r2.pos;
         if ( r1.overlaps( r2 ) ) {

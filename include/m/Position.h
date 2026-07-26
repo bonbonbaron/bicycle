@@ -1,8 +1,10 @@
 #pragma once
+#include "fixed.h"
 
 struct Position {
   Position() = default;
-  Position( int x, int y, int z = 0) : x(x), y(y), z(z) {}
+  // see if automatically upshifting it from here works.
+  Position( int x, int y, int z = 0) : x(x << FIXEDPT_DEC_BITS), y(y << FIXEDPT_DEC_BITS), z(z << FIXEDPT_DEC_BITS) {}
   Position( const Position& ) = default;
   Position( Position&& ) = default;
   Position& operator=( const Position& ) = default;
@@ -44,6 +46,14 @@ struct Position {
     pos.x = x >> n;
     pos.y = y >> n;
     pos.z = z >> n;
+    return pos;
+  }
+
+  auto operator<<( const unsigned n ) const -> Position {
+    Position pos;
+    pos.x = x << n;
+    pos.y = y << n;
+    pos.z = z << n;
     return pos;
   }
 };

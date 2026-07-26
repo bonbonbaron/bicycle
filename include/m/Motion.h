@@ -1,9 +1,9 @@
 #pragma once
 #include "m/Entity.h"
-#include "m/Rect.h"
+#include "m/Box.h"
 
-using Velocity = Rect;
-using Acceleration = Rect;
+using Velocity = Box;
+using Acceleration = Box;
 
 enum MotionType { LINEAR, ORBITAL };
 

@@ -5,8 +5,8 @@
 
 struct AnimFrame {
   unsigned duration{};
-  Rect srcRect{};
-  CollRect collisionRect{};
+  Box srcBox{};
+  CollBox collisionBox{};
 };
 
 enum AnimType { LOOP, ONE_SHOT, PINGPONG };

@@ -28,9 +28,9 @@ void Image::strToImg( const char* str ) {
     currLineLims.start += currLineLims.len + 1;  // "+1" includes the newline character.
   }
   // Even though we're not right-padding the shorter lines with spaces, we'll treat
-  // the grid as a rectangle for easier collision detection.
+  // the grid as a boxangle for easier collision detection.
   // Now set the size you discovered above.
-  size.w = maxLineWidth;
-  size.h = lineLimits.size();
-  size.d = 1;  // TODO check this later
+  size.w = maxLineWidth << FIXEDPT_DEC_BITS;
+  size.h = lineLimits.size() << FIXEDPT_DEC_BITS;
+  size.d = 1 << FIXEDPT_DEC_BITS;  // TODO check this later
 }

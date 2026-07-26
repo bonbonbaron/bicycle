@@ -8,7 +8,7 @@ auto Kinematics::getInstance() -> Kinematics& {
 
 // TODO implement fixed point math here
 void Kinematics::run() {
-  auto& rects = World::get<Rect>();
+  auto& boxs = World::get<Box>();
   // Add accelerations to velocities.
   for ( unsigned i = 0; i < NUM_SUPPORTED_ENTITIES; ++i ) {
     _vels.at(i) += _accs.at(i);
@@ -26,7 +26,7 @@ void Kinematics::run() {
   }
   // Add velocities to positions.
   for ( unsigned i = 0; i < NUM_SUPPORTED_ENTITIES; ++i ) {
-    rects.at(i) += _vels.at(i);
+    boxs.at(i) += _vels.at(i);
   }
   // TODO add tracking logic here
   // TODO add 
@@ -49,8 +49,8 @@ void Kinematics::start( const Entity entity ) {
 }
 
 void Kinematics::stop( const Entity entity ) {
-  _vels.at(entity) = Rect();
-  _accs.at(entity) = Rect();
+  _vels.at(entity) = Box();
+  _accs.at(entity) = Box();
 }
 
 void Kinematics::pause( const Entity entity ) {

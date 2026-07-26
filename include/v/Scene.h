@@ -6,7 +6,7 @@
 #include <unordered_map>
 
 #include "m/Camera.h"
-#include "m/Rect.h"
+#include "m/Box.h"
 #include "m/Entity.h"
 
 #include "v/Window.h"

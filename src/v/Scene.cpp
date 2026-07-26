@@ -14,7 +14,7 @@ Layer::Layer( const std::string bgStr, const std::string& bgCollStr, LayerType t
 {
   World::set<Image>( id, bgStr.c_str() );
   auto& bgImg = World::get<Image>( id );
-  World::set<Rect>( id, { { 0, 0, 0 }, bgImg.size } );
+  World::set<Box>( id, { { 0, 0, 0 }, bgImg.size } );
   // World::set<Image>( bgCollStr.c_str() ),
 }
 
@@ -54,10 +54,12 @@ auto Grid::getLayer( Entity entity ) -> std::optional<unsigned> {
 
 Scene::Scene() : Window( 0, 0, COLS - 2, LINES ) {
   _camera.setDims( LINES, COLS - 2 );
+  _camera.setMargin( 10 );  // TODO set margin in a bicycle API call
 }
 
 Scene::Scene( const int x, const int y, const int w, const int h ) : Window( x, y, w, h ) {
   _camera.setDims( h, w );
+  _camera.setMargin( 10 );  // TODO set margin in a bicycle API call
 }
 
 void Scene::renderFixedLayer( const Layer& layer ) {
@@ -71,9 +73,7 @@ void Scene::renderFixedLayer( const Layer& layer ) {
 
 void Scene::render() {
   _camera.followFocus();
-  // For each layer..
   for ( const auto& layer : _grid.getLayers() ) {
-    // Background
     switch ( layer.type ) {
       case LayerType::FIXED:     // Doesn't move with camera
         renderFixedLayer( layer );
@@ -88,8 +88,6 @@ void Scene::render() {
         // TODO
         break;
     }
-    // Foreground
-    
   }
 }
 

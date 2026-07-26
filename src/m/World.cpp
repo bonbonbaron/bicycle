@@ -12,13 +12,13 @@ auto World::getInstance() -> World& {
 
 extern "C" {
   EXPORT_API
-  LWorldArr<Rect> World_getRects() { 
-    return World_getArr<Rect>(); 
+  LWorldArr<Box> World_getBoxes() { 
+    return World_getArr<Box>(); 
   }
 
   EXPORT_API
-  LWorldArr<CollRect> World_getCollRects() { 
-    return World_getArr<CollRect>(); 
+  LWorldArr<CollBox> World_getCollBoxes() { 
+    return World_getArr<CollBox>(); 
   }
 
   EXPORT_API

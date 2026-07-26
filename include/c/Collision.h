@@ -1,6 +1,6 @@
 #pragma once
 #include "m/Entity.h"
-#include "m/Rect.h"
+#include "m/Box.h"
 #include "c/CollisionDetector.h"
 
 struct Collision {
@@ -9,9 +9,9 @@ struct Collision {
   unsigned type{}; // their collision type
 };
 
-struct CollRect : public Rect {
-  CollRect() = default;
-  CollRect( Rect rect, unsigned type ) : Rect(rect), type(type) {}  // register with CollisionDetector
+struct CollBox : public Box {
+  CollBox() = default;
+  CollBox( Box box, unsigned type ) : Box(box), type(type) {}  // register with CollisionDetector
   unsigned type{}; // their collision type
 };
 

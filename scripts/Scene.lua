@@ -1,6 +1,7 @@
 require("Window")
 require("io")
 require("table")
+require("bit")  -- WARNING: bit lib requires luajit
 
 -- Layer etc. aren't going to be needed anywhere else, so I'll put them all in here.
 
@@ -54,19 +55,15 @@ function Scene:addFg( Genome, fg )
     local genome = Genome.new( instance.genome )
     ffi.C.addFgEntity( genome.id )
     if instance.pos then
-      local pos = ffi.new("Position", { x=instance.pos[1], y=instance.pos[2], z=instance.pos[3] or 0 } )
-      --print("setting x: "..pos.x..", y: "..pos.y)
+      local pos = ffi.new("Position", 
+      { x=instance.pos[1],
+        y=instance.pos[2],
+        z=instance.pos[3] or 0 } )
       ffi.C.setPos( genome.id, pos )
       -- TODO keep a reference to the position in entity data for easy manipulation
-      local rects = ffi.C.World_getRects()
-      --print("there are "..rects.len.." rects")
-      --for i = 0, 10 do
-        --rect = rects.arr[i]
-        --print("getting rects["..i.."] => x: "..rect.pos.x..", y: "..rect.pos.y..", z: "..rect.pos.z..", w: "..rect.size.w..", h: "..rect.size.h..", d: "..rect.size.d.."\r")
-      --end
-      --io.read()
-      genome.tbl.pos = rects.arr[genome.id].pos -- hopefully this works
-      genome.tbl.size = rects.arr[genome.id].size
+      local boxes = ffi.C.World_getBoxes()
+      genome.tbl.pos = boxes.arr[genome.id].pos -- hopefully this works
+      genome.tbl.size = boxes.arr[genome.id].size
     end
     if instance.focus then
       focusOn( genome.id )
@@ -74,8 +71,6 @@ function Scene:addFg( Genome, fg )
     end
     genome.tbl.id = genome.id
 
-    -- dbgp(genome.tbl)
-    -- if not instance.onInput then error("OOF") end
     register( genome.id, genome.tbl )
   end
 end

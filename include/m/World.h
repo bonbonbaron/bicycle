@@ -8,14 +8,14 @@
 #include "m/TypeTag.h"
 #include "m/Entity.h"
 
-#include "m/Rect.h"
+#include "m/Box.h"
 #include "c/Collision.h"
 #include "v/Image.h"
 #include "m/Animation.h"
 
 using ArrayVar = std::variant<
-  std::array<Rect, NUM_SUPPORTED_ENTITIES>,
-  std::array<CollRect, NUM_SUPPORTED_ENTITIES>,
+  std::array<Box, NUM_SUPPORTED_ENTITIES>,
+  std::array<CollBox, NUM_SUPPORTED_ENTITIES>,
   std::array<Image, NUM_SUPPORTED_ENTITIES>,
   std::array<Animation, NUM_SUPPORTED_ENTITIES>
 >;
@@ -83,7 +83,7 @@ class World {
 
     // Convenience: initialize all known types in one call
     void initialize_all() {
-      initialize<Rect, CollRect, Image, Animation>();
+      initialize<Box, CollBox, Image, Animation>();
     }
 
     // Optional: check whether a type is already initialized  // TODO delete if unneeded
@@ -130,8 +130,8 @@ LWorldArr<T> World_getArr() {
 }
 
 extern "C" {
-  LWorldArr<Rect> World_getRects();
-  LWorldArr<CollRect> World_getCollRects();
+  LWorldArr<Box> World_getBoxes();
+  LWorldArr<CollBox> World_getCollBoxes();
   LWorldArr<Image> World_getImages();
   LWorldArr<Animation> World_getAnims();
 }

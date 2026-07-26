@@ -4,6 +4,7 @@ require("io")
 require("debug")
 
 ffi.cdef([[
+  static const unsigned FIXEDPT_DEC_BITS = 8;
   typedef enum {
       // Letters (HID 0x04–0x1D)  <-- these will be treated as case-insensitive
       NOTHING = 0,
@@ -82,7 +83,7 @@ ffi.cdef([[
   typedef struct {
     Position pos;
     Size size;
-  } Rect;
+  } Box;
 
   typedef enum {
     BLACK	  ,
@@ -102,14 +103,14 @@ ffi.cdef([[
   } Image;
 
   typedef struct {
-    Rect rect;
+    Box box;
     unsigned type;
-  } CollRect;
+  } CollBox;
 
   typedef struct {
     unsigned duration;
-    Rect srcRect;
-    CollRect collisionRect;
+    Box srcBox;
+    CollBox collisionBox;
   } AnimFrame;
 
   typedef enum { LOOP, ONE_SHOT, PINGPONG } AnimType;
@@ -123,14 +124,14 @@ ffi.cdef([[
   // world arrays
 
   typedef struct {
-    Rect* arr;
+    Box* arr;
     unsigned len;
-  } WorldRectArr;
+  } WorldBoxArr;
 
   typedef struct {
-    CollRect* arr;
+    CollBox* arr;
     unsigned len;
-  } WorldCollRectArr;
+  } WorldCollBoxArr;
 
   typedef struct {
     Velocity* arr;
@@ -149,16 +150,14 @@ ffi.cdef([[
 
   // world array getters
 
-  WorldRectArr World_getRects();
-  WorldCollRectArr World_getCollRects();
+  WorldBoxArr World_getBoxes();
+  WorldCollBoxArr World_getCollBoxes();
   WorldImgArr  World_getImages();
-  WorldVelArr World_getVels();
-  WorldRectArr World_getVels();
   WorldAnimArr World_getAnims();
 
   typedef unsigned Entity;
 
-  enum TimeoutAddr { BRIDGE, ANIMATION, RENDERING, MOTION };  // Notice how this only addresses outputs. Cool.
+  typedef enum { BRIDGE, ANIMATION, RENDERING, MOTION } TimeoutAddr;  // Notice how this only addresses outputs. Cool.
 
   typedef struct {
     Entity entity;
