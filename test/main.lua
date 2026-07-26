@@ -1,12 +1,7 @@
 package.path = package.path .. ";./scripts/?.lua"
-require("Scene")
-require("Genome")
+local Genome = require("Genome")
 
 gameName = "test"
 gameSupportedGenes = {}
-genome = Genome.new()
-a = { img = "abc" }
-genome:load(a)
-
-Scene.new("level1")
+Genome.new("intro")
 

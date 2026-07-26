@@ -36,7 +36,8 @@ struct Layer {
 
 class Grid {
   public:
-    void addEntity( const Entity entity, const unsigned layerIdx );
+    // Adds entity to the latest created layer.
+    void addEntity( const Entity entity );
     void addLayer( const Layer& layer );
     auto getLayers() -> std::vector<Layer>&;
     void setFocusedLayerIdx( const unsigned layerIdx );

@@ -207,9 +207,9 @@ ffi.cdef([[
   Entity newEntity();
   Entity delEntity();
   void addBgLayer( const char* bgStr );
-  void addFgEntity( Entity entity, const unsigned layerIdx );
+  void addFgEntity( Entity entity );
   void newImage( Entity entity, const char* imgStr );
-
+  void setPos( Entity entity, Position pos );
 
 ]])
 

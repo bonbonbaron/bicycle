@@ -4,6 +4,7 @@
 #include <algorithm>
 #include "c/Trigger.h"
 #include "v/Image.h"
+#include <cassert>
 
 Layer::Layer() : id( newEntityId() ) {}
 
@@ -22,9 +23,11 @@ void Grid::addLayer( const Layer& layer ) {
   _layers.push_back( layer );
 }
 
-void Grid::addEntity( const Entity entity, const unsigned layerIdx ) {
-  _layers.at( layerIdx ).fg.push_back( entity );
-  _entityToLayerMap[ entity ] = layerIdx;
+// Adds entity to the latest created layer.
+void Grid::addEntity( const Entity entity ) {
+  assert( _layers.size() > 0 );
+  _layers.back().fg.push_back( entity );
+  _entityToLayerMap[ entity ] = _layers.size() - 1;  // so it's zero-indexed
 }
 
 auto Grid::getLayers() -> std::vector<Layer>& {

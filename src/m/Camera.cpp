@@ -102,7 +102,7 @@ void Camera::draw( const Entity entity, Window& tgt ) {
   auto entityPosWrtCamera = entityRect.pos - camRect.pos;
   // If the image's top row is out of FOV, then get the first row to draw.
   // imgRowIdx is the row of the image itself we're drawing.
-  auto imgRowIdx = std::max( 0, entityPosWrtCamera.y );  
+  auto imgRowIdx = std::abs( std::min( 0, entityPosWrtCamera.y ) );  
   for ( unsigned croppedRectRowIdx{}; croppedRectRowIdx < croppedRect.size.h; ++croppedRectRowIdx, ++imgRowIdx ) {
     const auto& lineLims = entityImg.lineLimits.at( imgRowIdx );
     int stringStartIdx = lineLims.start 

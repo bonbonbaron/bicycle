@@ -100,11 +100,20 @@ namespace bicycle {
       auto& wm = WindowManager::getInstance();
       auto scene = dynamic_pointer_cast<Scene>( wm.back() );
       auto& grid = scene->getGrid();
-      grid.addEntity( entity, layerIdx );
+      grid.addEntity( entity );
     }
 
     void newImage( Entity entity, const char* imgStr ) {
       World::set<Image>( entity, imgStr );
+      // Use image size to set rect size while we're at it.
+      const auto& img = World::get<Image>( entity );
+      auto& rect = World::get<Rect>( entity );
+      rect.size = img.size;
+    }
+
+    void setPos( Entity entity, Position pos ) {
+      auto& rect = World::get<Rect>( entity );
+      rect.pos = pos;
     }
 
     Entity popWindow() {
