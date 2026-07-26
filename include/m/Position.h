@@ -38,5 +38,13 @@ struct Position {
     pos.z = z - rhs.z;
     return pos;
   }
+
+  auto operator>>( const unsigned n ) const -> Position {
+    Position pos;
+    pos.x = x >> n;
+    pos.y = y >> n;
+    pos.z = z >> n;
+    return pos;
+  }
 };
 

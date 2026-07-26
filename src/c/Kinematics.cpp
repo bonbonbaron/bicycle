@@ -6,6 +6,7 @@ auto Kinematics::getInstance() -> Kinematics& {
   return kin;
 }
 
+// TODO implement fixed point math here
 void Kinematics::run() {
   auto& rects = World::get<Rect>();
   // Add accelerations to velocities.
@@ -27,6 +28,8 @@ void Kinematics::run() {
   for ( unsigned i = 0; i < NUM_SUPPORTED_ENTITIES; ++i ) {
     rects.at(i) += _vels.at(i);
   }
+  // TODO add tracking logic here
+  // TODO add 
 }
 
 void Kinematics::config( const Entity entity, const MotionConfig& src ) {

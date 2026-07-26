@@ -26,6 +26,7 @@ class Kinematics : Controllable {
     // To streamline processing, linear and orbital accelerations are treated synonymously (x -> tangential, y -> radial (positive-outward), z ignored for 2D but axial vel in 3D).
     // Only the treatment of cartesian positions is distinguished. Orbits must be translated from rotational to cartesian coordinates at that point.
     // We'll use a sine (doubles as cosine) look-up table to streamline that. Debating between 8- and 16-bit.
+    // TODO if this underperforms per frame, then I'll make these vectors of active motions.
     std::array<MotionConfig, NUM_SUPPORTED_ENTITIES> _cfgs{};       
     // Vels & accs combine linear/orbital motion w/ scaling (size-changes).
     std::array<Velocity, NUM_SUPPORTED_ENTITIES> _terminalVels{};       

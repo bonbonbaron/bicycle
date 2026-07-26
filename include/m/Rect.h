@@ -2,6 +2,8 @@
 #include "m/Position.h"
 #include "m/Size.h"
 
+static constexpr decltype(Position::x) FIXEDPT_DEC_BITS{8};
+
 struct Rect {
   Rect() = default;
   //World::set<Rect>( id, 
@@ -57,6 +59,17 @@ struct Rect {
     output.size.w = size.w - rhs.size.w;
     output.size.h = size.h - rhs.size.h;
     output.size.d = size.d - rhs.size.d;
+    return output;
+  }
+
+  auto operator>>( const unsigned n ) const -> Rect {
+    Rect output;
+    output.pos.x = pos.x >> n;
+    output.pos.y = pos.y >> n;
+    output.pos.z = pos.z >> n;
+    output.size.w = size.w >> n;
+    output.size.h = size.h >> n;
+    output.size.d = size.d >> n;
     return output;
   }
 

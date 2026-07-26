@@ -98,8 +98,8 @@ void Camera::draw( const Entity entity, Window& tgt ) {
     return;
   }
   const auto& entityImg = World::get<Image>( entity );
-  auto croppedRect = camRect.crop( entityRect );  // portion of entityRect in FOV
-  auto entityPosWrtCamera = entityRect.pos - camRect.pos;
+  auto croppedRect = camRect.crop( entityRect ) >> FIXEDPT_DEC_BITS;  // portion of entityRect in FOV
+  auto entityPosWrtCamera = ( entityRect.pos - camRect.pos ) >> FIXEDPT_DEC_BITS;
   // If the image's top row is out of FOV, then get the first row to draw.
   // imgRowIdx is the row of the image itself we're drawing.
   auto imgRowIdx = std::abs( std::min( 0, entityPosWrtCamera.y ) );  
