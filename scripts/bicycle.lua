@@ -157,7 +157,7 @@ ffi.cdef([[
 
   typedef unsigned Entity;
 
-  typedef enum { BRIDGE, ANIMATION, RENDERING, MOTION } TimeoutAddr;  // Notice how this only addresses outputs. Cool.
+  typedef enum { TO_BRIDGE, TO_ANIMATION, TO_RENDERING, TO_MOTION } TimeoutAddr;  // Notice how this only addresses outputs. Cool.
 
   typedef struct {
     Entity entity;
@@ -197,6 +197,9 @@ ffi.cdef([[
 		Input input; // Input is just a scalar.  // TODO should this be initialized?
 	} Bridge;
 
+  typedef enum { START, STOP, PAUSE, UNPAUSE } Action;
+  typedef enum { RECT, COLLRECT, IMAGE } Component;
+  typedef enum { SYS_TIMER, SYS_MOTION } System;
   Entity pushDialogue( const char* text, int x, int y, int w, int h );
   Entity pushTextMenu( int x, int y, int w, int h );
   void addItem( const char* text );
@@ -212,6 +215,7 @@ ffi.cdef([[
   void newImage( Entity entity, const char* imgStr );
   void setPos( Entity entity, Position pos );
   void focusCamOn( Entity entity );
+  void sys(const Action action, const System system, Entity entity);
 
 ]])
 
@@ -242,6 +246,17 @@ function focusOn( entity )
 end
 
 --TODO write wrappers for menu and dialogue that 1) don't require dimensions and 2) auto-focus on them, 3) send moveCursorUp/Down()
+--TODO write wrappers for system calls
+
+function move( entity, vel )
+  checkType( entity, "number" )
+  checkType( vel, "table" )
+  -- TODO write a motion config wrapper in bicycle.cpp.
+  -- TODO write a Motion table that defaults values and allows you to easily define a motion in Lua. Then you can handle all the nasty configuration stuff here.
+  if vel.x and vel.y then
+    sys( START, SYS_MOTION, entity )
+  end
+end
 
 -------------------------------------
 

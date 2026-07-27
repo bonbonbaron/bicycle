@@ -22,16 +22,17 @@ auto Trigger::getInstance() -> Trigger& {
 
 // This function eases exposure of generic system manipulations.
 void Trigger::sys(const Action action, const System system, Entity entity) {
-  auto& trig = getInstance();
-  auto* timer = trig.getTimer();
-
   Controllable* ctrl{};
   switch ( system ) {
     case System::TIMER:
-      assert(timer != nullptr );
-      ctrl = timer;
+      ctrl = _timer;
+      break;
+    case System::MOTION:
+      ctrl = _motion;
       break;
   }
+
+  assert( ctrl != nullptr );
 
   switch ( action ) {
     case Action::START:
@@ -53,6 +54,7 @@ void Trigger::init( const std::string& gameName ) {
   L = luaL_newstate();
   luaL_openlibs(L);
   _timer = &Timer::getInstance();
+  _motion = &Kinematics::getInstance();
 
   // Start the game
   std::string gamePath{"./" + gameName + "/main.lua"};

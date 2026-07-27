@@ -5,7 +5,7 @@
 #include <array>
 #include "m/Entity.h"
 
-class Kinematics : Controllable {
+class Kinematics : public Controllable {
   public:
     static auto getInstance() -> Kinematics&;
     void run();

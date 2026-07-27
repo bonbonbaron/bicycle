@@ -4,20 +4,14 @@ GOALS FOR THIS WEEKEND:
   \ moving image around with keyboard
   motion system ( triggerize it, make sys call available in lua, expose motion's more specialized funcs to lua)
 
-BOOKMARK: gotta go back to sleep. but i left off at trying to ge tthe image loader in Genome.lua to work. A bad arg type error in loader.
-
 TODAY:
   \  make 3 triggers send data for Trigger.cpp to fill 2 arrays with 
   \  share that array with FFI in bicycle.lua
-  impl, test, and debug Image, all in C++
-    \ it compiles
-    \ genome img loader first draft
-    prove it's going into the world
-    get it to show up
+  \  impl, test, and debug Image, all in C++
   Genome (for foreground objects)
-    img
+    \  img
+    \  pos (multiple, inject)
     vel
-    pos (multiple, inject)
     personality (respond to ITC)
     anim
     coll

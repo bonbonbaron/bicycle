@@ -6,6 +6,7 @@
 #include "c/WindowManager.h"
 #include "m/Position.h"
 #include "c/Timer.h"
+#include "c/Kinematics.h"
 #include "m/World.h"
 #include <lua.hpp>
 
@@ -23,6 +24,11 @@
 class Trigger {
   public:
 
+    // Generic system actions
+    enum Action { START, STOP, PAUSE, UNPAUSE };
+    enum Component { RECT, COLLRECT, IMAGE };
+    enum System{ TIMER, MOTION };
+
     static auto getInstance() -> Trigger&;
 		void init( const std::string& gameName );
 
@@ -35,6 +41,8 @@ class Trigger {
 
     auto getTimer() -> Timer*;
 
+    void sys(const Action action, const System system, Entity entity);
+
   private:
     Trigger();
     Trigger(const Trigger&) = delete;
@@ -42,16 +50,9 @@ class Trigger {
     Trigger(const Trigger&&) = delete;
     Trigger operator=(const Trigger&&) = delete;
 
-    // Generic system actions
-    enum Action { START, STOP, PAUSE, UNPAUSE };
-    enum Component { RECT, COLLRECT, IMAGE };
-    enum System{ TIMER };
-
-    static void sys(const Action action, const System system, Entity entity);
-
     // Systems
     Timer* _timer;
-
+    Kinematics* _motion;
     
     // Trigger outputs
     static constexpr unsigned MAX_COLLS_PER_ENTITY{10};  // this is arbitrary; surely there's a better data structure for this that can be safely shared with Lua.

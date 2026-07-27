@@ -1,3 +1,4 @@
+#pragma once
 class Controllable {
   public:
     virtual void start( unsigned ) = 0;

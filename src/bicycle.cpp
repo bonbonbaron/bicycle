@@ -126,6 +126,10 @@ namespace bicycle {
       scene->setFocus( entity );
     }
 
+    void sys(const Action action, const System system, Entity entity) {
+      auto& trig = Trigger::getInstance();
+      trig.sys( action, system, entity );
+    }
   }
 
   Entity pop() {
