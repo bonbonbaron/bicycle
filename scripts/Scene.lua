@@ -1,7 +1,6 @@
 require("Window")
 require("io")
 require("table")
-require("bit")  -- WARNING: bit lib requires luajit
 
 -- Layer etc. aren't going to be needed anywhere else, so I'll put them all in here.
 
