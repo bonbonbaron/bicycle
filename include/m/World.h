@@ -11,13 +11,13 @@
 #include "m/Box.h"
 #include "c/Collision.h"
 #include "v/Image.h"
-#include "m/Animation.h"
+#include "m/Rect.h"   // used for animation and rendering
 
 using ArrayVar = std::variant<
   std::array<Box, NUM_SUPPORTED_ENTITIES>,
   std::array<CollBox, NUM_SUPPORTED_ENTITIES>,
   std::array<Image, NUM_SUPPORTED_ENTITIES>,
-  std::array<Animation, NUM_SUPPORTED_ENTITIES>
+  std::array<Rect, NUM_SUPPORTED_ENTITIES>
 >;
 
 class World {
@@ -83,7 +83,7 @@ class World {
 
     // Convenience: initialize all known types in one call
     void initialize_all() {
-      initialize<Box, CollBox, Image, Animation>();
+      initialize<Box, CollBox, Image, Rect>();
     }
 
     // Optional: check whether a type is already initialized  // TODO delete if unneeded
@@ -133,7 +133,7 @@ extern "C" {
   LWorldArr<Box> World_getBoxes();
   LWorldArr<CollBox> World_getCollBoxes();
   LWorldArr<Image> World_getImages();
-  LWorldArr<Animation> World_getAnims();
+  LWorldArr<Rect> World_getRects();
 }
 
 #pragma GCC diagnostic pop

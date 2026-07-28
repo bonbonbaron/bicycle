@@ -1,0 +1,25 @@
+#pragma once
+#include "m/Animation.h"
+#include "c/Controllable.h"
+#include <vector>
+#include <array>
+#include "m/Entity.h"
+
+class Animator : public Controllable {
+  public:
+    static auto getInstance() -> Animator&;
+    void tick( const Entity entity );
+    void set( const Entity entity, const std::string& stripName );
+    void start( const Entity entity ) override;  // returns the ID of the timer started for caller's future reference
+    void stop( const Entity entity ) override;
+    void pause( const Entity entity ) override;
+    void unpause( const Entity entity ) override;
+
+  private:
+    Animator() = default;
+    Animator(const Animator&) = delete;
+    Animator operator=(const Animator&) = delete;
+    Animator(const Animator&&) = delete;
+    Animator operator=(const Animator&&) = delete;
+};
+

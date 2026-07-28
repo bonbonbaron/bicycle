@@ -27,7 +27,7 @@ extern "C" {
   }
 
   EXPORT_API
-  LWorldArr<Animation> World_getAnims() { 
-    return World_getArr<Animation>(); 
+  LWorldArr<Rect> World_getRects() { 
+    return World_getArr<Rect>(); 
   }
 }

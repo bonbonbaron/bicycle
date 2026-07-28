@@ -126,7 +126,7 @@ namespace bicycle {
       scene->setFocus( entity );
     }
 
-    void sys(const Action action, const System system, Entity entity) {
+    void sys(const Trigger::Action action, const Trigger::System system, Entity entity) {
       auto& trig = Trigger::getInstance();
       trig.sys( action, system, entity );
     }
@@ -150,7 +150,5 @@ namespace bicycle {
       Timer::sleepFrame();
     }
 
-    return endwin();
+  return endwin();
   }
-
-} // namespace bicycle

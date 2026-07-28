@@ -3,8 +3,6 @@ local horse = { img="horse" }
 function horse:onInput(input)
   local boxes = ffi.C.World_getBoxes()
   pos = boxes.arr[self.id].pos -- hopefully this works
-  print("K?")
-  print(pos.x)
   io.read()
   if input == ffi.C.A then
     pos.x = pos.x - 256
