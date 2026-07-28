@@ -1,19 +1,21 @@
+#include <cassert>
 #include "c/Animator.h"
 #include "m/World.h"
+#include "c/Timeout.h"
 
 auto Animator::getInstance() -> Animator& {
   static Animator kin{};
   return kin;
 }
 
-// TODO implement fixed point math here
+// TODO you should probably dumb down the logic in here so it's not so hard to look at.
 void Animator::tick( const Entity entity ) {
   // Get state
   auto& state = _animStates.at(entity);
 
   if (state.frameIdx == state.currStrip->nFrames - 1) {
     // If this is a repeating animation strip, reset index, time left, and srcRectP.
-    if (state.currStrip->pingPong) {
+    if (state.currStrip->pingpong) {
       state.increment *= -1;
       state.frameIdx += state.increment;
     }
@@ -28,7 +30,7 @@ void Animator::tick( const Entity entity ) {
   }
   // Otherwise, if this is a ping pong strip returning to the first frame, reverse directions.
   else if (state.frameIdx == 0) {
-    if (state.currStrip->pingPong) {
+    if (state.currStrip->pingpong) {
       // If we just finished going backwards in a pingpong
       if (state.increment < 0) {
         // Start over if we're repeating
@@ -43,55 +45,74 @@ void Animator::tick( const Entity entity ) {
         }
       }
       else {
-        state.frameIdx += state.increment
+        state.frameIdx += state.increment;
       }
     }
     else {
-      state.frameIdx += state.increment
+      state.frameIdx += state.increment;
     }
   }
+  // If we're not at either extreme of the strip, increment normally.
   else {
-    state.frameIdx += state.increment
+    state.frameIdx += state.increment;
   }
   // Advance the animation frame in whatever direction we're going.
   // TODO populate world rects
-  *cP->srcRectP = frameA.at(state.frameIdx).rect;
-  cP->dstRectP->w = cP->srcRectP->w;
-  cP->dstRectP->h = cP->srcRectP->h;
+  auto& currFrame = currStrip->frames.at(state.frameIdx);
+  World::set<Rect>( entity, currFrame.srcRect );
+  // Assume we don't want to change the depth or z-dimension of box to new rect w&h.
+  auto& box = World::get<Box>( entity );
+  box.w = currFrame.srcRect.w;
+  box.h = currFrame.srcRect.h;
+  World::set<CollBox>( entity, currFrame.collisionBox );
 }  // tick()
 
-void Animator::config( const Entity entity, const MotionConfig& src ) {
-  auto& dst = _cfgs.at(entity);
-  dst.initVel = src.initVel;
-  dst.termVel = src.termVel;
-  dst.initAcc = src.initAcc;
-  dst.type = src.type;
-  dst.tgt = src.tgt;
+void Animator::set( const Entity entity, const std::string& stripName ) {
+  auto& state = _animStates.at( entity );
+  auto strip = state.animation.find( stripName );
+  if ( strip != state.animation.end() ) {
+    state.currStrip = *strip;
+  }
+  // TODO make some kind of status bar at the bottom to tell user strip isn't found.
 }
 
+// TODO start timer here. 
 void Animator::start( const Entity entity ) {
-  const auto& cfg = _cfgs.at(entity);
-  _vels.at(entity) = cfg.initVel;
-  _terminalVels.at(entity) = cfg.termVel;
-  _accs.at(entity) = cfg.initAcc;
+  auto& state = _animStates.at( entity );
+  state.frameIdx = 0;
+  state.increment = 1;
+  assert( state.currStrip != nullptr );
+  auto& timer = Timer::getInstance();
+  state.timerId = timer.create( 
+    currStrip->frames.at(0).durationMs, 
+    entity, 
+    0,      // timeout type doesn't matter here
+    false,  // don't repeat
+    TimeoutAddr::ANIMATION
+  );
 }
 
+// TODO stop timer here. 
 void Animator::stop( const Entity entity ) {
-  _vels.at(entity) = Box();
-  _accs.at(entity) = Box();
+  auto& state = _animStates.at( entity );
+  auto& timer = Timer::getInstance();
+  timer.stop( state.timerId );
 }
 
 void Animator::pause( const Entity entity ) {
-  stop(entity);
+  auto& state = _animStates.at( entity );
+  auto& timer = Timer::getInstance();
+  timer.pause( state.timerId );
 }
 
 void Animator::unpause( const Entity entity ) {
-  start(entity);
+  auto& state = _animStates.at( entity );
+  auto& timer = Timer::getInstance();
+  timer.unpause( state.timerId );
 }
 
-void Animator::track( Entity follower, Entity tgt ) {
-  _cfgs.at(follower).tgt = tgt;
+// TODO 
+void Animator::newStrip( Entity follower, const std::string& stripName ) {
 }
-
 
 
