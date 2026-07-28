@@ -20,6 +20,7 @@ class Animator : public Controllable {
     void stop( const Entity entity ) override;
     void pause( const Entity entity ) override;
     void unpause( const Entity entity ) override;
+    void newStrip( Entity follower, const std::string& stripName );
 
   private:
     Animator() = default;

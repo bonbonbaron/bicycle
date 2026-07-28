@@ -150,5 +150,7 @@ namespace bicycle {
       Timer::sleepFrame();
     }
 
-  return endwin();
+    return endwin();
   }
+
+}

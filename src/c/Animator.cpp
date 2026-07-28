@@ -58,12 +58,12 @@ void Animator::tick( const Entity entity ) {
   }
   // Advance the animation frame in whatever direction we're going.
   // TODO populate world rects
-  auto& currFrame = currStrip->frames.at(state.frameIdx);
+  auto& currFrame = state.currStrip->frames.at(state.frameIdx);
   World::set<Rect>( entity, currFrame.srcRect );
   // Assume we don't want to change the depth or z-dimension of box to new rect w&h.
   auto& box = World::get<Box>( entity );
-  box.w = currFrame.srcRect.w;
-  box.h = currFrame.srcRect.h;
+  box.size.w = currFrame.srcRect.w;
+  box.size.h = currFrame.srcRect.h;
   World::set<CollBox>( entity, currFrame.collisionBox );
 }  // tick()
 
@@ -71,12 +71,11 @@ void Animator::set( const Entity entity, const std::string& stripName ) {
   auto& state = _animStates.at( entity );
   auto strip = state.animation.find( stripName );
   if ( strip != state.animation.end() ) {
-    state.currStrip = *strip;
+    state.currStrip = strip->second;
   }
   // TODO make some kind of status bar at the bottom to tell user strip isn't found.
 }
 
-// TODO start timer here. 
 void Animator::start( const Entity entity ) {
   auto& state = _animStates.at( entity );
   state.frameIdx = 0;
@@ -84,7 +83,7 @@ void Animator::start( const Entity entity ) {
   assert( state.currStrip != nullptr );
   auto& timer = Timer::getInstance();
   state.timerId = timer.create( 
-    currStrip->frames.at(0).durationMs, 
+    state.currStrip->frames.at(0).durationMs, 
     entity, 
     0,      // timeout type doesn't matter here
     false,  // don't repeat
@@ -92,7 +91,6 @@ void Animator::start( const Entity entity ) {
   );
 }
 
-// TODO stop timer here. 
 void Animator::stop( const Entity entity ) {
   auto& state = _animStates.at( entity );
   auto& timer = Timer::getInstance();
