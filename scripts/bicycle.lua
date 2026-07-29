@@ -306,6 +306,14 @@ ffi.cdef([[
       end
     end
     -- Time-outs
+    if bridge.uncollisions.len > 0 then
+      for i = 0, bridge.uncollisions.len do
+        timeout = bridge.timeouts[i]
+        entity = entities[timeout.entity]
+        if not entity then error("Timeout recorded for nonexistent entity "..tostring(timeout.entity)..".") end
+        entity:onTimeout( timeout.id, timeout.type )
+      end
+    end
     -- Inputs
     if bridge.input.lastPressed ~= ffi.C.NOTHING then
       entity = entities[focus]
