@@ -25,7 +25,7 @@ MidiPlayer::MidiPlayer() {
             bank = 0,
             preset = 1;
 
-  for (int channel = 0; channel < NUM_SUPPORTED_CHANNELS; ++channel ) {
+  for (unsigned channel = 0; channel < NUM_SUPPORTED_CHANNELS; ++channel ) {
     fluid_synth_program_select( _synthP, channel, sfontId, bank, preset);
   }
 
@@ -75,4 +75,12 @@ void MidiPlayer::pauseSong() {
 void MidiPlayer::unpauseSong() {
   fluid_player_seek( _playerP, _tick );
   fluid_player_play( _playerP );
+}
+
+void MidiPlayer::loadSoundfont( const std::string& sfFilepath ) {
+  fluid_synth_sfload( _synthP, "/usr/share/sounds/sf2/TimGM6mb.sf2", 0 );
+}
+
+void MidiPlayer::loadSoundfont( const std::string&& sfFilepath ) {
+  loadSoundfont( sfFilepath );
 }

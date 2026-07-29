@@ -65,7 +65,20 @@ void Animator::tick( const Entity entity ) {
   box.size.w = currFrame.srcRect.w;
   box.size.h = currFrame.srcRect.h;
   World::set<CollBox>( entity, currFrame.collisionBox );
+  startTimer( entity, state );
 }  // tick()
+
+void Animator::startTimer( const Entity entity, AnimState& state ) {
+  // Set timer for this frame's duration.
+  auto& timer = Timer::getInstance();
+  state.timerId = timer.create( 
+    state.currStrip->frames.at(0).durationMs, 
+    entity, 
+    0,      // timeout type doesn't matter here, we only have one use for timer in animation
+    false,  // don't repeat
+    TimeoutAddr::ANIMATION
+  );
+}
 
 void Animator::set( const Entity entity, const std::string& stripName ) {
   auto& state = _animStates.at( entity );
@@ -81,14 +94,7 @@ void Animator::start( const Entity entity ) {
   state.frameIdx = 0;
   state.increment = 1;
   assert( state.currStrip != nullptr );
-  auto& timer = Timer::getInstance();
-  state.timerId = timer.create( 
-    state.currStrip->frames.at(0).durationMs, 
-    entity, 
-    0,      // timeout type doesn't matter here
-    false,  // don't repeat
-    TimeoutAddr::ANIMATION
-  );
+  startTimer( entity, state );
 }
 
 void Animator::stop( const Entity entity ) {
@@ -109,7 +115,14 @@ void Animator::unpause( const Entity entity ) {
   timer.unpause( state.timerId );
 }
 
-// TODO 
+// TODO how to populate easily via bicycle API?
+// i'll have a lua file that has the followig:
+//    table of strips
+//    (separate) table of frames for each strip
+//    (separate) instantiation of each frame's table
+//    frame object
+//    strip object
+//    animation object
 void Animator::newStrip( Entity follower, const std::string& stripName ) {
 }
 

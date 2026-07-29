@@ -11,23 +11,28 @@ auto CollisionDetector::getInstance() -> CollisionDetector& {
 }
 
 void CollisionDetector::check() {
-  // TODO also check for collisions with BG tiles
   auto& trig = Trigger::getInstance();
   auto& cd = getInstance();
   auto collLayers = cd.getCollisionLayers();
+  // TODO Background collision detection
   for ( const auto& collLayer : collLayers ) {
     for ( auto e1 = collLayer.begin(); e1 != collLayer.end(); ++e1 ) {
-      const auto& r1 = World::get<Box>( *e1 );
+    }
+  }
+  // Foreground collision detection
+  for ( const auto& collLayer : collLayers ) {
+    for ( auto e1 = collLayer.begin(); e1 != collLayer.end(); ++e1 ) {
+      const auto& b1 = World::get<Box>( *e1 );
       auto& c1 = World::get<CollBox>( *e1 );
-      auto f1 = c1;
-      f1.pos += r1.pos;
+      auto f1 = c1;  // copy collision box so the next line doesn't affect it
+      f1.pos += b1.pos;
       for ( auto e2 = std::next(e1); e2 != collLayer.end(); ++e2 ) {
 				auto wereCollided = cd.recordedCollision( *e1, *e2 );
-        const auto& r2 = World::get<Box>( *e2 );
+        const auto& b2 = World::get<Box>( *e2 );
         auto& c2 = World::get<CollBox>( *e2 );
-        auto f2 = c2;
-        f2.pos += r2.pos;
-        if ( r1.overlaps( r2 ) ) {
+        auto f2 = c2;  // copy collision box so the next line doesn't affect it
+        f2.pos += b2.pos;
+        if ( b1.overlaps( b2 ) ) {
           if ( !wereCollided ) {
             trig.sendCollision( { *e1, *e2, f2.type } );
             trig.sendCollision( { *e2, *e1, f1.type } );
@@ -35,7 +40,8 @@ void CollisionDetector::check() {
           }
         }
         else if ( wereCollided ) {
-          // TODO trig.offCollision( { *e1, *e2 } );
+          trig.sendUncollision( { *e1, *e2, f2.type } );
+          trig.sendUncollision( { *e2, *e1, f1.type } );
           cd.deleteCollision( *e1, *e2 );
         }
       }  // for each entity for *e1 to check for collisions with

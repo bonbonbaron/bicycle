@@ -35,7 +35,8 @@ class Trigger {
     // Le trifecta
     static void sendInput( Input& input );  // straightforward feeding to whatever holds context
     static void sendTimeout( const Timeout& timeout );  
-    static void sendCollision( const Collision& collision );  // TODO
+    static void sendCollision( const Collision& collision );
+    static void sendUncollision( const Collision& uncollision );
 
     void send();  // sends all the above
 
@@ -94,5 +95,6 @@ struct BridgedArray {
 struct Bridge {
   BridgedArray<Timeout> timeouts;
   BridgedArray<Collision> collisions;
+  BridgedArray<Collision> uncollisions;
   Input input; // Input is just a scalar.  // TODO should this be initialized?
 };

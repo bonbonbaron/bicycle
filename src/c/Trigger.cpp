@@ -86,6 +86,7 @@ void Trigger::sendInput( Input& input ) {
   bridge.input = input;
 }
 
+// Notice timeouts are only sent to outputs.
 void Trigger::sendTimeout( const Timeout& timeout ) {
   switch( timeout.addr ) {
     case TimeoutAddr::BRIDGE:
@@ -102,6 +103,10 @@ void Trigger::sendTimeout( const Timeout& timeout ) {
 
 void Trigger::sendCollision( const Collision& collision ) {
   bridge.collisions.add( collision );
+}
+
+void Trigger::sendUncollision( const Collision& uncollision ) {
+  bridge.uncollisions.add( uncollision );
 }
 
 void Trigger::send() {

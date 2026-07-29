@@ -1,5 +1,6 @@
 #include "c/Kinematics.h"
 #include "m/World.h"
+#include "trigLUT.h"
 
 auto Kinematics::getInstance() -> Kinematics& {
   static Kinematics kin{};
@@ -9,6 +10,30 @@ auto Kinematics::getInstance() -> Kinematics& {
 // TODO implement fixed point math here
 void Kinematics::run() {
   auto& boxes = World::get<Box>();
+  // Trackers need to know where they're going before we move them.
+  for ( const auto& track : _tracks ) {
+    auto& tracker = World::get<Box>( track.tracker ).pos;
+    auto& target = boxes.at( track.tgt ).pos;
+    // If motion is acceleration-based, accelerate toward target.
+    auto& trkrAcc = _accs.at( track.tracker ).pos;
+    auto& trkrVel = _vels.at( track.tracker ).pos;
+    // unit vector from tracker to target
+    auto direction = ( target - tracker).normalize();  
+    // Acceleration-based tracking
+    if ( ! trkrAcc.hasZeroMag() ) {
+      trkrAcc = direction * trkrAcc.mag();
+    }
+    // Velocity-based tracking
+    else if ( ! trkrVel.hasZeroMag() ) {
+      trkrVel = direction * trkrVel.mag();
+    }
+    // Position-based tracking
+    else {
+      // Since tracker as zero velocity, it just moves with its target.
+      tracker += _vels.at( track.tgt ).pos;
+    }
+  }
+
   // Add accelerations to velocities.
   for ( unsigned i = 0; i < NUM_SUPPORTED_ENTITIES; ++i ) {
     _vels.at(i) += _accs.at(i);
@@ -28,8 +53,6 @@ void Kinematics::run() {
   for ( unsigned i = 0; i < NUM_SUPPORTED_ENTITIES; ++i ) {
     boxes.at(i) += _vels.at(i);
   }
-  // TODO add tracking logic here
-  // TODO add 
 }
 
 void Kinematics::config( const Entity entity, const MotionConfig& src ) {

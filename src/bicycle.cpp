@@ -7,6 +7,7 @@
 #include "v/Dialogue.h"
 #include "v/TextMenu.h"
 #include "v/Scene.h"
+#include "c/MidiPlayer.h"
 
 namespace bicycle {
 
@@ -130,7 +131,51 @@ namespace bicycle {
       auto& trig = Trigger::getInstance();
       trig.sys( action, system, entity );
     }
-  }
+
+    // ============
+    // MIDI PLAYER 
+    // ============
+    void playSound( const int chan, const int key, const int vel ) {
+      auto& player = MidiPlayer::getInstance();
+      player.playSound( chan, key, vel );
+    }
+    void stopSound( const int chan ) {
+      auto& player = MidiPlayer::getInstance();
+      player.stopSound( chan );
+    }
+    void stopSoundFX() {
+      auto& player = MidiPlayer::getInstance();
+      player.stopSoundFX();
+    }
+    void playSoundFX( const int key, const int vel ) {
+      auto& player = MidiPlayer::getInstance();
+      player.playSoundFX(key, vel);
+    }
+    void playSong() {
+      auto& player = MidiPlayer::getInstance();
+      player.playSong();
+    }
+    void stopSong() {
+      auto& player = MidiPlayer::getInstance();
+      player.stopSong();
+    }
+    void pauseSong() {
+      auto& player = MidiPlayer::getInstance();
+      player.pauseSong();
+    }
+    void unpauseSong() {
+      auto& player = MidiPlayer::getInstance();
+      player.unpauseSong();
+    }
+    void loadMidi( const char* midiFilepath ) {
+      auto& player = MidiPlayer::getInstance();
+      player.loadMidi( midiFilepath );
+    }
+    void loadSoundfont( const char* sfFilepath ) {
+      auto& player = MidiPlayer::getInstance();
+      player.loadSoundfont( sfFilepath );
+    }
+  }  // extern "C"
 
   Entity pop() {
     auto& wm = WindowManager::getInstance();

@@ -23,6 +23,11 @@ class Kinematics : public Controllable {
     Kinematics(const Kinematics&&) = delete;
     Kinematics operator=(const Kinematics&&) = delete;
 
+    struct Track {
+      Entity tracker;
+      Entity tgt;
+    };
+
     // To streamline processing, linear and orbital accelerations are treated synonymously (x -> tangential, y -> radial (positive-outward), z ignored for 2D but axial vel in 3D).
     // Only the treatment of cartesian positions is distinguished. Orbits must be translated from rotational to cartesian coordinates at that point.
     // We'll use a sine (doubles as cosine) look-up table to streamline that. Debating between 8- and 16-bit.
@@ -32,6 +37,7 @@ class Kinematics : public Controllable {
     std::array<Velocity, NUM_SUPPORTED_ENTITIES> _terminalVels{};       
     std::array<Velocity, NUM_SUPPORTED_ENTITIES> _vels{};       
     std::array<Acceleration, NUM_SUPPORTED_ENTITIES> _accs{};
+    std::vector<Track> _tracks{};
     MotionType type{};
     Entity tgt{};  // orbiting, tracking (e.g. missiles), or just general destination
 };

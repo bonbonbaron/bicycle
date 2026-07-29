@@ -54,6 +54,8 @@ class Animator : public Controllable {
       std::shared_ptr<AnimStrip> currStrip{};
     };
 
+    void startTimer( const Entity entity, AnimState& state );
+
     // TODO make matching entities map to the same animation set
     std::array<AnimState, NUM_SUPPORTED_ENTITIES> _animStates{};
 
