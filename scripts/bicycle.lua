@@ -306,8 +306,8 @@ ffi.cdef([[
       end
     end
     -- Time-outs
-    if bridge.uncollisions.len > 0 then
-      for i = 0, bridge.uncollisions.len do
+    if bridge.timeouts.len > 0 then
+      for i = 0, bridge.timeouts.len do
         timeout = bridge.timeouts[i]
         entity = entities[timeout.entity]
         if not entity then error("Timeout recorded for nonexistent entity "..tostring(timeout.entity)..".") end
