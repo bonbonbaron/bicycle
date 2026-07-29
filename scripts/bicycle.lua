@@ -230,11 +230,14 @@ ffi.cdef([[
   void loadMidi( const char* midiFilepath );
   void loadSoundfont( const char* sfFilepath );
 
-
   Entity pop() {
     auto& wm = WindowManager::getInstance();
     return wm.pop();
   }
+
+  typedef unsigned TimerId;
+  TimerId createTimer( const unsigned timeMs, Entity entity, const unsigned timeoutType, const bool repeat, const TimeoutAddr addr );
+
   ]])
 
   function checkType( arg, expType )

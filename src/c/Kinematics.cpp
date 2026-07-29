@@ -11,14 +11,15 @@ auto Kinematics::getInstance() -> Kinematics& {
 void Kinematics::run() {
   auto& boxes = World::get<Box>();
   // Trackers need to know where they're going before we move them.
-  for ( const auto& track : _tracks ) {
-    auto& tracker = World::get<Box>( track.tracker ).pos;
-    auto& target = boxes.at( track.tgt ).pos;
+  for ( Entity follower = 0; follower < _tracks.size(); ++follower ) {
+    auto& target = _tracks.at( follower );
+    auto& trackerPos = World::get<Box>( follower ).pos;
+    auto& targetPos = boxes.at( target ).pos;
     // If motion is acceleration-based, accelerate toward target.
-    auto& trkrAcc = _accs.at( track.tracker ).pos;
-    auto& trkrVel = _vels.at( track.tracker ).pos;
+    auto& trkrAcc = _accs.at( follower ).pos;
+    auto& trkrVel = _vels.at( follower ).pos;
     // unit vector from tracker to target
-    auto direction = ( target - tracker).normalize();  
+    auto direction = ( targetPos - trackerPos ).normalize();  
     // Acceleration-based tracking
     if ( ! trkrAcc.hasZeroMag() ) {
       trkrAcc = direction * trkrAcc.mag();
@@ -30,7 +31,7 @@ void Kinematics::run() {
     // Position-based tracking
     else {
       // Since tracker as zero velocity, it just moves with its target.
-      tracker += _vels.at( track.tgt ).pos;
+      trackerPos += _vels.at( target ).pos;
     }
   }
 
@@ -85,6 +86,9 @@ void Kinematics::unpause( const Entity entity ) {
 }
 
 void Kinematics::track( Entity follower, Entity tgt ) {
-  _cfgs.at(follower).tgt = tgt;
+  _tracks.at( follower ) = tgt;
 }
 
+void Kinematics::untrack( Entity follower ) {
+  _tracks.at( follower ) = 0;
+}

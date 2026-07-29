@@ -175,6 +175,13 @@ namespace bicycle {
       auto& player = MidiPlayer::getInstance();
       player.loadSoundfont( sfFilepath );
     }
+
+    // Timer
+    // auto Timer::create( const unsigned timeMs, Entity entity, const unsigned timeoutType, const bool repeat, const TimeoutAddr addr) -> TimerId {
+    TimerID createTimer( const unsigned timeMs, Entity entity, const unsigned timeoutType, const bool repeat, const TimeoutAddr addr ) {
+      auto& timer = Timer::getInstance();
+      timer.create( timeMs, entity, timeoutType, repeat, addr );
+    }
   }  // extern "C"
 
   Entity pop() {

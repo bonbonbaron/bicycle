@@ -34,6 +34,7 @@ void CollisionDetector::check() {
         f2.pos += b2.pos;
         if ( b1.overlaps( b2 ) ) {
           if ( !wereCollided ) {
+            // TODO send both collisions in one function call by including both types
             trig.sendCollision( { *e1, *e2, f2.type } );
             trig.sendCollision( { *e2, *e1, f1.type } );
             cd.recordCollision( *e1, *e2 );

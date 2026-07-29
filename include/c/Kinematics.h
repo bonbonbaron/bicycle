@@ -4,6 +4,7 @@
 #include <vector>
 #include <array>
 #include "m/Entity.h"
+#include <unordered_set>
 
 class Kinematics : public Controllable {
   public:
@@ -15,7 +16,7 @@ class Kinematics : public Controllable {
     void pause( const Entity entity ) override;
     void unpause( const Entity entity ) override;
     void track( Entity follower, Entity tgt );  // tgt=0 to disable tracking
-
+    void untrack( Entity follower );  // tgt=0 to disable tracking
   private:
     Kinematics() = default;
     Kinematics(const Kinematics&) = delete;
@@ -37,7 +38,7 @@ class Kinematics : public Controllable {
     std::array<Velocity, NUM_SUPPORTED_ENTITIES> _terminalVels{};       
     std::array<Velocity, NUM_SUPPORTED_ENTITIES> _vels{};       
     std::array<Acceleration, NUM_SUPPORTED_ENTITIES> _accs{};
-    std::vector<Track> _tracks{};
+    std::array<Entity, NUM_SUPPORTED_ENTITIES> _tracks{};
     MotionType type{};
     Entity tgt{};  // orbiting, tracking (e.g. missiles), or just general destination
 };
