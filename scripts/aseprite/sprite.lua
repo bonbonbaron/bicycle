@@ -14,12 +14,10 @@ package.path = current_dir .. "?.lua;" .. package.path
 		\color maps    (png)
 		\tile sets     (png)
 		\tile maps     (lua)   (TODO: fix bug drawing tile indices in wrong order)
-		~animation      (lua)  (bookmark... need to insert frames flexibly)
+		\animation      (lua)  (bookmark... need to insert frames flexibly)
 			two types of animation: tile-based and frame-based.
-			TILE-BASED:
-				
-			FRAME-BASED:
-				TODO
+			\TILE-BASED
+			\FRAME-BASED
 		collision sets (lua)  -- needs to be animation frame- and strip-based
 		collision maps (lua)  -- 
 
@@ -138,7 +136,18 @@ local function getPixelValues(pixel, colorMode, spritePal)
 	end
 end
 
+local function getAnimTag(sprite, frameIdx)
+	for i = 1,#sprite.tags do
+		local tag = sprite.tags[i]
+		if frameIdx >= tag.fromFrame.frameNumber and frameIdx <= tag.toFrame.frameNumber then
+			return tag.name
+		end
+	end
+	return nil
+end
+
 local OUTPUT_DIR = "C:\\Users\\michael\\AppData\\Roaming\\Aseprite\\scripts\\output\\"
+
 local function getColors(ctr, globAnim)
 	if ctr.layers == nil then
 		error(debug.traceback())
@@ -205,7 +214,7 @@ local function getColors(ctr, globAnim)
 				outputTilesetImg:saveAs(outputColormapFp)
 				outputTilesetImg = nil
 			elseif layer.isImage then
-				local outputAnimSrcRects = {}
+				local outputAnimSrcRects = { strips = {} }
 				dbgp("PROCESSING LAYER "..layer.name.." AS AN IMAGE")
 				local outputColormapFp = OUTPUT_DIR..baseName.."_colormap.png"
 				-- First, obtain the total size of the output image.
@@ -219,19 +228,32 @@ local function getColors(ctr, globAnim)
 				end
 				local outputFullImg = Image(outputW, outputH, ColorMode.INDEXED)
 				local cumulativeWidth = 0
-				for _, cel in ipairs(layer.cels) do
+				for frameIdx, cel in ipairs(layer.cels) do
 					for pixel in cel.image:pixels() do  -- TODO support animation (multiple cels)
 						local srcX, srcY, pixelValue = getPixelValues(pixel, colorMode, spritePal)
 						colorpal:add(pixelValue)
 						cmIdx = colorpal.members[pixelValue]
 						outputFullImg:drawPixel(cumulativeWidth + srcX, srcY, cmIdx )
 					end   -- for each pixel in cel image
+					local srcRect = { x = cumulativeWidth, y = 0, w = cel.image.width, h = cel.image.height }
+					local animTag = getAnimTag(s, frameIdx)
+					print(animTag .. " IS MY TAG BABY")
+					if animTag and outputAnimSrcRects.strips[animTag] then
+						table.insert(outputAnimSrcRects.strips[animTag], srcRect)
+					elseif animTag then
+						outputAnimSrcRects.strips[animTag] = { srcRect }
+					else
+						table.insert(outputAnimSrcRects.strips["DEFAULT"], srcRect)
+					end
 					cumulativeWidth = cumulativeWidth + cel.image.width
 					-- While we're at it, let's add the source rectangle to the animation frame.
-					-- TODO we need to make a separate anim set for each layer.
-					-- insertSrcRect(globAnim, celIdx, cumulativeTilesWide, 0, cel.image.width, cel.image.height)
-				end  -- for each cel in layer
+					end  -- for each cel in layer
 				outputFullImg:saveAs(outputColormapFp)
+				-- If there are any animation frames, write out the source rectangles for each frame.
+				if next(outputAnimSrcRects) then
+					outputAnimSrcRects.refGlobalAnim = globAnim.name
+					g.serialize_table(baseName.."_anim_src_rects", outputAnimSrcRects, DEBUG)
+				end
 			end  -- whether layer is a tileset or an image
 			g.serialize_table(baseName.."_color_palette", colorpal:keys(), DEBUG)
 		end  -- if layer is group, recurse
@@ -244,7 +266,6 @@ local globAnim = getGlobalAnimData(s)
 if colorMode == ColorMode.RGB or colorMode == ColorMode.INDEXED then
 	getColors(s, globAnim)
 	if globAnim ~= nil then
-		local basename = s.filename:match("([^\\]*)%.[^%.]+$")
 		g.serialize_table(globAnim.name.."_globalAnim", globAnim, DEBUG)
 	end
 	--elseif colorMode == ColorMode.GRAY then  -- PSST! This'll be super useful for ASCII games.
