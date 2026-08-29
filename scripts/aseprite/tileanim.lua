@@ -1,9 +1,3 @@
-function printKeys(t)
-  for k, v in pairs(t) do
-    print(k..": "..tostring(v))
-  end
-end
-
 local spr = app.sprite
 if not spr then return end
 
@@ -16,7 +10,6 @@ local ts = layer.tileset
 local tileIdx = app.fgTile
 print("tileIdx is "..tileIdx)
 local tile = ts:tile(tileIdx)
--- printKeys(tile)
 if not tile then
   return app.alert("Select a tile in the tileset first.")
 end

@@ -15,7 +15,7 @@ package.path = current_dir .. "?.lua;" .. package.path
 		\tile sets     (png)
 		\tile maps     (lua)   (TODO: fix bug drawing tile indices in wrong order)
 		\animation      (lua)  (bookmark... need to insert frames flexibly)
-			two types of animation: tile-based and frame-based.
+			\two types of animation: tile-based and frame-based.
 			\TILE-BASED
 			\FRAME-BASED
 		collision sets (lua)  -- needs to be animation frame- and strip-based
@@ -271,3 +271,5 @@ if colorMode == ColorMode.RGB or colorMode == ColorMode.INDEXED then
 	--elseif colorMode == ColorMode.GRAY then  -- PSST! This'll be super useful for ASCII games.
 	-- TODO
 end
+
+app.events:off("fgcolorchange")
