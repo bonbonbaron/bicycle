@@ -2,6 +2,13 @@ local current_file = debug.getinfo(1, "S").source:match("^@?(.*)")
 local current_dir = current_file:match("^(.*[/\\])")
 package.path = current_dir .. "?.lua;" .. package.path
 
+
+local function pkv(m)
+  for k, v in pairs(m) do
+    print("key "..k.." --> "..tostring(v))
+  end
+end
+
 --[[
 	NOTES
 		1) minimizing the palette in AS excludes occluded colors, preventing parallax layers
@@ -18,6 +25,7 @@ package.path = current_dir .. "?.lua;" .. package.path
 			\two types of animation: tile-based and frame-based.
 			\TILE-BASED
 			\FRAME-BASED
+		ALMOST DONE WITH COLLISION... I just need to export the lua script containing their mapping now in sprite.lua.
 		collision sets (lua)  -- needs to be animation frame- and strip-based
 		collision maps (lua)  -- 
 
@@ -25,7 +33,7 @@ package.path = current_dir .. "?.lua;" .. package.path
 			  That means I need to output time remaining until the next tile change. 
 			  I need to figure out how I'll do this from Aseprite.
 ]]
-DEBUG = true
+DEBUG = false
 local function dbgp( s )
 	if DEBUG then
 		print(s)
@@ -46,6 +54,17 @@ if not s then
 	app.alert('no active sprite')
 	return
 end
+
+local function count(t)
+    local n = 0
+	if type(t) == "table" then
+		for _ in pairs(t) do
+			n = n + 1
+		end
+	end
+    return n
+end
+
 local colorMode = s.colorMode
 local spritePal = app.sprite.palettes[1]
 
@@ -175,13 +194,24 @@ local function getColors(ctr, globAnim)
 				local outputTileIdx = 0
 				local outputTilemap = {}
 				local outputTileset = { anim = {}, colormap = baseName.."_tileset_colormap" }
+				local outputCollmap = {}
+				local outputCollset = {}
 				-- Generate the tileset.
 				for tileIdx = 0, #layer.tileset - 1 do  -- don't go over image, do tileset
 					local tile = tileset:tile(tileIdx)
+					-- Tile animation
 					if tile.properties.duration then
-						print("tile "..tileIdx.." has duration "..tile.properties.duration)
 						table.insert(outputTileset.anim, { tileIdx = tileIdx, duration = tile.properties.duration })
 					end
+					-- Tile collision
+					if s.properties.tileIdxToCollisionType then
+						local collType = s.properties.tileIdxToCollisionType[tileIdx]
+						if collType then
+							outputCollmap[tileIdx] = collType
+							outputCollset[collType] = true
+						end
+					end
+					-- Tile image
 					local tileImg = tile.image -- the image of a cel within tileset
 					for pixel in tileImg:pixels() do
 						local srcX, srcY, pixelValue = getPixelValues(pixel, colorMode, spritePal)
@@ -211,6 +241,8 @@ local function getColors(ctr, globAnim)
 				end
 				g.serialize_table( baseName.."_tilemap", outputTilemap, DEBUG )
 				g.serialize_table( baseName.."_tileset", outputTileset, DEBUG )
+				g.serialize_table( baseName.."_collmap", outputCollmap, DEBUG )
+				g.serialize_table( baseName.."_collset", outputCollset, DEBUG )
 				outputTilesetImg:saveAs(outputColormapFp)
 				outputTilesetImg = nil
 			elseif layer.isImage then
@@ -220,6 +252,8 @@ local function getColors(ctr, globAnim)
 				-- First, obtain the total size of the output image.
 				local outputW = 0
 				local outputH = 0
+				-- Get maximum cel height to determine output image size.
+				-- Width can just be added together. Anim strips are horizontal in our engine.
 				for _, cel in ipairs(layer.cels) do
 					outputW = outputW + cel.image.width
 					if cel.image.height > outputH then
@@ -228,16 +262,24 @@ local function getColors(ctr, globAnim)
 				end
 				local outputFullImg = Image(outputW, outputH, ColorMode.INDEXED)
 				local cumulativeWidth = 0
+				local outputCollRects = {}
+				local outputCollSet = {}
 				for frameIdx, cel in ipairs(layer.cels) do
+					local collType = nil
+					-- Frame image
 					for pixel in cel.image:pixels() do  -- TODO support animation (multiple cels)
 						local srcX, srcY, pixelValue = getPixelValues(pixel, colorMode, spritePal)
 						colorpal:add(pixelValue)
 						cmIdx = colorpal.members[pixelValue]
 						outputFullImg:drawPixel(cumulativeWidth + srcX, srcY, cmIdx )
+						-- For now, support only one collision type per frame.
+						if layer.name == "collision" and s.properties.colorToCollisionType then
+							collType = collType or s.properties.colorToCollisionType[tostring(pixelValue)]
+						end
 					end   -- for each pixel in cel image
+					-- Frame animation
 					local srcRect = { x = cumulativeWidth, y = 0, w = cel.image.width, h = cel.image.height }
 					local animTag = getAnimTag(s, frameIdx)
-					print(animTag .. " IS MY TAG BABY")
 					if animTag and outputAnimSrcRects.strips[animTag] then
 						table.insert(outputAnimSrcRects.strips[animTag], srcRect)
 					elseif animTag then
@@ -246,13 +288,42 @@ local function getColors(ctr, globAnim)
 						table.insert(outputAnimSrcRects.strips["DEFAULT"], srcRect)
 					end
 					cumulativeWidth = cumulativeWidth + cel.image.width
-					-- While we're at it, let's add the source rectangle to the animation frame.
-					end  -- for each cel in layer
+					-- Frame collision (rectangle-based, at least for now in our engine)
+					if layer.name == "collision" then
+						local label = animTag or "default"
+						-- Start a new animation strip if this is a new one (or anim'd at all).	
+						local collRect = {
+							x = cel.bounds.x,
+							y = cel.bounds.y,
+							w = cel.bounds.w,
+							h = cel.bounds.h
+						}
+						outputCollRects[label] = outputCollRects[label] or {}
+						table.insert(outputCollRects[label], collRect)
+						if collType then 
+							outputCollSet[collType] = true
+						end
+					end
+				end  -- for each cel in layer
 				outputFullImg:saveAs(outputColormapFp)
 				-- If there are any animation frames, write out the source rectangles for each frame.
+				-- Collision map
 				if next(outputAnimSrcRects) then
 					outputAnimSrcRects.refGlobalAnim = globAnim.name
 					g.serialize_table(baseName.."_anim_src_rects", outputAnimSrcRects, DEBUG)
+				end
+				-- Collision set
+				if next(outputCollRects) then
+					g.serialize_table(baseName.."_collRects", outputCollRects, DEBUG)
+					if not next(outputCollSet) then
+						app.alert("Your sprite has coll rects, but no collision types.")
+					end
+				end
+				if next(outputCollSet) then
+					g.serialize_table(baseName.."_collSet", outputCollSet, DEBUG)
+					if not next(outputCollSet) then
+						app.alert("Your sprite has coll types, but no collision rects.")
+					end
 				end
 			end  -- whether layer is a tileset or an image
 			g.serialize_table(baseName.."_color_palette", colorpal:keys(), DEBUG)
@@ -271,5 +342,3 @@ if colorMode == ColorMode.RGB or colorMode == ColorMode.INDEXED then
 	--elseif colorMode == ColorMode.GRAY then  -- PSST! This'll be super useful for ASCII games.
 	-- TODO
 end
-
-app.events:off("fgcolorchange")

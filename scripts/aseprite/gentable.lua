@@ -29,7 +29,7 @@ local function serialize_value(filenamePrefix, val, dbg, indent)
   elseif t == "table" then
     return gen.serialize_table(filenamePrefix, val, dbg, indent)
   else
-    error("Unsupported type: " .. t)
+    error(debug.traceback().."\nUnsupported type: " .. t)
   end
 end
 

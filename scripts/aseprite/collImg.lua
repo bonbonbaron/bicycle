@@ -64,6 +64,7 @@ local function copyMap(src)
   return dst
 end
 
+local printed = false
 local function getProperties(datatype)
   datatype = datatype or "color"
   if datatype == "color" then
@@ -121,9 +122,13 @@ local function saveState(types, map, datatype)
   map = sanitizeMap(map) or {DEFAULT = ""}
   app.transaction("Update collision types", function()
     if datatype == "color" then
+      print("color-based collision:")
+      pkv(map)
       app.sprite.properties.colorCollisionTypes = types
       app.sprite.properties.colorToCollisionType = map
     elseif datatype == "tile" then
+      print("tile-based collision:")
+      pkv(map)
       app.sprite.properties.tileCollisionTypes = types
       app.sprite.properties.tileIdxToCollisionType = map
     end
@@ -254,6 +259,7 @@ local function showDialog(datatype)
       
       types, map = loadState(datatype)
       map[key] = chosen
+      print("setting "..key.." to "..chosen)
       saveState(types, map, datatype)
       dlg:modify{ id = "status", text = statusText(map, datatype) }
       app.tip(string.format("Color #%08X assigned to \"%s\"", key, chosen))
@@ -303,20 +309,6 @@ local function showDialog(datatype)
   }  -- button to adda  new datatype
 
   dlg:separator()
-
-  dlg:button{
-    id = "refresh",
-    text = "Refresh status",
-    onclick = function()
-      local current = app.sprite
-      if current == nil then
-        return
-      end
-      local _, map = loadState(datatype)
-      dlg:modify{ id = "status", text = statusText(map, datatype) }
-    end
-  }
-
 
   dlg:button{
     id = "clear",
@@ -411,3 +403,6 @@ if isValid() then
   local datatype = getDatatype()
   showDialog(datatype)
 end
+
+print("final color-to-coll state:")
+pkv(app.sprite.properties.colorToCollisionType)
