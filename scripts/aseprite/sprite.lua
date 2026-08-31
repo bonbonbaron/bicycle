@@ -178,7 +178,8 @@ local function getColors(ctr, globAnim)
 		end
 		-- layer is a group
 		local colorpal = Set.new(layer.name.." palette")
-		local baseName = layer.name:gsub("%s+", "_")
+		local layerName = layer.name:gsub("%s+", "_")
+		local spriteName = getBasename(s.filename)
 		local cmIdx
 		if layer.isGroup then
 			getColors(layer, globAnim)  -- recurse for each layer in layer group
@@ -186,14 +187,14 @@ local function getColors(ctr, globAnim)
 		else  -- layer is a standalone
 			if layer.isTilemap then
 				dbgp("PROCESSING LAYER "..layer.name.." AS A TILEMAP")
-				local outputColormapFp = OUTPUT_DIR..baseName.."_tileset_colormap.png"
+				local outputColormapFp = OUTPUT_DIR..layerName.."_tileset_colormap.png"
 				local tileset = layer.tileset
 				local TILE_W = tileset.grid.tileSize.width
 				local TILE_H = tileset.grid.tileSize.height
 				local outputTilesetImg = Image(TILE_W * #layer.tileset, TILE_H, ColorMode.INDEXED)
 				local outputTileIdx = 0
 				local outputTilemap = {}
-				local outputTileset = { anim = {}, colormap = baseName.."_tileset_colormap" }
+				local outputTileset = { anim = {}, colormap = layerName.."_tileset_colormap" }
 				local outputCollmap = {}
 				local outputCollset = {}
 				-- Generate the tileset.
@@ -228,9 +229,13 @@ local function getColors(ctr, globAnim)
 				outputTilemap["numTilesHigh"] = 0
 				local cumulativeTilesWide = 0
 				-- Write tile indices to output tilemap.
-				for _, cel in ipairs(layer.cels) do
-					for tileIdx in cel.image:pixels() do
-						table.insert( outputTilemap, tileIdx() ) -- TODO fix this
+				for _, cel in ipairs(layer.cels) do  -- for each frame
+					for row = 1, cel.image.height do  -- for each row in current tile
+						local curr = cumulativeTilesWide + (row * (cumulativeTilesWide + cel.image.width))
+						for col = 1, cel.image.width do  -- for each column in current tile
+							curr = curr + col
+							outputTilemap[curr] = cel.image:getPixel(col, row)
+						end
 					end
 					outputTilemap["numTilesWide"] = outputTilemap["numTilesWide"] + cel.image.width
 					if outputTilemap["numTilesHigh"] < cel.image.height then
@@ -239,16 +244,16 @@ local function getColors(ctr, globAnim)
 					-- While we're at it, let's add the source rectangle to the animation frame.
 					cumulativeTilesWide = cumulativeTilesWide + cel.image.width
 				end
-				g.serialize_table( baseName.."_tilemap", outputTilemap, DEBUG )
-				g.serialize_table( baseName.."_tileset", outputTileset, DEBUG )
-				g.serialize_table( baseName.."_collmap", outputCollmap, DEBUG )
-				g.serialize_table( baseName.."_collset", outputCollset, DEBUG )
+				g.serialize_table( layerName.."_tilemap", outputTilemap, DEBUG )
+				g.serialize_table( layerName.."_tileset", outputTileset, DEBUG )
+				g.serialize_table( layerName.."_collmap", outputCollmap, DEBUG )
+				g.serialize_table( layerName.."_collset", outputCollset, DEBUG )
 				outputTilesetImg:saveAs(outputColormapFp)
 				outputTilesetImg = nil
 			elseif layer.isImage then
 				local outputAnimSrcRects = { strips = {} }
 				dbgp("PROCESSING LAYER "..layer.name.." AS AN IMAGE")
-				local outputColormapFp = OUTPUT_DIR..baseName.."_colormap.png"
+				local outputColormapFp = OUTPUT_DIR..layerName.."_colormap.png"
 				-- First, obtain the total size of the output image.
 				local outputW = 0
 				local outputH = 0
@@ -310,23 +315,23 @@ local function getColors(ctr, globAnim)
 				-- Collision map
 				if next(outputAnimSrcRects) then
 					outputAnimSrcRects.refGlobalAnim = globAnim.name
-					g.serialize_table(baseName.."_anim_src_rects", outputAnimSrcRects, DEBUG)
+					g.serialize_table(layerName.."_anim_src_rects", outputAnimSrcRects, DEBUG)  -- reusable per sprite, so name after layer
 				end
 				-- Collision set
 				if next(outputCollRects) then
-					g.serialize_table(baseName.."_collRects", outputCollRects, DEBUG)
+					g.serialize_table(spriteName.."_collRects", outputCollRects, DEBUG)  -- only one per sprite, so name after sprite
 					if not next(outputCollSet) then
 						app.alert("Your sprite has coll rects, but no collision types.")
 					end
 				end
 				if next(outputCollSet) then
-					g.serialize_table(baseName.."_collSet", outputCollSet, DEBUG)
+					g.serialize_table(spriteName.."_collSet", outputCollSet, DEBUG)  -- only one per sprite, so name after sprite
 					if not next(outputCollSet) then
 						app.alert("Your sprite has coll types, but no collision rects.")
 					end
 				end
 			end  -- whether layer is a tileset or an image
-			g.serialize_table(baseName.."_color_palette", colorpal:keys(), DEBUG)
+			g.serialize_table(layerName.."_color_palette", colorpal:keys(), DEBUG)
 		end  -- if layer is group, recurse
 		::continue::
 	end  -- for each layer
