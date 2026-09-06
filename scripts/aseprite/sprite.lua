@@ -10,28 +10,14 @@ local function pkv(m)
 end
 
 --[[
-	NOTES
-		1) minimizing the palette in AS excludes occluded colors, preventing parallax layers
-		2) every layer should be saved separately except in sprites, where we'll flatten for safety
-		3) only one color palette is allowed per animation frame across
-		4) layers shrink-wrap their contents when we write out. That's good!
-		
-	So for worlds, i want to
-		\color sets    (png)
-		\color maps    (png)
-		\tile sets     (png)
-		\tile maps     (lua)   (TODO: fix bug drawing tile indices in wrong order)
-		\animation      (lua)  (bookmark... need to insert frames flexibly)
-			\two types of animation: tile-based and frame-based.
-			\TILE-BASED
-			\FRAME-BASED
-		ALMOST DONE WITH COLLISION... I just need to export the lua script containing their mapping now in sprite.lua.
-		collision sets (lua)  -- needs to be animation frame- and strip-based
-		collision maps (lua)  -- 
+	Remaining things to do:
+		0. support ColorMode.GRAY
+		1. wrap all outputs into a single body lua file
+		2. wrap body file into a genome lua file
+		3. load genome from bicycle and see what it does
+		4. convert pixels to ASCII (how to handle terminals with limited color?)
+		5. 
 
-	BOOKMARK: okay.... i'm seeing what needs to happen. Tile-based animation changes per tile, not entire image.
-			  That means I need to output time remaining until the next tile change. 
-			  I need to figure out how I'll do this from Aseprite.
 ]]
 DEBUG = false
 local function dbgp( s )
