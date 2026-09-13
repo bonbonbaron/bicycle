@@ -8,6 +8,7 @@
 #include "v/TextMenu.h"
 #include "v/Scene.h"
 #include "c/MidiPlayer.h"
+#include "c/Dice.h"
 
 namespace bicycle {
 
@@ -178,9 +179,14 @@ namespace bicycle {
 
     // Timer
     // auto Timer::create( const unsigned timeMs, Entity entity, const unsigned timeoutType, const bool repeat, const TimeoutAddr addr) -> TimerId {
-    TimerID createTimer( const unsigned timeMs, Entity entity, const unsigned timeoutType, const bool repeat, const TimeoutAddr addr ) {
+    TimerId createTimer( const unsigned timeMs, Entity entity, const unsigned timeoutType, const bool repeat, const TimeoutAddr addr ) {
       auto& timer = Timer::getInstance();
-      timer.create( timeMs, entity, timeoutType, repeat, addr );
+      return timer.create( timeMs, entity, timeoutType, repeat, addr );
+    }
+
+    int rollDice( const int min, const int max ) {
+      auto d = Dice( min, max );
+      return d.roll();
     }
   }  // extern "C"
 
@@ -194,12 +200,24 @@ namespace bicycle {
     auto& trigger = Trigger::getInstance();
 
     while ( wm.size() > 0 ) {
+      // Inputs
       Timer::run();
       SshInput::listen();
       CollisionDetector::check();
+      // Process inputs
       trigger.send();
+      // Outputs
       wm.render();   // TODO make this internally only change dirty windows
-      Timer::sleepFrame();
+
+      // This is dummy-code for testing colors.
+      // std::array<chtype, 100> chs{};
+      // chs.fill( 'H' | COLOR_PAIR(RED) );
+      // chs.at(chs.size() - 1 ) = '\0';
+      // move(10,10);
+      // addchstr(chs.data());
+      // refresh();
+
+      Timer::sleepFrame();  // burn off excess frame time
     }
 
     return endwin();

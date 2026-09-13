@@ -115,18 +115,18 @@ void Window::setHeight( const int h ) {
   wresize( _win, _h, _w );
 }
 
-void Window::setAttr( const int attr ) {
-  wattron( _win, attr );
-}
-
-void Window::unsetAttr( const int attr ) {
-  wattroff( _win, attr );
-}
-
 auto Window::getContext() const -> Entity {
   return _context;
 }
 
 auto Window::getId() const -> Entity {
   return _id;
+}
+
+void Window::setAttr( const int attr ) {
+  wattron( _win, attr );
+}
+
+void Window::unsetAttr( const int attr ) {
+  wattroff( _win, attr );
 }

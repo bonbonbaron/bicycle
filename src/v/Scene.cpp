@@ -84,6 +84,9 @@ void Scene::render() {
       case LayerType::PARALLAX:  // Moves parallax to camera's focused-on layer
         // TODO
         break;
+      case LayerType::LOOP:      // Loops back on itself as camera moves past its boundaries
+        // TODO
+        break;
       case LayerType::AUTOLOOP:  // Moves in constant velocity and loops back
         // TODO
         break;

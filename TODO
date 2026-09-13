@@ -1,11 +1,4 @@
-GOALS FOR THIS WEEKEND:
-  \ make a proper scene loader so entities can be added to the scene class
-  \ image drawing wherever i want, however many times i want it to
-  \ moving image around with keyboard
-  \ motion system ( triggerize it, make sys call available in lua, expose motion's more specialized funcs to lua)
-  \ animation system ( triggerize it, make sys call available in lua, expose motion's more specialized funcs to lua)
-
-TODAY:
+REMAINING:
   \  make 3 triggers send data for Trigger.cpp to fill 2 arrays with 
   \  share that array with FFI in bicycle.lua
   \  impl, test, and debug Image, all in C++

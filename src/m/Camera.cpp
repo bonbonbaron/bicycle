@@ -3,6 +3,36 @@
 #include <algorithm>
 #include "m/World.h"
 
+
+/* TODO: consider using these functions:
+ * int add_wchstr(const cchar_t *wchstr);
+ * int add_wchnstr(const cchar_t *wchstr, int n);
+ * int wadd_wchstr(WINDOW * win, const cchar_t *wchstr);
+ * int wadd_wchnstr(WINDOW * win, const cchar_t *wchstr, int n);
+ *
+ * int mvadd_wchstr(int y, int x, const cchar_t *wchstr);
+ * int mvadd_wchnstr(int y, int x, const cchar_t *wchstr, int n);
+ * int mvwadd_wchstr(WINDOW *win, int y, int x, const cchar_t *wchstr);
+ * int mvwadd_wchnstr(WINDOW *win, int y, int x, const cchar_t *wchstr, int n);
+ *
+ *
+ * These functions copy the (null-terminated) array of complex characters wchstr into the window image structure starting at the current cursor position.  The four  functions
+ * with  n  as  the last argument copy at most n elements, but no more than will fit on the line.  If n=-1 then the whole array is copied, to the maximum number of characters
+ * that will fit on the line.
+ *
+ * The window cursor is not advanced.  These functions work faster than waddnstr.  On the other hand:
+ *
+ * •   they do not perform checking (such as for the newline, backspace, or carriage return characters),
+ *
+ * •   they do not advance the current cursor position,
+ *
+ * •   they do not expand other control characters to ^-escapes, and
+ *
+ * •   they truncate the string if it crosses the right margin, rather than wrapping it around to the new line.
+ *
+ * These functions end successfully on encountering a null cchar_t, or when they have filled the current line.  If a complex character cannot completely fit at the end of the
+ * current line, the remaining columns are filled with the background character and rendition.
+ */
 Camera::Camera() : _id( newEntityId() ) {}
 
 Camera::Camera( const int x, const int y, const int margin ) : _id( newEntityId() ), _margin(margin) {
@@ -92,6 +122,7 @@ auto Camera::getId() const -> Entity {
 
 // Images don't own boxs because motion system needs those to be separate.
 // So instead we access those via entity ID.
+// TODO distinguish between drawing backgrounds and foregrounds
 void Camera::draw( const Entity entity, Window& tgt ) {
   // TODO Consider making a pointer to this.
   const auto& camBox = World::get<Box>( _id );  // entity->body.getPosition();

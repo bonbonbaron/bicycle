@@ -11,10 +11,10 @@ auto Box::overlaps( const Box& rhs ) const -> bool {
 auto Box::crop( const Box& rhs ) const -> Box {
   Box output{};
   if ( this->overlaps( rhs ) ) {
-    // Position of cropped boxangle
+    // Position of cropped rectangle
     output.pos.x = std::max( this->pos.x, rhs.pos.x );
     output.pos.y = std::max( this->pos.y, rhs.pos.y );
-    // Size of cropped boxangle ( min right size - max left side )
+    // Size of cropped rectangle ( min right size - max left side )
     output.size.w =   std::min( ( rhs.pos.x + rhs.size.w ), ( this->pos.x + this->size.w ) )
                     - std::max( rhs.pos.x, this->pos.x );
     output.size.h =   std::min( ( rhs.pos.y + rhs.size.h ), ( this->pos.y + this->size.h ) )

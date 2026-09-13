@@ -238,89 +238,90 @@ ffi.cdef([[
   typedef unsigned TimerId;
   TimerId createTimer( const unsigned timeMs, Entity entity, const unsigned timeoutType, const bool repeat, const TimeoutAddr addr );
 
-  ]])
+  int rollDice( const int min, const int max );
+]])
 
-  function checkType( arg, expType )
-    if type(arg) ~= expType then 
-      error( debug.traceback().."\n\nExpected a "..expType..", got a "..type(arg) )
+function checkType( arg, expType )
+  if type(arg) ~= expType then 
+    error( debug.traceback().."\n\nExpected a "..expType..", got a "..type(arg) )
+  end
+end
+
+gameName = ""
+
+local entities = {}  -- maps entity ID to callbackID-to-callback maps
+local focus = 0
+
+function register( entityId, entity )
+  entities[entityId] = entity -- TODO check whether entity ID is already used in table later
+end
+
+function unregister( id )
+  if not id then
+    error("trying to unregsiter "..id, 5)
+  end
+  entities[id] = nil
+end
+
+function focusOn( entity )
+  focus = entity
+end
+
+--TODO write wrappers for menu and dialogue that 1) don't require dimensions and 2) auto-focus on them, 3) send moveCursorUp/Down()
+--TODO write wrappers for system calls
+
+function move( entity, vel )
+  checkType( entity, "number" )
+  checkType( vel, "table" )
+  -- TODO write a motion config wrapper in bicycle.cpp.
+  -- TODO write a Motion table that defaults values and allows you to easily define a motion in Lua. Then you can handle all the nasty configuration stuff here.
+  if vel.x and vel.y then
+    sys( START, SYS_MOTION, entity )
+  end
+end
+
+-------------------------------------
+
+local bridge
+function initBridge( bridgePtr )
+  bridge = ffi.cast("Bridge*", bridgePtr)
+end
+
+function getUpdates()
+  -- Collisions
+  if bridge.collisions.len > 0 then
+    for i = 0, bridge.collisions.len do
+      coll = bridge.collisions.arr[i]
+      entity = entities[coll.lhs]
+      if not entity then error("Collision recorded for nonexistent entity "..tostring(coll.lhs)..".") end
+      entity:onCollision( coll.rhs, coll.type )
     end
   end
-
-  gameName = ""
-
-  local entities = {}  -- maps entity ID to callbackID-to-callback maps
-  local focus = 0
-
-  function register( entityId, entity )
-    entities[entityId] = entity -- TODO check whether entity ID is already used in table later
-  end
-
-  function unregister( id )
-    if not id then
-      error("trying to unregsiter "..id, 5)
-    end
-    entities[id] = nil
-  end
-
-  function focusOn( entity )
-    focus = entity
-  end
-
-  --TODO write wrappers for menu and dialogue that 1) don't require dimensions and 2) auto-focus on them, 3) send moveCursorUp/Down()
-  --TODO write wrappers for system calls
-
-  function move( entity, vel )
-    checkType( entity, "number" )
-    checkType( vel, "table" )
-    -- TODO write a motion config wrapper in bicycle.cpp.
-    -- TODO write a Motion table that defaults values and allows you to easily define a motion in Lua. Then you can handle all the nasty configuration stuff here.
-    if vel.x and vel.y then
-      sys( START, SYS_MOTION, entity )
+  -- Uncollisions
+  if bridge.uncollisions.len > 0 then
+    for i = 0, bridge.uncollisions.len do
+      coll = bridge.uncollisions.arr[i]
+      entity = entities[coll.lhs]
+      if not entity then error("Un-collision recorded for nonexistent entity "..tostring(coll.lhs)..".") end
+      entity:onCollision( coll.rhs, coll.type )
     end
   end
-
-  -------------------------------------
-
-  local bridge
-  function initBridge( bridgePtr )
-    bridge = ffi.cast("Bridge*", bridgePtr)
-  end
-
-  function getUpdates()
-    -- Collisions
-    if bridge.collisions.len > 0 then
-      for i = 0, bridge.collisions.len do
-        coll = bridge.collisions.arr[i]
-        entity = entities[coll.lhs]
-        if not entity then error("Collision recorded for nonexistent entity "..tostring(coll.lhs)..".") end
-        entity:onCollision( coll.rhs, coll.type )
-      end
-    end
-    -- Uncollisions
-    if bridge.uncollisions.len > 0 then
-      for i = 0, bridge.uncollisions.len do
-        coll = bridge.uncollisions.arr[i]
-        entity = entities[coll.lhs]
-        if not entity then error("Un-collision recorded for nonexistent entity "..tostring(coll.lhs)..".") end
-        entity:onCollision( coll.rhs, coll.type )
-      end
-    end
-    -- Time-outs
-    if bridge.timeouts.len > 0 then
-      for i = 0, bridge.timeouts.len do
-        timeout = bridge.timeouts[i]
-        entity = entities[timeout.entity]
-        if not entity then error("Timeout recorded for nonexistent entity "..tostring(timeout.entity)..".") end
-        entity:onTimeout( timeout.id, timeout.type )
-      end
-    end
-    -- Inputs
-    if bridge.input.lastPressed ~= ffi.C.NOTHING then
-      entity = entities[focus]
-      if not entity then error("We're focused on nonexistent entity "..tostring(focus)..".") end
-      if entity and bridge.input.lastPressed then
-        entity:onInput( bridge.input.lastPressed )
-        bridge.input.lastPressed = ffi.C.NOTHING
-      end
+  -- Time-outs
+  if bridge.timeouts.len > 0 then
+    for i = 0, bridge.timeouts.len do
+      timeout = bridge.timeouts[i]
+      entity = entities[timeout.entity]
+      if not entity then error("Timeout recorded for nonexistent entity "..tostring(timeout.entity)..".") end
+      entity:onTimeout( timeout.id, timeout.type )
     end
   end
+  -- Inputs
+  if bridge.input.lastPressed ~= ffi.C.NOTHING then
+    entity = entities[focus]
+    if not entity then error("We're focused on nonexistent entity "..tostring(focus)..".") end
+    if entity and bridge.input.lastPressed then
+      entity:onInput( bridge.input.lastPressed )
+      bridge.input.lastPressed = ffi.C.NOTHING
+    end
+  end
+end

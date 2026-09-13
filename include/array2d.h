@@ -10,9 +10,9 @@
 template<typename T>
 class Array2D {
 private:
-    std::vector<T> data;
-    size_t rows_;
-    size_t cols_;
+    size_t rows_{};
+    size_t cols_{};
+    std::vector<T> data{};
 
 public:
     // Constructor

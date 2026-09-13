@@ -12,7 +12,40 @@
 #include "v/Window.h"
 #include "v/Image.h"
 
-enum LayerType { FIXED, GLUED, PARALLAX, AUTOLOOP };
+#include "array2d.h"
+
+enum LayerType { FIXED, GLUED, PARALLAX, LOOP, AUTOLOOP };
+
+struct TileStage {
+  // TileStage( int c, Color color, char duration, char collType
+  const chtype img{};           // includes color
+  const char duration{};        // only ONE timer gets created for all homogeneous tiles on-screen
+  const char collType{};        // can be assigned FIRE, WATER, NORMAL, etc. Lua-side
+};
+
+struct TileCycle {
+  unsigned len{};
+  TileStage* stages{};
+};
+
+struct Tilemap {
+  Size dimsPerTile{1,1}; // Some tilesets' tiles may be bigger than 1x1.
+  Size numTiles{};       // Number of tiles in each dimension
+  TileCycle* tileset{};  // Palette of tiles we draw from
+  unsigned *tilemap{};   // Indices into the tileset; lays out their arrangement
+};
+
+// What we CAN do for ease of use is divide this into an SoA:
+//      1. collision layer
+//      2. image layer
+
+struct Background {
+  Array2D<unsigned> collisionLayer{};
+  Array2D<TileCycle> tileCycles{};
+};
+
+// We can't construct the full image since tile have a color attribute that has to be draw with waddch().
+// But we can make a 2D array to make things easier.
 
 struct Layer {
   Layer();

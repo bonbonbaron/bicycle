@@ -29,9 +29,6 @@ class Window {
     auto getWidth() const -> unsigned;
     auto getHeight() const -> unsigned;
 
-    void setAttr( const int attr );
-    void unsetAttr( const int attr );
-
     void setX( const int x );
     void setY( const int y );
     void setWidth( const int w );
@@ -46,6 +43,9 @@ class Window {
 
     auto getContext() const -> Entity; // window's an entity now
     auto getId() const -> Entity;
+    void setAttr( const int attr );
+    void unsetAttr( const int attr );
+
   private:
     WINDOW* _win;
     chtype _colorPair;

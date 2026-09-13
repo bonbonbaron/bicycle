@@ -1,10 +1,20 @@
 #include <iterator>
 #include <cassert>
-
 #include "c/CollisionDetector.h"
 #include "c/Trigger.h"
 #include "m/World.h"
 
+/* What kind of mage do I want to be?
+       * One who understands, but not one who philosophizes.
+       * One who gets tools out quickly.
+       * One who's result-oriented.
+       * One who serves others rather than his own ego (e.g. the idol of own's own cleverness).
+       */
+
+// It's wise to give each tile control over its own dimension.
+// Because then there are fewer collisions to check in bigger tiles.
+// However, that erases the meaning of "number of tiles high/wide".
+// What this means is getting the smallest tile dim, or rather, a flat-out 1x1 tile size, and creating a grid on that.
 auto CollisionDetector::getInstance() -> CollisionDetector& {
   static CollisionDetector cd;
   return cd;
@@ -17,6 +27,9 @@ void CollisionDetector::check() {
   // TODO Background collision detection
   for ( const auto& collLayer : collLayers ) {
     for ( auto e1 = collLayer.begin(); e1 != collLayer.end(); ++e1 ) {
+      /* TODO bg element width & height to compute which cells you overlap
+              Does that require a structure? Like a bg tiledim, width, and height structure?
+       */
     }
   }
   // Foreground collision detection
