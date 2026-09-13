@@ -6,9 +6,10 @@
   - Nested key-value tables
 ]]
 require("debug")
+cfg = require("config")
 local gen = {}
 
-local function serialize_value(filenamePrefix, val, dbg, indent)
+local function serialize_value(fileBasename, val, dbg, indent)
   indent = indent or ""
   local t = type(val)
 
@@ -27,14 +28,14 @@ local function serialize_value(filenamePrefix, val, dbg, indent)
     -- Escape special characters and wrap in double quotes
     return string.format("%q", val)
   elseif t == "table" then
-    return gen.serialize_table(filenamePrefix, val, dbg, indent)
+    return gen.serialize_table(fileBasename, val, dbg, indent)
   else
     error(debug.traceback().."\nUnsupported type: " .. t)
   end
 end
 
-function gen.serialize_table (filenamePrefix, tbl, dbg, indent)
-  local arg1type = type(filenamePrefix)
+function gen.serialize_table (fileBasename, tbl, dbg, indent)
+  local arg1type = type(fileBasename)
   local arg2type = type(tbl)
   if arg1type ~= "string" then
     error("gen.serialize_table(): arg 1 is supposed to be a string, got a "..arg1type.."\n"..debug.traceback())
@@ -44,7 +45,7 @@ function gen.serialize_table (filenamePrefix, tbl, dbg, indent)
   indent = indent or ""
   local next_indent = indent .. "  "
   local parts = {}
-  filenamePrefix = filenamePrefix:gsub(" ", "_")
+  fileBasename = fileBasename:gsub(" ", "_")
 
   -- Determine if the table is a pure array (consecutive integer keys starting at 1)
   local is_array = true
@@ -63,11 +64,11 @@ function gen.serialize_table (filenamePrefix, tbl, dbg, indent)
   if is_array and count == max_index then
     -- Pure array: write values only
     for i = 1, max_index do
-      local val = serialize_value(filenamePrefix, tbl[i], dbg, next_indent)
+      local val = serialize_value(fileBasename, tbl[i], dbg, next_indent)
       if val == nil then
         error(debug.traceback("got a nil value"))
       end
-      table.insert(parts, next_indent .. serialize_value(filenamePrefix, tbl[i], dbg, next_indent))
+      table.insert(parts, next_indent .. serialize_value(fileBasename, tbl[i], dbg, next_indent))
     end
   else
     -- Dictionary / mixed table: write key = value
@@ -78,15 +79,15 @@ function gen.serialize_table (filenamePrefix, tbl, dbg, indent)
         key_str = k
       else
         -- Otherwise use [key] syntax
-        key_str = "[" .. serialize_value(filenamePrefix, k, dbg, next_indent) .. "]"
+        key_str = "[" .. serialize_value(fileBasename, k, dbg, next_indent) .. "]"
       end
-      table.insert(parts, next_indent .. key_str .. " = " .. serialize_value(filenamePrefix, v, dbg, next_indent))
+      table.insert(parts, next_indent .. key_str .. " = " .. serialize_value(fileBasename, v, dbg, next_indent))
     end
   end
 
   if #parts == 0 then
     if dbg then
-      print("returning empty")
+      print("returning empty for "..fileBasename)
     end
     return "{}"
   end
@@ -96,11 +97,11 @@ function gen.serialize_table (filenamePrefix, tbl, dbg, indent)
     return table_literal
   end
 
-  local contents = "--auto-generated table by generate_table.lua\n\nlocal "..filenamePrefix.." = " .. table_literal .. "\n\nreturn "..filenamePrefix
+  local contents = "--auto-generated table by generate_table.lua\n\nlocal "..fileBasename.." = " .. table_literal .. "\n\nreturn "..fileBasename
   -- Write the file
-  local outfile = filenamePrefix..".lua"
+  local outfile = fileBasename..".lua"
   -- TODO figure out how to configure where this goes in game engine context
-  local f, err = io.open("C:\\Users\\michael\\AppData\\Roaming\\Aseprite\\scripts\\output\\"..outfile, "w")
+  local f, err = io.open(cfg.genomePath..outfile, "w")
   if not f then
     error("Could not open " .. outfile .. " for writing: " .. tostring(err))
   end

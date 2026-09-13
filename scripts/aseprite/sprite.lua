@@ -1,7 +1,8 @@
 local current_file = debug.getinfo(1, "S").source:match("^@?(.*)")
 local current_dir = current_file:match("^(.*[/\\])")
 package.path = current_dir .. "?.lua;" .. package.path
-
+local cfg = require("config")
+local ascii = require("pixelToAscii")
 
 local function pkv(m)
   for k, v in pairs(m) do
@@ -19,7 +20,7 @@ end
 		5. 
 
 ]]
-DEBUG = false
+DEBUG = true
 local function dbgp( s )
 	if DEBUG then
 		print(s)
@@ -91,11 +92,10 @@ end
 
 
 local function getGlobalAnimData(sprite)
-	local globalAnimData = { strips = {} }
+	local globalAnimData = { strips = {}, name = getBasename(sprite.filename) }
 	-- ... what if there are untagged frames amidst tag ones?
 	-- we'll only support one set of untagged frames. That'll be keyed "DEFAULT".
 	if #sprite.tags > 0 then
-		globalAnimData.name = getBasename(sprite.filename)
 		for i = 1,#sprite.tags do
 			local tag = sprite.tags[i]
 			globalAnimData.strips[tag.name] = {}
@@ -114,6 +114,7 @@ local function getGlobalAnimData(sprite)
 		end
 		-- TODO handle the case of leftover frames that're untagged
 	elseif #sprite.frames > 1 then
+		dbgp("WARNING: Your animation frames are untagged, so we're making only one and naming it 'DEFAULT'.")
 		local DEFAULT_KEY = "DEFAULT"
 		globalAnimData.strips[DEFAULT_KEY] = {}
 		globalAnimData.strips[DEFAULT_KEY].direction = AniDir.FORWARD
@@ -122,7 +123,7 @@ local function getGlobalAnimData(sprite)
 		globalAnimData.strips[DEFAULT_KEY].frames = {}
 		local frames = globalAnimData.strips[DEFAULT_KEY].frames
 		for i = 1,#sprite.frames do
-			table.insert( frames, { duration = frames[i].duration })
+			table.insert( frames, { duration = sprite.frames[i].duration })
 		end
 	else
 		globalAnimData = nil
@@ -151,9 +152,7 @@ local function getAnimTag(sprite, frameIdx)
 	return nil
 end
 
-local OUTPUT_DIR = "C:\\Users\\michael\\AppData\\Roaming\\Aseprite\\scripts\\output\\"
-
-local function getColors(ctr, globAnim)
+local function makeSprite(ctr, globAnim)
 	if ctr.layers == nil then
 		error(debug.traceback())
 	end
@@ -168,12 +167,12 @@ local function getColors(ctr, globAnim)
 		local spriteName = getBasename(s.filename)
 		local cmIdx
 		if layer.isGroup then
-			getColors(layer, globAnim)  -- recurse for each layer in layer group
+			makeSprite(layer, globAnim)  -- recurse for each layer in layer group
 			-- TODO groups of layers may warrant combined anim info
 		else  -- layer is a standalone
 			if layer.isTilemap then
 				dbgp("PROCESSING LAYER "..layer.name.." AS A TILEMAP")
-				local outputColormapFp = OUTPUT_DIR..layerName.."_tileset_colormap.png"
+				local outputColormapFp = cfg.genomePath..layerName.."_tileset_colormap.png"
 				local tileset = layer.tileset
 				local TILE_W = tileset.grid.tileSize.width
 				local TILE_H = tileset.grid.tileSize.height
@@ -239,7 +238,13 @@ local function getColors(ctr, globAnim)
 			elseif layer.isImage then
 				local outputAnimSrcRects = { strips = {} }
 				dbgp("PROCESSING LAYER "..layer.name.." AS AN IMAGE")
-				local outputColormapFp = OUTPUT_DIR..layerName.."_colormap.png"
+				-- Decide between outputting ASCII art or pixel art.
+				local outputColormapFp = cfg.genomePath..layerName.."_colormap."
+				local ext = "png"
+				if cfg.ascii then
+					ext = "lua"
+				end
+				outputColormapFp = outputColormapFp .. ext
 				-- First, obtain the total size of the output image.
 				local outputW = 0
 				local outputH = 0
@@ -251,23 +256,37 @@ local function getColors(ctr, globAnim)
 						outputH = cel.image.height
 					end
 				end
-				local outputFullImg = Image(outputW, outputH, ColorMode.INDEXED)
+				local outputFullImg
+				if cfg.ascii then
+					outputFullImg = Image(outputW, outputH, ColorMode.INDEXED)
+				else
+					outputFullImg = ""
+				end
 				local cumulativeWidth = 0
 				local outputCollRects = {}
 				local outputCollSet = {}
+				local asciiFrames = {}
 				for frameIdx, cel in ipairs(layer.cels) do
 					local collType = nil
 					-- Frame image
-					for pixel in cel.image:pixels() do  -- TODO support animation (multiple cels)
-						local srcX, srcY, pixelValue = getPixelValues(pixel, colorMode, spritePal)
-						colorpal:add(pixelValue)
-						cmIdx = colorpal.members[pixelValue]
-						outputFullImg:drawPixel(cumulativeWidth + srcX, srcY, cmIdx )
-						-- For now, support only one collision type per frame.
-						if layer.name == "collision" and s.properties.colorToCollisionType then
-							collType = collType or s.properties.colorToCollisionType[tostring(pixelValue)]
-						end
-					end   -- for each pixel in cel image
+					if cfg.ascii then
+							local currCelAsAscii = ascii.image_to_ascii(s, cel.image, cel, "detailed", false)
+							table.insert(asciiFrames, currCelAsAscii)
+					else
+						for pixel in cel.image:pixels() do  -- TODO support animation (multiple cels)
+							local srcX, srcY, pixelValue = getPixelValues(pixel, colorMode, spritePal)
+							colorpal:add(pixelValue)
+							cmIdx = colorpal.members[pixelValue]
+							outputFullImg:drawPixel(cumulativeWidth + srcX, srcY, cmIdx )  -- This is the key fork in the road between pixel and ASCII.
+							-- For now, support only one collision type per frame.
+							if layer.name == "collision" and s.properties.colorToCollisionType then
+								collType = collType or s.properties.colorToCollisionType[tostring(pixelValue)]
+							end
+						end   -- for each pixel in cel image
+					end
+					if cfg.ascii then
+						outputFullImg = ascii.hconcat(asciiFrames, " ")
+					end
 					-- Frame animation
 					local srcRect = { x = cumulativeWidth, y = 0, w = cel.image.width, h = cel.image.height }
 					local animTag = getAnimTag(s, frameIdx)
@@ -275,7 +294,10 @@ local function getColors(ctr, globAnim)
 						table.insert(outputAnimSrcRects.strips[animTag], srcRect)
 					elseif animTag then
 						outputAnimSrcRects.strips[animTag] = { srcRect }
-					else
+					else  -- if there is no tag foer this animation, name it "DEFAULT".
+						if outputAnimSrcRects.strips["DEFAULT"] == nil then
+							outputAnimSrcRects.strips["DEFAULT"] = {}
+						end
 						table.insert(outputAnimSrcRects.strips["DEFAULT"], srcRect)
 					end
 					cumulativeWidth = cumulativeWidth + cel.image.width
@@ -296,7 +318,14 @@ local function getColors(ctr, globAnim)
 						end
 					end
 				end  -- for each cel in layer
-				outputFullImg:saveAs(outputColormapFp)
+				if cfg.ascii then
+					-- TODO convert image to ascii first
+					-- TODO store it in a table
+					-- TODO serialize it
+					g.serialize_table(spriteName.."_img", {img = outputFullImg}, DEBUG)
+				else
+					outputFullImg:saveAs(outputColormapFp)
+				end
 				-- If there are any animation frames, write out the source rectangles for each frame.
 				-- Collision map
 				if next(outputAnimSrcRects) then
@@ -321,12 +350,12 @@ local function getColors(ctr, globAnim)
 		end  -- if layer is group, recurse
 		::continue::
 	end  -- for each layer
-end  -- function getColors()
+end  -- function makeSprite()
 
 
 local globAnim = getGlobalAnimData(s)
 if colorMode == ColorMode.RGB or colorMode == ColorMode.INDEXED then
-	getColors(s, globAnim)
+	makeSprite(s, globAnim)
 	if globAnim ~= nil then
 		g.serialize_table(globAnim.name.."_globalAnim", globAnim, DEBUG)
 	end
