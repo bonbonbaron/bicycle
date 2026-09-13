@@ -72,7 +72,7 @@ function Gene:load( entity, genomeName )
 
   -- Error-handling
   if not loader then
-    recognizedGenes = ""
+    local recognizedGenes = ""
     for key, _ in pairs(Gene.GeneLoader) do
       recognizedGenes = recognizedGenes.."  "..key
     end
