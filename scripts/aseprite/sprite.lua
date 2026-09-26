@@ -152,25 +152,34 @@ local function getAnimTag(sprite, frameIdx)
 	return nil
 end
 
+-- This is going to bundle together everything you output. 
+local luaSprite = { layers = {}, anim = nil}
+local spriteName = getBasename(s.filename)
+
 local function makeSprite(ctr, globAnim)
+	-- If your sprite has no layers, what're you even doing bro?
 	if ctr.layers == nil then
 		error(debug.traceback())
 	end
+	-- For each layer in sprite...
 	for i, layer in ipairs(ctr.layers) do
+		local colorpalName = layer.name.." palette"
+		local colorpal = Set.new(colorpalName)
+		local layerName = layer.name:gsub("%s+", "_")
+		local cmIdx
+		local outputLayer = {}
 		if layer.isReference then
 			dbgp("skipping reference layer "..layer.name)
 			goto continue
 		end
-		-- layer is a group
-		local colorpal = Set.new(layer.name.." palette")
-		local layerName = layer.name:gsub("%s+", "_")
-		local spriteName = getBasename(s.filename)
-		local cmIdx
+		-- Layers that contain sub-layers are groups; recurse into them while not creating new sprites every time.
 		if layer.isGroup then
+			dbgp('layer is group')
 			makeSprite(layer, globAnim)  -- recurse for each layer in layer group
 			-- TODO groups of layers may warrant combined anim info
 		else  -- layer is a standalone
 			if layer.isTilemap then
+
 				dbgp("PROCESSING LAYER "..layer.name.." AS A TILEMAP")
 				local outputColormapFp = cfg.genomePath..layerName.."_tileset_colormap.png"
 				local tileset = layer.tileset
@@ -229,17 +238,26 @@ local function makeSprite(ctr, globAnim)
 					-- While we're at it, let's add the source rectangle to the animation frame.
 					cumulativeTilesWide = cumulativeTilesWide + cel.image.width
 				end
-				g.serialize_table( layerName.."_tilemap", outputTilemap, DEBUG )
-				g.serialize_table( layerName.."_tileset", outputTileset, DEBUG )
-				g.serialize_table( layerName.."_collmap", outputCollmap, DEBUG )
-				g.serialize_table( layerName.."_collset", outputCollset, DEBUG )
+				local layerTilemapName = layerName.."_tilemap"
+				local layerTilesetName = layerName.."_tileset"
+				local layerCollmapName = layerName.."_collmap"
+				local layerCollsetName = layerName.."_collset"
+				outputLayer.tilemap = layerTilemapName
+				outputLayer.tileset = layerTilesetName
+				outputLayer.collmap = layerCollmapName
+				outputLayer.collset = layerCollsetName
+				g.serialize_table( layerTilemapName, outputTilemap, DEBUG )
+				g.serialize_table( layerTilesetName, outputTileset, DEBUG )
+				g.serialize_table( layerCollmapName, outputCollmap, DEBUG )
+				g.serialize_table( layerCollsetName, outputCollset, DEBUG )
 				outputTilesetImg:saveAs(outputColormapFp)
 				outputTilesetImg = nil
 			elseif layer.isImage then
 				local outputAnimSrcRects = { strips = {} }
 				dbgp("PROCESSING LAYER "..layer.name.." AS AN IMAGE")
 				-- Decide between outputting ASCII art or pixel art.
-				local outputColormapFp = cfg.genomePath..layerName.."_colormap."
+				local colormapName = layerName.."_colormap"
+				local outputColormapFp = cfg.genomePath..colormapName.."."
 				local ext = "png"
 				if cfg.ascii then
 					ext = "lua"
@@ -288,13 +306,14 @@ local function makeSprite(ctr, globAnim)
 						outputFullImg = ascii.hconcat(asciiFrames, " ")
 					end
 					-- Frame animation
+					-- The reason we do this separately from global animation is each layer has different source rects.
 					local srcRect = { x = cumulativeWidth, y = 0, w = cel.image.width, h = cel.image.height }
 					local animTag = getAnimTag(s, frameIdx)
 					if animTag and outputAnimSrcRects.strips[animTag] then
 						table.insert(outputAnimSrcRects.strips[animTag], srcRect)
 					elseif animTag then
 						outputAnimSrcRects.strips[animTag] = { srcRect }
-					else  -- if there is no tag foer this animation, name it "DEFAULT".
+					else  -- if there is no tag for this animation, name it "DEFAULT".
 						if outputAnimSrcRects.strips["DEFAULT"] == nil then
 							outputAnimSrcRects.strips["DEFAULT"] = {}
 						end
@@ -318,42 +337,58 @@ local function makeSprite(ctr, globAnim)
 						end
 					end
 				end  -- for each cel in layer
+				-- Image (whether ascii or PNG)
+				dbgp("outputting colormap name "..colormapName)
+				outputLayer.colormap = colormapName
 				if cfg.ascii then
-					-- TODO convert image to ascii first
-					-- TODO store it in a table
-					-- TODO serialize it
-					g.serialize_table(spriteName.."_img", {img = outputFullImg}, DEBUG)
+					g.serialize_table(colormapName, {img = outputFullImg}, DEBUG)
 				else
 					outputFullImg:saveAs(outputColormapFp)
 				end
 				-- If there are any animation frames, write out the source rectangles for each frame.
 				-- Collision map
 				if next(outputAnimSrcRects) then
-					outputAnimSrcRects.refGlobalAnim = globAnim.name
-					g.serialize_table(layerName.."_anim_src_rects", outputAnimSrcRects, DEBUG)  -- reusable per sprite, so name after layer
+					local animSrcRectsName = layerName.."_anim_src_rects"
+					outputLayer.animSrcRects = animSrcRectsName
+					outputAnimSrcRects.refGlobalAnim = globAnim.name  -- TODO  put this at sprite's top level
+					g.serialize_table(animSrcRectsName, outputAnimSrcRects, DEBUG)  -- reusable per sprite, so name after layer
 				end
-				-- Collision set
+				-- Collision rects
 				if next(outputCollRects) then
-					g.serialize_table(spriteName.."_collRects", outputCollRects, DEBUG)  -- only one per sprite, so name after sprite
+					local collRectsName = spriteName.."_collRects"
+					outputLayer.collRects = collRectsName
+					g.serialize_table(collRectsName, outputCollRects, DEBUG)  -- only one per sprite, so name after sprite
 					if not next(outputCollSet) then
 						app.alert("Your sprite has coll rects, but no collision types.")
 					end
 				end
+				-- Collision set
 				if next(outputCollSet) then
-					g.serialize_table(spriteName.."_collSet", outputCollSet, DEBUG)  -- only one per sprite, so name after sprite
+					local collSetName = spriteName.."_collSet"
+					outputLayer.collSet = collSetName
+					g.serialize_table(collSetName, outputCollSet, DEBUG)  -- only one per sprite, so name after sprite
 					if not next(outputCollSet) then
 						app.alert("Your sprite has coll types, but no collision rects.")
 					end
 				end
+			-- else
+			-- 	if layer.isBackground then
+			-- 		dbpg("its'a  bg")
+			-- 	end
+			-- 	dbgp("its' none of these thnings")
 			end  -- whether layer is a tileset or an image
-			g.serialize_table(layerName.."_color_palette", colorpal:keys(), DEBUG)
 		end  -- if layer is group, recurse
 		::continue::
+		g.serialize_table(colorpalName, colorpal, DEBUG)
+		outputLayer.colorpal = colorpalName
+		table.insert( luaSprite.layers, outputLayer )
 	end  -- for each layer
 end  -- function makeSprite()
 
 
+
 local globAnim = getGlobalAnimData(s)
+luaSprite.anim = globAnim.name
 if colorMode == ColorMode.RGB or colorMode == ColorMode.INDEXED then
 	makeSprite(s, globAnim)
 	if globAnim ~= nil then
@@ -361,4 +396,5 @@ if colorMode == ColorMode.RGB or colorMode == ColorMode.INDEXED then
 	end
 	--elseif colorMode == ColorMode.GRAY then  -- PSST! This'll be super useful for ASCII games.
 	-- TODO
+	g.serialize_table(spriteName, luaSprite, DEBUG)
 end

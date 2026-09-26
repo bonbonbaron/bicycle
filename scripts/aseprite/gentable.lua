@@ -45,7 +45,8 @@ function gen.serialize_table (fileBasename, tbl, dbg, indent)
   indent = indent or ""
   local next_indent = indent .. "  "
   local parts = {}
-  fileBasename = fileBasename:gsub(" ", "_")
+  fileBasename = fileBasename:gsub("[ -]", "_")
+  -- fileBasename = fileBasename:gsub("-", "_")
 
   -- Determine if the table is a pure array (consecutive integer keys starting at 1)
   local is_array = true

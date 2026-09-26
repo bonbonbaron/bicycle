@@ -20,6 +20,12 @@ local Layer_1_anim_src_rects = {
         h = 32,
         y = 0,
         x = 64
+      },
+      {
+        w = 32,
+        h = 32,
+        y = 0,
+        x = 96
       }
     }
   },
