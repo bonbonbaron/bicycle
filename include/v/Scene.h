@@ -50,6 +50,7 @@ struct Background {
 struct Layer {
   Layer();
   Layer( const std::string bgStr = "", const std::string& bgCollStr = "", LayerType type = LayerType::FIXED );
+  Layer( const std::string& bgStr, LayerType type, int parallaxPct, int parallaxPctY, Position vel, Position offset );
 
   Entity id{};
   Image bgImg;
@@ -63,6 +64,10 @@ struct Layer {
   // Backgrounds can have positions other than (0,0) for parallax or auto-looping
   // They may need to pass an Image in too.
   LayerType type{};
+  int parallaxPct{100};   // PARALLAX/LOOP/AUTOLOOP: percent of the camera's horizontal motion this layer follows
+  int parallaxPctY{100};  // ... and of its vertical motion
+  Position vel{};        // AUTOLOOP: drift per frame (fixed point)
+  Position drift{};      // AUTOLOOP: drift accumulated so far (fixed point)
   std::vector<Entity> fg{};  // entities in the foreground
   // TODO some timer tracker to know which BG tile to animate next
 };
@@ -98,5 +103,7 @@ class Scene : public Window {
   private:
     Grid _grid{};    // This has layers of BGs and FGs.
     Camera _camera{};  // TODO  when we have minimaps, the input needs to go to a window BELOW the top of WindowManager's stack.
-    void renderFixedLayer( const Layer& layer );
+    void renderFg( const Layer& layer );
+    void renderBg( const Layer& layer, const int offX, const int offY, const bool wrap );
+    void updateCameraLimits();
 };

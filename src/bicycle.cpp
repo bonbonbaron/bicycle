@@ -92,6 +92,18 @@ namespace bicycle {
       grid.addLayer( layer );
     }
 
+    // type is a LayerType; vx/vy are fixed-point cells per frame (AUTOLOOP); x/y offset the layer in cells.
+    void addBgLayerEx( const char* bgStr, int type, int parallaxPct, int parallaxPctY, int vx, int vy, int x, int y ) {
+      auto& wm = WindowManager::getInstance();
+      auto scene = dynamic_pointer_cast<Scene>( wm.back() );
+      auto& grid = scene->getGrid();
+      Position vel{};
+      vel.x = vx;
+      vel.y = vy;
+      Layer layer{ std::string( bgStr ), static_cast<LayerType>( type ), parallaxPct, parallaxPctY, vel, Position( x, y ) };
+      grid.addLayer( layer );
+    }
+
     Entity newEntity() {
       return newEntityId();
     }

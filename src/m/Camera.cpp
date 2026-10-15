@@ -47,23 +47,25 @@ void Camera::pan( const int dy, const int dx ) {
   box.pos.y = std::clamp<int>( box.pos.y, 0, _maxY );
 }
 
+// Pans just enough to keep the whole focused-on entity at least _margin inside the field of view
+// (within the limits set by setLims()).
 void Camera::followFocus() {
-  auto& focusBox = World::get<Box>( getFocus() );
-  auto lx = getLxMargin();
-  auto hx = getHxMargin();
-  auto ly = getLyMargin();
-  auto hy = getHyMargin();
-  if ( focusBox.pos.x <= lx ) {
-    pan( 0, focusBox.pos.x - lx );
+  const auto& focusBox = World::get<Box>( getFocus() );
+  const int left = focusBox.pos.x;
+  const int right = focusBox.pos.x + static_cast<int>( focusBox.size.w );
+  const int top = focusBox.pos.y;
+  const int bottom = focusBox.pos.y + static_cast<int>( focusBox.size.h );
+  if ( left < getLxMargin() ) {
+    pan( 0, left - getLxMargin() );
   }
-  else if ( focusBox.pos.x >= hx ) {
-    pan( 0, focusBox.pos.x - hx );
+  else if ( right > getHxMargin() ) {
+    pan( 0, right - getHxMargin() );
   }
-  if ( focusBox.pos.y <= ly ) {
-    pan( focusBox.pos.y - ly, 0 );
+  if ( top < getLyMargin() ) {
+    pan( top - getLyMargin(), 0 );
   }
-  else if ( focusBox.pos.y >= hy ) {
-    pan( focusBox.pos.y - hy, 0 );
+  else if ( bottom > getHyMargin() ) {
+    pan( bottom - getHyMargin(), 0 );
   }
 }
 
@@ -87,13 +89,15 @@ void Camera::setDims( const unsigned h, const unsigned w) {
   box.size = Size(w, h);
 }
 
+// Highest camera position (fixed point) in each dimension; the lowest is 0.
 void Camera::setLims( const int y, const int x) {
   _maxY = y;
   _maxX = x;
 }
 
+// margin is in cells.
 void Camera::setMargin( const int margin ) {
-  _margin = margin;
+  _margin = margin << FIXEDPT_DEC_BITS;
 }
 
 auto Camera::getLxMargin() const -> int {
@@ -103,7 +107,7 @@ auto Camera::getLxMargin() const -> int {
 
 auto Camera::getHxMargin() const -> int {
   const auto& camBox = World::get<Box>( _id );  // entity->body.getPosition();
-  return camBox.pos.x + camBox.size.w - _margin + (WINDOW_PADDING/2);
+  return camBox.pos.x + static_cast<int>( camBox.size.w ) - _margin;
 }
 
 auto Camera::getLyMargin() const -> int {
@@ -113,7 +117,7 @@ auto Camera::getLyMargin() const -> int {
 
 auto Camera::getHyMargin() const -> int {
   const auto& camBox = World::get<Box>( _id );  // entity->body.getPosition();
-  return camBox.pos.y + camBox.size.h - _margin + (WINDOW_PADDING/2);
+  return camBox.pos.y + static_cast<int>( camBox.size.h ) - _margin;
 }
 
 auto Camera::getId() const -> Entity {
@@ -128,7 +132,7 @@ void Camera::draw( const Entity entity, Window& tgt ) {
   const auto& camBox = World::get<Box>( _id );  // entity->body.getPosition();
   //TODO if box and image sizes don't match, imge should scale to box
   const auto& entityBox = World::get<Box>( entity );  
-  if ( ! _canSee( camBox, entityBox ) ) {  // TODO let camera track what it sees via onCollision(), not Scene
+  if ( ! camBox.overlaps( entityBox ) ) {  // TODO let camera track what it sees via onCollision(), not Scene
     return;
   }
   const auto& entityImg = World::get<Image>( entity );
@@ -154,6 +158,8 @@ void Camera::draw( const Entity entity, Window& tgt ) {
       continue;
     }
     auto rowStr = std::string( entityImg.string, lineLims.start + rowStart + clipLeft, stringLength );
-    tgt.mvprint( croppedBox.pos.y + croppedBoxRowIdx, croppedBox.pos.x, rowStr );  // layerRow + 1 to skip the stop border 
+    // croppedBox is in world cells; the window is in screen cells.
+    tgt.mvprint( croppedBox.pos.y - ( camBox.pos.y >> FIXEDPT_DEC_BITS ) + croppedBoxRowIdx,
+                 croppedBox.pos.x - ( camBox.pos.x >> FIXEDPT_DEC_BITS ), rowStr );  // layerRow + 1 to skip the stop border 
   }
 }
