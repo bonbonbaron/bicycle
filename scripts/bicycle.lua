@@ -185,8 +185,8 @@ ffi.cdef([[
   } CollisionArr;
 
   typedef struct {
-    LogicalKey lastPressed;
-    // int millisSinceLast;  // i don't like making input dependent on Timer.
+    uint8_t lastPressed;  // C++'s LogicalKey is a uint8_t enum
+    int millisSinceLast;
     // int currKeysPressed;
     // int deltaKeysPressed;
   } Input;
@@ -290,21 +290,23 @@ end
 function getUpdates()
   -- Collisions
   if bridge.collisions.len > 0 then
-    for i = 0, bridge.collisions.len do
+    for i = 0, bridge.collisions.len - 1 do
       coll = bridge.collisions.arr[i]
       entity = entities[coll.lhs]
       if not entity then error("Collision recorded for nonexistent entity "..tostring(coll.lhs)..".") end
       entity:onCollision( coll.rhs, coll.type )
     end
+    bridge.collisions.len = 0  -- consumed; C++ appends from len
   end
   -- Uncollisions
   if bridge.uncollisions.len > 0 then
-    for i = 0, bridge.uncollisions.len do
+    for i = 0, bridge.uncollisions.len - 1 do
       coll = bridge.uncollisions.arr[i]
       entity = entities[coll.lhs]
       if not entity then error("Un-collision recorded for nonexistent entity "..tostring(coll.lhs)..".") end
       entity:onCollision( coll.rhs, coll.type )
     end
+    bridge.uncollisions.len = 0  -- consumed; C++ appends from len
   end
   -- Time-outs
   if bridge.timeouts.len > 0 then

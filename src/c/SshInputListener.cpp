@@ -93,19 +93,21 @@ auto SshInput::convertCodeToLogicalInt(int code) -> LogicalKey {
 } // SshInput::convertCodeToLogicalInt()
 
 void SshInput::_listen() {
-  char buffer[static_cast<unsigned>(LogicalKey::COUNT)] = {};  
-  // TODO i put "LogicalKey::COUNT" abvoe so i can support multiple button presses per frame later... 
-  // for now, i'm happy with actually only working wiht one byte
-  // Reads 1 byte from fd 0 into a buffer.
-  read( STDIN_FILENO, buffer, 1 );
-  if ( buffer[0] != '\0' ) {
-    auto lkey = convertCodeToLogicalInt( buffer[0] );
-    _inputState.currKeysPressed.reset(); // SSH mode doesn't support key press/release distinctions. Press-detections only.
-    if ( lkey != LogicalKey::COUNT ) {
-      _inputState.currKeysPressed.set( static_cast<unsigned>( lkey ) );
-      _inputState.lastPressed = lkey;
-      Trigger::sendInput( _inputState );
+  // Drain everything typed since last frame and keep only the newest key. Reading one byte per frame let
+  // key-repeat bursts queue up, so moves landed frames late and in clumps (uneven movement per press).
+  char c{};
+  auto lkey = LogicalKey::COUNT;
+  while ( read( STDIN_FILENO, &c, 1 ) == 1 ) {
+    auto curr = convertCodeToLogicalInt( c );
+    if ( curr != LogicalKey::COUNT ) {
+      lkey = curr;
     }
+  }
+  if ( lkey != LogicalKey::COUNT ) {
+    _inputState.currKeysPressed.reset(); // SSH mode doesn't support key press/release distinctions. Press-detections only.
+    _inputState.currKeysPressed.set( static_cast<unsigned>( lkey ) );
+    _inputState.lastPressed = lkey;
+    Trigger::sendInput( _inputState );
   }
 }
 
