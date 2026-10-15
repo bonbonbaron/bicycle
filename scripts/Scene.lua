@@ -74,7 +74,22 @@ function Scene:addFg( Genome, fg )
   end
 end
 
+-- bg is either an Aseprite background sprite exported by scripts/aseprite/sprite.lua (one tilemap layer per
+-- background layer, each with its mode) or a directory of .txt layers under genome/scene/bg/.
+-- fg[i] holds the entities that live in background layer i.
 function Scene:readLayers(Genome)
+  local Sprite = Genome.Sprite
+  if Sprite.exists( self.bg ) then
+    local spr = Sprite.load( self.bg )
+    if spr.kind ~= Sprite.TILEMAP then error( "Scene background '"..self.bg.."' isn't a tilemap sprite." ) end
+    for bgIdx, tm in ipairs( spr.layers ) do
+      Sprite.addBgLayer( tm )
+      if self.fg[bgIdx] then
+        self:addFg( Genome, self.fg[bgIdx] )
+      end
+    end
+    return
+  end
   -- TODO later don't require backgrounds to allow for entities without 
   local bg = self:getBg( "./"..gameName.."/genome/scene/bg/"..self.bg.."/*.txt"  )
   local bgIdx = 1

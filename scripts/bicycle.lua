@@ -214,10 +214,11 @@ ffi.cdef([[
   Entity pushScene();
   Entity popWindow();
 
-  enum LayerType { FIXED, GLUED, PARALLAX, AUTOLOOP };
+  // Background layer types (C++'s LayerType): 0 FIXED, 1 GLUED, 2 PARALLAX, 3 LOOP, 4 AUTOLOOP. See Genome.lua's Sprite.BG_MODES.
   Entity newEntity();
   Entity delEntity();
   void addBgLayer( const char* bgStr );
+  void addBgLayerEx( const char* bgStr, int type, int parallaxPct, int parallaxPctY, int vx, int vy, int x, int y );
   void addFgEntity( Entity entity );
   void newImage( Entity entity, const char* imgStr );
   void setPos( Entity entity, Position pos );

@@ -71,6 +71,12 @@ function Sprite.getAsset( name )
   return chunk()
 end
 
+function Sprite.exists( name )
+  local f = io.open( "./"..gameName.."/genome/"..Sprite.assetName( name )..".lua", "r" )
+  if f then f:close() end
+  return f ~= nil
+end
+
 local function splitLines( str )
   local lines = {}
   for line in ( str.."\n" ):gmatch( "(.-)\n" ) do
@@ -159,11 +165,44 @@ function Sprite.loadTilemapLayer( layer )
     tileset = layer.tileset and Sprite.getAsset( layer.tileset ) or {},
     collmap = layer.collmap and Sprite.getAsset( layer.collmap ) or {},
     collset = layer.collset and Sprite.getAsset( layer.collset ) or {},
+    bg = Sprite.bgSettings( layer.bg ),
   }
   for i = 1, tm.numTilesWide * tm.numTilesHigh do
     tm.tiles[i] = map[i] or 0
   end
   return tm
+end
+
+-- Background modes, matching C++'s LayerType (src/v/Scene.h). Set per tilemap layer in Aseprite via its
+-- user data, e.g. "mode=parallax parallax=50" (see scripts/aseprite/README.txt).
+Sprite.BG_MODES = { fixed = 0, glued = 1, parallax = 2, loop = 3, autoloop = 4 }
+Sprite.FRAMES_PER_SECOND = 30  -- Constants::FRAMES_PER_SECOND
+
+-- Fills in defaults for exports without settings (or older ones).
+function Sprite.bgSettings( bg )
+  bg = bg or {}
+  local mode = bg.mode or "fixed"
+  if not Sprite.BG_MODES[mode] then error( "Unknown background mode '"..tostring( mode ).."'." ) end
+  local parallax = bg.parallax or ( mode == "parallax" and 50 or 100 )
+  return {
+    mode = mode,
+    parallax = parallax,
+    parallaxy = bg.parallaxy or parallax,
+    vx = bg.vx or ( mode == "autoloop" and not bg.vy and 4 or 0 ),
+    vy = bg.vy or 0,
+    x = bg.x or 0,
+    y = bg.y or 0,
+  }
+end
+
+-- Pushes one tilemap layer into the current scene as a background layer in its mode.
+function Sprite.addBgLayer( tm )
+  local bg = tm.bg
+  local FIXEDPT = 256  -- 1 << FIXEDPT_DEC_BITS
+  ffi.C.addBgLayerEx( Sprite.tilemapToAscii( tm ), Sprite.BG_MODES[bg.mode], bg.parallax, bg.parallaxy,
+    math.floor( bg.vx * FIXEDPT / Sprite.FRAMES_PER_SECOND + 0.5 ),  -- cells/second -> fixed-point cells/frame
+    math.floor( bg.vy * FIXEDPT / Sprite.FRAMES_PER_SECOND + 0.5 ),
+    bg.x, bg.y )
 end
 
 -- Overlays characters' frames in order (first = bottom, like Aseprite's layer order). Spaces are transparent.
@@ -335,8 +374,10 @@ Gene["GeneLoader"] = {
       if not tbl.anim:set( tbl.initAnim or "DEFAULT" ) then
         tbl.anim:set( next( character.strips ) )
       end
-    else  -- Sprite.TILEMAP
-      ffi.C.newImage( entity, Sprite.tilemapToAscii( spr.layers[1] ) )
+    else  -- Sprite.TILEMAP: every layer becomes a background layer of the current scene, back to front
+      for _, tm in ipairs( spr.layers ) do
+        Sprite.addBgLayer( tm )
+      end
     end
   end,
   initAnim = 0,  -- do nothing; read by the sprite loader
