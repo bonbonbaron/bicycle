@@ -1,5 +1,6 @@
 #pragma once
 #include <bitset>
+#include <cstdint>
 #include "c/Priority.h"
 #include "m/Entity.h"
 

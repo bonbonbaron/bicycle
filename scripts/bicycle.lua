@@ -308,12 +308,13 @@ function getUpdates()
   end
   -- Time-outs
   if bridge.timeouts.len > 0 then
-    for i = 0, bridge.timeouts.len do
-      timeout = bridge.timeouts[i]
+    for i = 0, bridge.timeouts.len - 1 do
+      timeout = bridge.timeouts.arr[i]
       entity = entities[timeout.entity]
       if not entity then error("Timeout recorded for nonexistent entity "..tostring(timeout.entity)..".") end
       entity:onTimeout( timeout.id, timeout.type )
     end
+    bridge.timeouts.len = 0  -- consumed; C++ appends from len
   end
   -- Inputs
   if bridge.input.lastPressed ~= ffi.C.NOTHING then
