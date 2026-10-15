@@ -71,6 +71,16 @@ check( room.kind == Sprite.TILEMAP, "room should be a tilemap" )
 check( Sprite.tilemapToAscii( room.layers[1] ) == "....\n. #.\n....", "room should render to glyphs" )
 check( room.layers[1].collmap[1] == "WALL", "room collmap should load" )
 
+-- 3b. Real Aseprite export (test/aseprite/pilgrim.aseprite): two layers composited, four walk tags.
+local pilgrim = Sprite.load( "pilgrim" )
+describe( pilgrim )
+check( pilgrim.kind == Sprite.CHARACTER and #pilgrim.layers == 2, "pilgrim should be a 2-layer character" )
+check( #pilgrim.character.frames == 8 and pilgrim.character.w == 16 and pilgrim.character.h == 8, "pilgrim should have 8 frames of 16x8 chars" )
+for _, dir in ipairs( { "walk_down", "walk_up", "walk_left", "walk_right" } ) do
+  check( pilgrim.character.strips[dir], "pilgrim should have strip "..dir )
+end
+print( pilgrim.character.frames[1] )
+
 -- 4. Image layers composite in order; spaces are transparent.
 local strips = { DEFAULT = { frames = { { frameIdx = 1, durationMs = 100 } }, sequence = { 1 } } }
 local bottom = { kind = Sprite.CHARACTER, frames = { "aaaa\naaaa" }, strips = strips, w = 4, h = 2 }

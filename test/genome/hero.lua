@@ -1,6 +1,6 @@
 require('bicycle')
 -- An animated character exported from Aseprite (see scripts/aseprite/sprite.lua).
-local hero = { sprite="walker", initAnim="walk_down" }
+local hero = { sprite="pilgrim", initAnim="walk_down" }
 
 local STEP = 256  -- one cell in fixed-point (FIXEDPT_DEC_BITS = 8)
 local DIRS = {
