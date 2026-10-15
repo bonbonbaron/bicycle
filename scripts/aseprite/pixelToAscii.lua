@@ -100,15 +100,20 @@ local function flatten_on_white(r, g, b, a)
 end
 
 -- Render the visible canvas (flattened cel at the current frame).
-function ascii.image_to_ascii(sprite, image, cel, ramp, invert)
+-- ramp may be a ramp name (e.g. "detailed") or a literal ramp string.
+-- w and h default to the sprite canvas; pass an image's size to convert e.g. a tileset tile.
+function ascii.image_to_ascii(sprite, image, cel, ramp, invert, w, h)
+  ramp = RAMPS[ramp] or ramp
   local lines = {}
   local ox = cel and cel.position.x or 0
   local oy = cel and cel.position.y or 0
+  w = w or sprite.width
+  h = h or sprite.height
 
   -- Walk the sprite canvas so empty areas become spaces / light chars.
-  for y = 0, sprite.height - 1 do
+  for y = 0, h - 1 do
     local row = {}
-    for x = 0, sprite.width - 1 do
+    for x = 0, w - 1 do
       local ix = x - ox
       local iy = y - oy
       local r, g, b, a = 255, 255, 255, 0
