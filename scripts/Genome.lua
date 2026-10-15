@@ -166,8 +166,36 @@ function Sprite.loadTilemapLayer( layer )
   return tm
 end
 
+-- Overlays characters' frames in order (first = bottom, like Aseprite's layer order). Spaces are transparent.
+-- The exporter gives every layer one full-canvas frame per sprite frame, so frames line up by index.
+function Sprite.composite( characters )
+  local base = characters[1]
+  if #characters == 1 then return base end
+  local frames = {}
+  for f = 1, #base.frames do
+    local rows = splitLines( base.frames[f] )
+    for c = 2, #characters do
+      local upper = characters[c].frames[f]
+      if not upper then error( "Image layers have different frame counts; can't composite frame "..f.."." ) end
+      for r, line in ipairs( splitLines( upper ) ) do
+        local below = rows[r] or ""
+        local out = {}
+        for i = 1, math.max( #below, #line ) do
+          local ch = line:sub( i, i )
+          if ch == "" or ch == " " then ch = below:sub( i, i ) end
+          out[i] = ch ~= "" and ch or " "
+        end
+        rows[r] = table.concat( out )
+      end
+    end
+    frames[f] = table.concat( rows, "\n" )
+  end
+  return { kind = Sprite.CHARACTER, frames = frames, strips = base.strips, w = base.w, h = base.h }
+end
+
 -- Returns { name, kind, layers }. kind is "character" if the sprite's layers are images (frames, maybe
 -- animated) or "tilemap" if they're tilemaps. Mixing the two in one sprite is an error: export them separately.
+-- Characters also get result.character: all image layers composited into one.
 function Sprite.load( name )
   local spr = Sprite.getAsset( name )
   checkType( spr.layers, "table" )
@@ -189,21 +217,42 @@ function Sprite.load( name )
     end
   end
   if not result.kind then error( "Sprite '"..name.."' has no image or tilemap layers." ) end
+  if result.kind == Sprite.CHARACTER then
+    result.character = Sprite.composite( result.layers )
+  end
   return result
 end
 
--- No ASCII tiles are exported yet (tilesets are PNGs), so draw each tile index as a glyph.
+-- Draws a tilemap from its tileset's ASCII tiles (tileset.ascii[tileIdx + 1], exported by sprite.lua).
+-- Older exports without ASCII tiles fall back to one glyph per tile.
 function Sprite.tilemapToAscii( tm, glyphs )
-  glyphs = glyphs or " .#~^=+*%@"
+  local asciiTiles = tm.tileset and tm.tileset.ascii
   local rows = {}
-  for row = 1, tm.numTilesHigh do
-    local chars = {}
-    for col = 1, tm.numTilesWide do
-      local idx = tm.tiles[ ( row - 1 ) * tm.numTilesWide + col ]
-      local g = idx % #glyphs + 1
-      chars[col] = glyphs:sub( g, g )
+  if asciiTiles and next( asciiTiles ) then
+    local tileLines, blank = {}, nil
+    for i, str in pairs( asciiTiles ) do tileLines[i] = splitLines( str ) end
+    for row = 1, tm.numTilesHigh do
+      for tileRow = 1, tm.tileH do
+        local chars = {}
+        for col = 1, tm.numTilesWide do
+          local lines = tileLines[ tm.tiles[ ( row - 1 ) * tm.numTilesWide + col ] + 1 ]
+          blank = blank or string.rep( " ", tm.tileW * 2 )
+          chars[col] = lines and lines[tileRow] or blank
+        end
+        table.insert( rows, table.concat( chars ) )
+      end
     end
-    rows[row] = table.concat( chars )
+  else
+    glyphs = glyphs or " .#~^=+*%@"
+    for row = 1, tm.numTilesHigh do
+      local chars = {}
+      for col = 1, tm.numTilesWide do
+        local idx = tm.tiles[ ( row - 1 ) * tm.numTilesWide + col ]
+        local g = idx % #glyphs + 1
+        chars[col] = glyphs:sub( g, g )
+      end
+      rows[row] = table.concat( chars )
+    end
   end
   return table.concat( rows, "\n" )
 end
@@ -275,7 +324,7 @@ Gene["GeneLoader"] = {
     local spr = Sprite.load( gene.val )
     tbl.spriteData = spr
     if spr.kind == Sprite.CHARACTER then
-      local character = spr.layers[1]  -- TODO composite multiple image layers
+      local character = spr.character  -- all image layers composited
       ffi.C.newImage( entity, character.frames[1] )
       tbl.anim = Animation.new( entity, character )
       -- Play the untagged strip, else whichever tag the genome asked for, else any.
