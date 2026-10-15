@@ -93,21 +93,17 @@ auto SshInput::convertCodeToLogicalInt(int code) -> LogicalKey {
 } // SshInput::convertCodeToLogicalInt()
 
 void SshInput::_listen() {
-  // Drain everything typed since last frame and keep only the newest key. Reading one byte per frame let
-  // key-repeat bursts queue up, so moves landed frames late and in clumps (uneven movement per press).
+  // Drain everything typed since last frame and send every key, in order. Reading only one byte per frame
+  // let key bursts queue up and land frames late; keeping only the newest key dropped presses.
   char c{};
-  auto lkey = LogicalKey::COUNT;
   while ( read( STDIN_FILENO, &c, 1 ) == 1 ) {
-    auto curr = convertCodeToLogicalInt( c );
-    if ( curr != LogicalKey::COUNT ) {
-      lkey = curr;
+    auto lkey = convertCodeToLogicalInt( c );
+    if ( lkey != LogicalKey::COUNT ) {
+      _inputState.currKeysPressed.reset(); // SSH mode doesn't support key press/release distinctions. Press-detections only.
+      _inputState.currKeysPressed.set( static_cast<unsigned>( lkey ) );
+      _inputState.lastPressed = lkey;
+      Trigger::sendInput( _inputState );
     }
-  }
-  if ( lkey != LogicalKey::COUNT ) {
-    _inputState.currKeysPressed.reset(); // SSH mode doesn't support key press/release distinctions. Press-detections only.
-    _inputState.currKeysPressed.set( static_cast<unsigned>( lkey ) );
-    _inputState.lastPressed = lkey;
-    Trigger::sendInput( _inputState );
   }
 }
 

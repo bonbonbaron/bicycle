@@ -9,6 +9,7 @@
 #include "v/Scene.h"
 #include "c/MidiPlayer.h"
 #include "c/Dice.h"
+#include "c/Animator.h"
 
 namespace bicycle {
 
@@ -116,6 +117,30 @@ namespace bicycle {
     void setPos( Entity entity, Position pos ) {
       auto& box = World::get<Box>( entity );
       box.pos = pos << FIXEDPT_DEC_BITS;
+    }
+
+    // ANIMATION
+    // Strips are built once per entity: newAnimStrip(), then addAnimFrame() for each frame in play order.
+    // Src rects are in character cells within the entity's image (all frames side by side).
+    void newAnimStrip( Entity entity, const char* stripName, bool repeat ) {
+      Animator::getInstance().newStrip( entity, stripName, repeat );
+    }
+
+    void addAnimFrame( Entity entity, const char* stripName, unsigned durationMs, int x, int y, int w, int h ) {
+      Animator::getInstance().addFrame( entity, stripName, durationMs, Rect( x, y, w, h ) );
+    }
+
+    // Switches to and starts a strip; returns false if it's already playing or doesn't exist.
+    bool setAnim( Entity entity, const char* stripName ) {
+      return Animator::getInstance().set( entity, stripName );
+    }
+
+    void stopAnim( Entity entity ) {
+      Animator::getInstance().stop( entity );
+    }
+
+    unsigned getAnimFrameIdx( Entity entity ) {
+      return Animator::getInstance().getFrameIdx( entity );
     }
 
     Entity popWindow() {

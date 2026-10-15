@@ -81,6 +81,16 @@ for _, dir in ipairs( { "walk_down", "walk_up", "walk_left", "walk_right" } ) do
 end
 print( pilgrim.character.frames[1] )
 
+-- 3c. What C++'s Animator gets: one image with frames side by side, and each frame's src rect in it.
+local stripImg, rects = Sprite.toStrip( pilgrim.character )
+check( #rects == 8 and rects[2].x == 17 and rects[2].w == 16 and rects[2].h == 8, "pilgrim src rects should step by frame width + separator" )
+local firstRow = stripImg:match( "^[^\n]*" )
+check( #firstRow == 8 * 16 + 7, "pilgrim strip image should be 8 frames + 7 separators wide" )
+for f, rect in ipairs( rects ) do
+  local row1 = pilgrim.character.frames[f]:match( "^[^\n]*" )
+  check( firstRow:sub( rect.x + 1, rect.x + rect.w ) == row1, "src rect "..f.." should cover frame "..f )
+end
+
 -- 4. Image layers composite in order; spaces are transparent.
 local strips = { DEFAULT = { frames = { { frameIdx = 1, durationMs = 100 } }, sequence = { 1 } } }
 local bottom = { kind = Sprite.CHARACTER, frames = { "aaaa\naaaa" }, strips = strips, w = 4, h = 2 }

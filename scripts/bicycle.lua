@@ -191,10 +191,16 @@ ffi.cdef([[
     // int deltaKeysPressed;
   } Input;
 
+  typedef struct {
+    uint8_t arr[32];
+    unsigned len;
+  } KeyQueue;
+
 	typedef struct {
 		TimeoutArr timeouts;
 		CollisionArr collisions;
 		CollisionArr uncollisions;
+		KeyQueue keys;  // every key since the last getUpdates(), in order
 		Input input; // Input is just a scalar.  // TODO should this be initialized?
 	} Bridge;
 
@@ -215,6 +221,11 @@ ffi.cdef([[
   void addFgEntity( Entity entity );
   void newImage( Entity entity, const char* imgStr );
   void setPos( Entity entity, Position pos );
+  void newAnimStrip( Entity entity, const char* stripName, bool repeat );
+  void addAnimFrame( Entity entity, const char* stripName, unsigned durationMs, int x, int y, int w, int h );
+  bool setAnim( Entity entity, const char* stripName );
+  void stopAnim( Entity entity );
+  unsigned getAnimFrameIdx( Entity entity );
   void focusCamOn( Entity entity );
   void sys(const Action action, const System system, Entity entity);
 
@@ -318,13 +329,14 @@ function getUpdates()
     end
     bridge.timeouts.len = 0  -- consumed; C++ appends from len
   end
-  -- Inputs
-  if bridge.input.lastPressed ~= ffi.C.NOTHING then
+  -- Inputs (every key since last frame, in order)
+  if bridge.keys.len > 0 then
     entity = entities[focus]
     if not entity then error("We're focused on nonexistent entity "..tostring(focus)..".") end
-    if entity and bridge.input.lastPressed then
-      entity:onInput( bridge.input.lastPressed )
-      bridge.input.lastPressed = ffi.C.NOTHING
+    for i = 0, bridge.keys.len - 1 do
+      entity:onInput( bridge.keys.arr[i] )
     end
+    bridge.keys.len = 0
+    bridge.input.lastPressed = ffi.C.NOTHING
   end
 end

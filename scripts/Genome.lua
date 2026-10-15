@@ -257,55 +257,58 @@ function Sprite.tilemapToAscii( tm, glyphs )
   return table.concat( rows, "\n" )
 end
 
+-- Lays a character's frames side by side (one space apart) as one image, and gives each frame's src rect
+-- in character cells. C++'s Animator points the entity at one rect at a time; Camera draws only that part.
+function Sprite.toStrip( character )
+  local lines = {}
+  local rects = {}
+  for f, frame in ipairs( character.frames ) do
+    for r, line in ipairs( splitLines( frame ) ) do
+      lines[r] = lines[r] and ( lines[r]..Sprite.ASCII_FRAME_SEP..line ) or line
+    end
+    rects[f] = { x = ( f - 1 ) * ( character.w + #Sprite.ASCII_FRAME_SEP ), y = 0, w = character.w, h = character.h }
+  end
+  return table.concat( lines, "\n" ), rects
+end
+
 --------------------
----- ANIMATION (driven by bridge timeouts until C++'s Animator renders src rects)
+---- ANIMATION (a thin handle on C++'s Animator)
 --------------------
 
 local Animation = {}
 Animation.__index = Animation
 
-Animation.new = function( entity, character )
-  local instance = { entity = entity, character = character, strip = nil, seqIdx = 1, timerId = nil, timerMs = nil }
+-- Hands the character's strips to C++: frames in play order (directions already expanded), each with its
+-- src rect and duration. Expects the entity's image to be Sprite.toStrip()'s image.
+Animation.new = function( entity, character, rects )
+  for stripName, strip in pairs( character.strips ) do
+    ffi.C.newAnimStrip( entity, stripName, strip.numReps == 0 )
+    for _, seqIdx in ipairs( strip.sequence ) do
+      local frame = strip.frames[seqIdx]
+      local rect = rects[frame.frameIdx]
+      ffi.C.addAnimFrame( entity, stripName, frame.durationMs, rect.x, rect.y, rect.w, rect.h )
+    end
+  end
+  local instance = { entity = entity, character = character }
   setmetatable( instance, Animation )
   return instance
 end
 
-function Animation:show()
-  local frame = self.strip.frames[ self.strip.sequence[self.seqIdx] ]
-  ffi.C.newImage( self.entity, self.character.frames[frame.frameIdx] )
-  -- (Re)start the timer only when this frame's duration differs from the running timer's.
-  if self.timerMs ~= frame.durationMs then
-    self:stop()
-    self.timerMs = frame.durationMs
-    self.timerId = ffi.C.createTimer( frame.durationMs, self.entity, 0, true, ffi.C.TO_BRIDGE )
-  end
-end
-
--- Switch strips (e.g. "walk_left"). Does nothing if it's already playing or doesn't exist.
+-- Switch strips (e.g. "walk_left"). Returns false if it's already playing or doesn't exist.
 function Animation:set( stripName )
-  local strip = self.character.strips[stripName]
-  if not strip or strip == self.strip then return false end
-  self.strip = strip
-  self.seqIdx = 1
-  self:show()
-  return true
+  return self:has( stripName ) and ffi.C.setAnim( self.entity, stripName )
 end
 
 function Animation:has( stripName )
   return self.character.strips[stripName] ~= nil
 end
 
-function Animation:tick()
-  if not self.strip or #self.strip.sequence < 2 then return end
-  self.seqIdx = self.seqIdx % #self.strip.sequence + 1
-  self:show()
+function Animation:stop()
+  ffi.C.stopAnim( self.entity )
 end
 
-function Animation:stop()
-  if self.timerId then
-    ffi.C.sys( ffi.C.STOP, ffi.C.SYS_TIMER, self.timerId )
-    self.timerId, self.timerMs = nil, nil
-  end
+function Animation:frameIdx()
+  return ffi.C.getAnimFrameIdx( self.entity )
 end
 
 Gene["GeneLoader"] = {
@@ -325,17 +328,12 @@ Gene["GeneLoader"] = {
     tbl.spriteData = spr
     if spr.kind == Sprite.CHARACTER then
       local character = spr.character  -- all image layers composited
-      ffi.C.newImage( entity, character.frames[1] )
-      tbl.anim = Animation.new( entity, character )
+      local img, rects = Sprite.toStrip( character )
+      ffi.C.newImage( entity, img )
+      tbl.anim = Animation.new( entity, character, rects )
       -- Play the untagged strip, else whichever tag the genome asked for, else any.
       if not tbl.anim:set( tbl.initAnim or "DEFAULT" ) then
         tbl.anim:set( next( character.strips ) )
-      end
-      -- Advance frames on animation timeouts unless the genome handles timeouts itself.
-      if not tbl.onTimeout then
-        tbl.onTimeout = function( self, timerId, type )
-          if self.anim and timerId == self.anim.timerId then self.anim:tick() end
-        end
       end
     else  -- Sprite.TILEMAP
       ffi.C.newImage( entity, Sprite.tilemapToAscii( spr.layers[1] ) )

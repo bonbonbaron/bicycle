@@ -132,17 +132,28 @@ void Camera::draw( const Entity entity, Window& tgt ) {
     return;
   }
   const auto& entityImg = World::get<Image>( entity );
+  // Animated entities draw only their current frame: the src rect (in character cells) of their image.
+  // A zero-width rect means "draw the whole image".
+  const auto& srcRect = World::get<Rect>( entity );
+  const bool hasSrcRect = srcRect.w > 0;
   auto croppedBox = camBox.crop( entityBox ) >> FIXEDPT_DEC_BITS;  // portion of entityBox in FOV
   auto entityPosWrtCamera = ( entityBox.pos - camBox.pos ) >> FIXEDPT_DEC_BITS;
   // If the image's top row is out of FOV, then get the first row to draw.
   // imgRowIdx is the row of the image itself we're drawing.
-  auto imgRowIdx = std::abs( std::min( 0, entityPosWrtCamera.y ) );  
+  unsigned imgRowIdx = std::abs( std::min( 0, entityPosWrtCamera.y ) ) + ( hasSrcRect ? srcRect.y : 0 );
+  const int clipLeft = std::abs( std::min( entityPosWrtCamera.x, 0 ) );
   for ( unsigned croppedBoxRowIdx{}; croppedBoxRowIdx < croppedBox.size.h; ++croppedBoxRowIdx, ++imgRowIdx ) {
+    if ( imgRowIdx >= entityImg.lineLimits.size() ) {
+      break;
+    }
     const auto& lineLims = entityImg.lineLimits.at( imgRowIdx );
-    int stringStartIdx = lineLims.start 
-      + std::abs( std::min( entityPosWrtCamera.x, 0 ) );
-    int stringLength = std::min( static_cast<int>( croppedBox.size.w ), lineLims.len );
-    auto rowStr = std::string( entityImg.string, stringStartIdx, stringLength );
+    int rowStart = hasSrcRect ? srcRect.x : 0;
+    int rowLen = hasSrcRect ? std::min( srcRect.w, lineLims.len - srcRect.x ) : lineLims.len;
+    int stringLength = std::min( static_cast<int>( croppedBox.size.w ), rowLen - clipLeft );
+    if ( stringLength <= 0 ) {
+      continue;
+    }
+    auto rowStr = std::string( entityImg.string, lineLims.start + rowStart + clipLeft, stringLength );
     tgt.mvprint( croppedBox.pos.y + croppedBoxRowIdx, croppedBox.pos.x, rowStr );  // layerRow + 1 to skip the stop border 
   }
 }
