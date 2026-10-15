@@ -91,6 +91,23 @@ for f, rect in ipairs( rects ) do
   check( firstRow:sub( rect.x + 1, rect.x + rect.w ) == row1, "src rect "..f.." should cover frame "..f )
 end
 
+-- 3d. Real Aseprite background (test/aseprite/meadow.aseprite): one tilemap layer per background mode.
+local meadow = Sprite.load( "meadow" )
+check( meadow.kind == Sprite.TILEMAP and #meadow.layers == 5, "meadow should be a 5-layer tilemap" )
+local expectModes = { "glued", "autoloop", "parallax", "fixed", "loop" }
+for i, tm in ipairs( meadow.layers ) do
+  check( tm.bg.mode == expectModes[i], "meadow layer "..i.." should be "..expectModes[i]..", got "..tm.bg.mode )
+  local str = Sprite.tilemapToAscii( tm )
+  local nRows, width = 0, 0
+  for line in ( str.."\n" ):gmatch( "(.-)\n" ) do nRows = nRows + 1; width = math.max( width, #line ) end
+  check( nRows == 50 and width == 320, "meadow layer "..i.." should render 320x50 chars, got "..width.."x"..nRows )
+  print( string.format( "  meadow layer %d: %s parallax=%d/%d v=(%g,%g)", i, tm.bg.mode, tm.bg.parallax, tm.bg.parallaxy, tm.bg.vx, tm.bg.vy ) )
+end
+check( meadow.layers[3].bg.parallax == 50 and meadow.layers[2].bg.vx == 6, "meadow settings should come from layer user data" )
+check( meadow.layers[5].bg.parallax == 150 and meadow.layers[5].bg.parallaxy == 100, "fence should loop at 150%/100%" )
+check( Sprite.tilemapToAscii( meadow.layers[4] ):find( "wwwwwwww", 1, true ), "ground should draw grass tiles" )
+check( room.layers[1].bg.mode == "fixed", "tilemaps without settings default to fixed" )
+
 -- 4. Image layers composite in order; spaces are transparent.
 local strips = { DEFAULT = { frames = { { frameIdx = 1, durationMs = 100 } }, sequence = { 1 } } }
 local bottom = { kind = Sprite.CHARACTER, frames = { "aaaa\naaaa" }, strips = strips, w = 4, h = 2 }
