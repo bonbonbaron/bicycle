@@ -316,4 +316,4 @@ function ascii.hconcat(frames, sep)
   return table.concat(out, "\n")
 end
 
-return ascii
+return ascii
