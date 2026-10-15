@@ -71,4 +71,15 @@ check( room.kind == Sprite.TILEMAP, "room should be a tilemap" )
 check( Sprite.tilemapToAscii( room.layers[1] ) == "....\n. #.\n....", "room should render to glyphs" )
 check( room.layers[1].collmap[1] == "WALL", "room collmap should load" )
 
+-- 4. Image layers composite in order; spaces are transparent.
+local strips = { DEFAULT = { frames = { { frameIdx = 1, durationMs = 100 } }, sequence = { 1 } } }
+local bottom = { kind = Sprite.CHARACTER, frames = { "aaaa\naaaa" }, strips = strips, w = 4, h = 2 }
+local top    = { kind = Sprite.CHARACTER, frames = { " b  \n  bb" }, strips = strips, w = 4, h = 2 }
+check( Sprite.composite( { bottom, top } ).frames[1] == "abaa\naabb", "layers should composite with spaces transparent" )
+
+-- 5. Tilemaps draw from the tileset's ASCII tiles when exported (tile 0 = empty).
+local tm = { numTilesWide = 2, numTilesHigh = 1, tileW = 1, tileH = 2, tiles = { 1, 0 },
+             tileset = { ascii = { "  \n  ", "##\n##" } } }
+check( Sprite.tilemapToAscii( tm ) == "##  \n##  ", "tilemap should render from ASCII tiles" )
+
 print( "ALL GENOME SPRITE TESTS PASSED" )
