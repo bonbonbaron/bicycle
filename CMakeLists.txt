@@ -199,6 +199,10 @@ else()
   add_custom_target( assets DEPENDS ${packs} )
 endif()
 add_custom_target( package DEPENDS ${packs} )
+# A private pack of the test game for the `codecs` ctest (always repacked, so it matches the sources).
+add_custom_target( codecs-pack
+  COMMAND "${BICYCLE_PACKER}" "${CMAKE_SOURCE_DIR}/test" "${CMAKE_BINARY_DIR}/codecs-test.bpak"
+  DEPENDS ${BICYCLE_PACKER_TARGET} ids VERBATIM )
 
 # Headless codec tests: `ctest --test-dir build` (or build/bicycle-tests test).
 if ( NOT CMAKE_CROSSCOMPILING )
@@ -207,10 +211,13 @@ if ( NOT CMAKE_CROSSCOMPILING )
   add_executable( bicycle-tests tests/codec_test.cpp )
   target_link_libraries( bicycle-tests PRIVATE bicycle_pack_codecs )
   enable_testing()
-  # The pack round-trip needs test/assets.bpak, which dev builds don't make: pack it first.
-  add_test( NAME pack-assets COMMAND "${CMAKE_COMMAND}" --build "${CMAKE_BINARY_DIR}" --target package )
+  # The pack round-trip packs the test game afresh into this build directory and checks that pack. Not
+  # test/assets.bpak: it's shared by every build directory and only rebuilt by builds whose BICYCLE_GAMES has
+  # "test", so in a plat3d/fps3d build it was stale after any test/genome edit (the flaky `codecs` failure).
+  set( codecsPack "${CMAKE_BINARY_DIR}/codecs-test.bpak" )
+  add_test( NAME pack-assets COMMAND "${CMAKE_COMMAND}" --build "${CMAKE_BINARY_DIR}" --target package codecs-pack )
   set_tests_properties( pack-assets PROPERTIES FIXTURES_SETUP packed )
-  add_test( NAME codecs COMMAND bicycle-tests test WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}" )
+  add_test( NAME codecs COMMAND bicycle-tests "test=${codecsPack}" WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}" )
   add_test( NAME motion COMMAND bicycle-motion-tests )
   add_executable( bicycle-mem-scene-tests tests/mem_scene_test.cpp src/data/Mem.cpp )
   target_include_directories( bicycle-mem-scene-tests PRIVATE include )

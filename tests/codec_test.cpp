@@ -225,9 +225,14 @@ static auto readFile( const std::string& p ) -> std::optional<std::string> {
 }
 
 // Every entry of <game>/assets.bpak must inflate to its source file (meshes: decode to the source's counts).
-static void testPack( const std::string& game ) {
-  auto pack = readFile( game + "/assets.bpak" );
-  CHECK( pack.has_value(), "no %s/assets.bpak (build the 'assets' target)", game.c_str() );
+// "<game>=<pack>" checks that pack instead (ctest packs its own copy into the build directory: the shared
+// <game>/assets.bpak in the source tree may be stale, left by another build directory packing other games).
+static void testPack( const std::string& arg ) {
+  const auto eq = arg.find( '=' );
+  const std::string game = arg.substr( 0, eq );
+  const std::string packPath = eq == std::string::npos ? game + "/assets.bpak" : arg.substr( eq + 1 );
+  auto pack = readFile( packPath );
+  CHECK( pack.has_value(), "no %s (build the 'assets' target)", packPath.c_str() );
   if ( !pack ) return;
   std::vector<assets::Entry> entries;
   CHECK( assets::parsePack( *pack, entries ), "%s: bad pack", game.c_str() );
