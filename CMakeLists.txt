@@ -347,11 +347,20 @@ if ( WIN32 )
     VERBATIM )
 endif()
 
+# ctest runs this build directory's own copy of the executable. The one in the repo root is shared by every build
+# directory of the same mode (a plat3d and an fps3d release build both write o-3d), so tests of one build could run
+# another's executable (`This release build runs only its embedded game`).
+set( BICYCLE_TEST_EXE "${CMAKE_BINARY_DIR}/test-bin/${BICYCLE_EXE_NAME}${CMAKE_EXECUTABLE_SUFFIX}" )
+add_custom_command( TARGET o POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/test-bin"
+  COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:o>" "${BICYCLE_TEST_EXE}"
+  VERBATIM )
+
 # Release builds: run the game headless for 120 frames under strace and fail if it opens anything but OS files
 # (tests/release_io_test.sh lists what's allowed and why). Needs strace; 2D/3D also xvfb-run (or a DISPLAY).
 if ( BICYCLE_RELEASE AND NOT CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_NAME STREQUAL "Linux" )
   string( TOLOWER "${BICYCLE_RENDER}" modeLower )
-  add_test( NAME release-zero-io COMMAND sh "${CMAKE_SOURCE_DIR}/tests/release_io_test.sh" "$<TARGET_FILE:o>" ${modeLower} 120 )
+  add_test( NAME release-zero-io COMMAND sh "${CMAKE_SOURCE_DIR}/tests/release_io_test.sh" "${BICYCLE_TEST_EXE}" ${modeLower} 120 )
   set_tests_properties( release-zero-io PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 300 )
   # Games with scenes change scenes during the run too (loads after start-up must come from the pack as well).
   if ( BICYCLE_RELEASE_GAME STREQUAL "test" )
@@ -376,12 +385,12 @@ if ( NOT CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_NAME STREQUAL "Linux" )
   # plat3d's coins (tests/coin_collect_test.sh): removing a body inside its collision dispatch. 3D dev builds run
   # loose files; a release build needs plat3d packed.
   if ( BICYCLE_RENDER STREQUAL "3D" AND ( NOT BICYCLE_RELEASE OR lifecycleGame STREQUAL "plat3d" ) )
-    add_test( NAME coin-collect COMMAND sh "${CMAKE_SOURCE_DIR}/tests/coin_collect_test.sh" "$<TARGET_FILE:o>"
+    add_test( NAME coin-collect COMMAND sh "${CMAKE_SOURCE_DIR}/tests/coin_collect_test.sh" "${BICYCLE_TEST_EXE}"
               WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}" )
     set_tests_properties( coin-collect PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 400 )
   endif()
   if ( lifecyclePair )
-    add_test( NAME scene-lifecycle COMMAND sh "${CMAKE_SOURCE_DIR}/tests/scene_lifecycle_test.sh" "$<TARGET_FILE:o>" ${modeLowerLc} 20
+    add_test( NAME scene-lifecycle COMMAND sh "${CMAKE_SOURCE_DIR}/tests/scene_lifecycle_test.sh" "${BICYCLE_TEST_EXE}" ${modeLowerLc} 20
               ${lifecycleGame} ${lifecyclePair} WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}" )
     set_tests_properties( scene-lifecycle PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 400 )
   endif()
