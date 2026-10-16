@@ -497,6 +497,7 @@ Gene["GeneLoader"] = {
     end
     Animation.rigged[entity] = true
   end,
+  motion = 0,  -- started by Scene once every entity is placed (Genome.startMotion), so targets can be named
   sprite2d = 0,  -- read by Genome.new: the sprite pixel modes use instead of img/sprite (ASCII keeps its own art)
   onSpawn = 0,  -- do nothing; called by Scene once the entity is placed
   onUncollision = 0,  -- do nothing, just allow it to exist
@@ -589,6 +590,71 @@ function Genome.inject(entity, tbl)
 end
 
 Genome.COLL = COLL
+
+--------------------
+---- MOTION
+--------------------
+-- A genome declares how it moves with a motion gene (Kinematics, src/c/Kinematics.cpp). Units: cells (a sprite
+-- pixel is 2 columns wide, 1 row tall), seconds, degrees. Paths are relative to where the entity spawns unless
+-- absolute = true. Entities are named by genome ("hero"); the first one spawned with that genome is used.
+--   motion = { type = "linear", speed = 8, path = { {0,0}, {30,0} }, pingpong = true }   -- patrol (cells/s)
+--   motion = { type = "orbital", around = "horse", radius = 4, speed = 120, phase = 0 }  -- or around = {x, y}
+--            radius is in rows (the orbit is 2 * radius columns wide so it looks round); rx/ry set an ellipse
+--   motion = { type = "combo", radius = 3, speed = 180, travel = 6, path = { {0,0}, {40,0} }, pingpong = true }
+--            an orbit (deg/s) whose center travels the path (cells/s)
+--   motion = { type = "follow", target = "hero", mode = "lerp", rate = 4, offset = {6, -4}, bob = 0.5, bobHz = 1.2 }
+--            eases toward the target's center + offset (the offset's x flips to stay behind it as it turns, unless
+--            mirror = false): each frame pos += (goal - pos) * (1 - exp(-rate * dt)); mode = "hard" snaps.
+--            deadzone = {x, y} lets the target roam before following. The camera uses the same options:
+--            Camera.track( id, opts ) (scripts/bicycle.lua).
+Genome.byName = {}  -- genome name -> entity id of the first instance spawned
+
+local function entityNamed( ref, what )
+  if type( ref ) == "number" then return ref end
+  local id = Genome.byName[ref]
+  if not id then error( "motion: no entity '"..tostring( ref ).."' to "..what ) end
+  return id
+end
+
+function Genome.startMotion( instance )
+  local m = instance.tbl.motion
+  if not m then return end
+  checkType( m, "table" )
+  local id = instance.id
+  local box = ffi.C.World_getBoxes().arr[id]
+  local x0, y0 = box.pos.x / 256, box.pos.y / 256
+  local function addPath( path, cx, cy )
+    for _, p in ipairs( path or {} ) do
+      if m.absolute then ffi.C.motionWaypoint( id, p[1], p[2] )
+      else ffi.C.motionWaypoint( id, cx + p[1], cy + p[2] ) end
+    end
+  end
+  local rows = m.radius or 3
+  local rx, ry = m.rx or rows * 2, m.ry or rows
+  if m.type == "linear" then
+    ffi.C.motionLinear( id, m.speed or 6, m.pingpong and true or false )
+    addPath( m.path, x0, y0 )
+  elseif m.type == "orbital" then
+    if type( m.around ) == "table" then
+      ffi.C.motionOrbit( id, 0, m.around[1], m.around[2], rx, ry, m.speed or 90, m.phase or 0 )
+    else
+      ffi.C.motionOrbit( id, entityNamed( m.around, "orbit" ), 0, 0, rx, ry, m.speed or 90, m.phase or 0 )
+    end
+  elseif m.type == "combo" then
+    ffi.C.motionCombo( id, rx, ry, m.speed or 180, m.phase or 0, m.travel or 6, m.pingpong and true or false )
+    local cx, cy = x0 + box.size.w / 512, y0 + box.size.h / 512  -- the path moves the orbit's center
+    addPath( m.path, cx, cy )
+  elseif m.type == "follow" then
+    -- Same options as track() / Camera.track() in scripts/bicycle.lua (mode, rate, offset, deadzone, mirror, bob).
+    local opts = {}
+    for k, v in pairs( m ) do opts[k] = v end
+    opts.offset = opts.offset or { 6, -3 }
+    if opts.mirror == nil then opts.mirror = true end
+    track( id, entityNamed( m.target, "follow" ), opts )
+  else
+    error( "motion: unknown type '"..tostring( m.type ).."' (linear, orbital, combo or follow)" )
+  end
+end
 
 Genome.Sprite = Sprite
 Genome.Animation = Animation

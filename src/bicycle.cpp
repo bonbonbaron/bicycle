@@ -14,6 +14,9 @@
 #include "data/Pack.h"
 #include "data/BImg.h"
 #include <sstream>
+#include <cctype>
+#include <cstdio>
+#include "c/Input.h"
 
 namespace bicycle {
 
@@ -301,6 +304,22 @@ namespace bicycle {
       Kinematics::getInstance().setVelocity( entity, vel );
     }
 
+    // Scripted motions (cells, seconds, degrees; see Kinematics.h and the motion gene in scripts/Genome.lua).
+    void motionLinear( Entity entity, float speed, bool pingPong ) { Kinematics::getInstance().linear( entity, speed, pingPong ); }
+    void motionWaypoint( Entity entity, float x, float y ) { Kinematics::getInstance().addWaypoint( entity, x, y ); }
+    void motionOrbit( Entity entity, Entity center, float cx, float cy, float rx, float ry, float degPerSec, float phaseDeg ) {
+      Kinematics::getInstance().orbit( entity, center, cx, cy, rx, ry, degPerSec, phaseDeg );
+    }
+    void motionCombo( Entity entity, float rx, float ry, float degPerSec, float phaseDeg, float speed, bool pingPong ) {
+      Kinematics::getInstance().combo( entity, rx, ry, degPerSec, phaseDeg, speed, pingPong );
+    }
+    void motionFollow( Entity entity, Entity target, float offX, float offY, float rate, float bobRows, float bobHz,
+                       bool mirror, float deadX, float deadY ) {
+      Kinematics::getInstance().follow( entity, target, offX, offY, rate, bobRows, bobHz, mirror, deadX, deadY );
+    }
+    void motionStop( Entity entity ) { Kinematics::getInstance().stopMotion( entity ); }
+    int motionType( Entity entity ) { return Kinematics::getInstance().motionType( entity ); }
+
     // HUD
     static auto currScene() -> std::shared_ptr<Scene> {
       return dynamic_pointer_cast<Scene>( WindowManager::getInstance().back() );
@@ -346,6 +365,12 @@ namespace bicycle {
       return pop();
     }
       
+    // The current scene's camera entity (a kinematic body: Camera.track in scripts/bicycle.lua drives it).
+    Entity cameraEntity() {
+      auto scene = dynamic_pointer_cast<Scene>( WindowManager::getInstance().back() );
+      return scene ? scene->cameraId() : 0;
+    }
+
     void focusCamOn( Entity entity ) {
       auto& wm = WindowManager::getInstance();
       auto scene = dynamic_pointer_cast<Scene>( wm.back() );
@@ -464,11 +489,38 @@ namespace bicycle {
     long maxFrames = 0, frames = 0;
     if ( const char* s = std::getenv( "BICYCLE_MAX_FRAMES" ) ) maxFrames = std::atol( s );
 
+    // BICYCLE_SCRIPTED_INPUT="d@30-60/3,a@70-90/2": press D every 3rd frame from frame 30 to 60, then A every 2nd
+    // from 70 to 90 (WASD/E/space), through the same path as real keys. For headless captures and tests, any mode.
+    struct Press { LogicalKey key; long from, to, every; };
+    std::vector<Press> script;
+    if ( const char* s = std::getenv( "BICYCLE_SCRIPTED_INPUT" ) ) {
+      std::stringstream ss( s );
+      std::string item;
+      while ( std::getline( ss, item, ',' ) ) {
+        char k{};
+        long from{}, to{}, every{ 1 };
+        if ( std::sscanf( item.c_str(), "%c@%ld-%ld/%ld", &k, &from, &to, &every ) >= 3 && every > 0 ) {
+          const char c = static_cast<char>( std::tolower( static_cast<unsigned char>( k ) ) );
+          const LogicalKey key = c == ' ' ? LogicalKey::Space : c >= 'a' && c <= 'z' ? static_cast<LogicalKey>( c - 'a' + 1 ) : LogicalKey::NOTHING;
+          if ( key != LogicalKey::NOTHING ) script.push_back( { key, from, to, every } );
+        }
+      }
+    }
+
     while ( wm.size() > 0 ) {
-      if ( maxFrames > 0 && frames++ >= maxFrames ) break;
+      if ( maxFrames > 0 && frames >= maxFrames ) break;
       // Inputs
       Timer::run();
       gfx::renderer().pollInput();
+      for ( const auto& p : script ) {
+        if ( frames >= p.from && frames <= p.to && ( frames - p.from ) % p.every == 0 ) {
+          Input in{};
+          in.currKeysPressed.set( static_cast<unsigned>( p.key ) );
+          in.lastPressed = p.key;
+          Trigger::sendInput( in );
+        }
+      }
+      ++frames;
       if ( gfx::renderer().quitRequested() ) {
         break;
       }

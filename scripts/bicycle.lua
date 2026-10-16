@@ -234,6 +234,14 @@ ffi.cdef([[
   void setPos( Entity entity, Position pos );
   void addCollider( Entity entity, unsigned layer, unsigned type, int x, int y, int w, int h );
   void setVelocity( Entity entity, int vx, int vy );
+  void motionLinear( Entity entity, float speed, bool pingPong );
+  void motionWaypoint( Entity entity, float x, float y );
+  void motionOrbit( Entity entity, Entity center, float cx, float cy, float rx, float ry, float degPerSec, float phaseDeg );
+  void motionCombo( Entity entity, float rx, float ry, float degPerSec, float phaseDeg, float speed, bool pingPong );
+  void motionFollow( Entity entity, Entity target, float offX, float offY, float rate, float bobRows, float bobHz, bool mirror, float deadX, float deadY );
+  Entity cameraEntity();
+  void motionStop( Entity entity );
+  int motionType( Entity entity );
   void newAnimStrip( Entity entity, const char* stripName, bool repeat );
   void addAnimFrame( Entity entity, const char* stripName, unsigned durationMs, int x, int y, int w, int h );
   bool setAnim( Entity entity, const char* stripName );
@@ -347,6 +355,27 @@ function unregister( id )
   end
   entities[id] = nil
 end
+
+-- Tracking, for any entity and the camera alike (Kinematics FOLLOW_LERP; the camera is just a kinematic body):
+--   opts = { mode = "lerp" | "hard", rate = 8, offset = { x, y }, deadzone = { x, y }, mirror = false,
+--            bob = 0, bobHz = 1 }
+-- mode "hard" snaps to target + offset every frame; "lerp" eases: pos += (goal - pos) * (1 - exp(-rate * dt)).
+-- deadzone (cells each side) lets the target roam that far before the follower moves. Call again to switch modes.
+function track( follower, target, opts )
+  opts = opts or {}
+  local off, dz = opts.offset or { 0, 0 }, opts.deadzone or { 0, 0 }
+  local rate = opts.mode == "hard" and 0 or ( opts.rate or opts.smoothing or 8 )
+  ffi.C.motionFollow( follower, target, off[1], off[2], rate, opts.bob or 0, opts.bobHz or 1,
+                      opts.mirror and true or false, dz[1], dz[2] )
+end
+
+-- The scene camera. By default it hard-tracks the focused entity with a dead zone (the scene's margins);
+-- Camera.track( entity, opts ) takes the same opts as track(), e.g.
+--   Camera.track( hero.id, { mode = "lerp", rate = 6, deadzone = { 8, 3 } } )
+--   Camera.track( hero.id, { mode = "hard" } )
+Camera = {}
+function Camera.id() return ffi.C.cameraEntity() end
+function Camera.track( target, opts ) track( ffi.C.cameraEntity(), target, opts ) end
 
 function focusOn( entity )
   focus = entity

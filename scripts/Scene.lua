@@ -58,9 +58,12 @@ end
 -- This adds the genomes of all the kk
 function Scene:addFg( Genome, fg )
 	checkType( fg, "table" )
+  local spawned = {}
   for _, instance in ipairs( fg ) do
     -- Express the genome of each entity.
     local genome = Genome.new( instance.genome )
+    table.insert( spawned, genome )
+    Genome.byName[instance.genome] = Genome.byName[instance.genome] or genome.id
     ffi.C.addFgEntity( genome.id )
     if instance.pos then
       local pos = ffi.new("Position", 
@@ -82,6 +85,8 @@ function Scene:addFg( Genome, fg )
     register( genome.id, genome.tbl )
     if genome.tbl.onSpawn then genome.tbl:onSpawn() end
   end
+  -- Motions last: a fairy may follow the hero spawned after it.
+  for _, genome in ipairs( spawned ) do Genome.startMotion( genome ) end
 end
 
 -- bg is either an Aseprite background sprite exported by scripts/aseprite/sprite.lua (one tilemap layer per
