@@ -3,6 +3,7 @@
 #include "data/BImg.h"
 #include <SDL3/SDL.h>
 #include <algorithm>
+#include <cstdlib>
 #include <cstdio>
 #include <string>
 
