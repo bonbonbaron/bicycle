@@ -1,12 +1,29 @@
+#include <chrono>
+#include <cstdio>
 #include <cstdlib>
 #include <fstream>
 #include "c/MidiPlayer.h"
+
+// BICYCLE_PROFILE=<file> appends how long each audio start-up step took (ms), to find what slows start-up.
+static void profile( const char* what ) {
+  static FILE* f = std::getenv( "BICYCLE_PROFILE" ) ? std::fopen( std::getenv( "BICYCLE_PROFILE" ), "a" ) : nullptr;
+  if ( !f ) {
+    return;
+  }
+  using Clock = std::chrono::steady_clock;
+  static Clock::time_point last = Clock::now();
+  const auto now = Clock::now();
+  std::fprintf( f, "audio %-40s %8.1f ms\n", what, std::chrono::duration<double, std::milli>( now - last ).count() );
+  std::fflush( f );
+  last = now;
+}
 
 static auto fileExists( const std::string& fp ) -> bool {
   return std::ifstream( fp ).good();
 }
 
 MidiPlayer::MidiPlayer() {
+  profile( "start" );
   // Settings
   _settingsP = new_fluid_settings();
   // fluidsynth supports the following audio drivers: alsa, file, jack, oss, pulseaudio, sdl2 
@@ -19,22 +36,28 @@ MidiPlayer::MidiPlayer() {
   }
   fluid_settings_setint( _settingsP, "player.reset-synth", 0 );
   fluid_settings_setint( _settingsP, "synth.verbose", 0 );
+  // Read a SoundFont's samples from disk only for the presets channels actually select, instead of all of them
+  // up front. General MIDI SoundFonts are big (FluidR3_GM is 148 MB), and the game uses a handful of programs.
+  fluid_settings_setint( _settingsP, "synth.dynamic-sample-loading", 1 );
   fluid_set_log_function( FLUID_WARN, nullptr, nullptr );  // keep fluidsynth from scribbling on the ncurses screen
   fluid_set_log_function( FLUID_INFO, nullptr, nullptr );
 
   // Synthesizer
   _synthP = new_fluid_synth( _settingsP );
   fluid_synth_set_gain( _synthP, 1.0 );
+  profile( "settings + synth" );
 
   // Audio driver output. Without one (e.g. no sound card) the game still runs, silently.
   _aDriverP = new_fluid_audio_driver( _settingsP, _synthP );
   _playerP = new_fluid_player( _synthP );
+  profile( _aDriverP ? "audio driver + player" : "audio driver (none) + player" );
 
   // General MIDI fallback goes on the bottom of the SoundFont stack.
   const char* gm = std::getenv( "BICYCLE_GM_SF2" );
   for ( const std::string& fp : { std::string( gm ? gm : "" ), std::string( "/usr/share/sounds/sf2/default-GM.sf2" ),
         std::string( "/usr/share/sounds/sf2/TimGM6mb.sf2" ), std::string( "/usr/share/sounds/sf2/FluidR3_GM.sf2" ) } ) {
     if ( !fp.empty() && fileExists( fp ) && fluid_synth_sfload( _synthP, fp.c_str(), 1 ) != FLUID_FAILED ) {
+      profile( ( "GM fallback " + fp ).c_str() );
       break;
     }
   }
@@ -56,7 +79,9 @@ auto MidiPlayer::loadMidi( const std::string& midiFilepath ) -> bool {
   delete_fluid_player( _playerP );
   _playerP = new_fluid_player( _synthP );
   _tick = 0;
-  return fluid_player_add( _playerP, midiFilepath.c_str() ) == FLUID_OK;
+  const bool ok = fluid_player_add( _playerP, midiFilepath.c_str() ) == FLUID_OK;
+  profile( ( "MIDI " + midiFilepath ).c_str() );
+  return ok;
 }
 
 void MidiPlayer::stopSound( const int chan ) {
@@ -106,6 +131,7 @@ auto MidiPlayer::loadSoundfont( const std::string& sfFilepath ) -> int {
     return -1;
   }
   auto id = fluid_synth_sfload( _synthP, sfFilepath.c_str(), 1 );
+  profile( ( "SoundFont " + sfFilepath ).c_str() );
   return id == FLUID_FAILED ? -1 : id;
 }
 

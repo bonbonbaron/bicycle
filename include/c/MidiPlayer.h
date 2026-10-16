@@ -10,6 +10,8 @@
 //   BICYCLE_AUDIO_DRIVER  fluidsynth audio driver (pulseaudio, alsa, jack, sdl2, ...); default: fluidsynth's choice
 //   BICYCLE_AUDIO_FILE    render all audio to this WAV file instead of a sound card (driver "file")
 //   BICYCLE_GM_SF2        fallback General MIDI SoundFont; default: first of /usr/share/sounds/sf2/{default-GM,TimGM6mb,FluidR3_GM}.sf2
+//   BICYCLE_PROFILE       append audio start-up timings (ms per step) to this file
+// Samples load lazily (synth.dynamic-sample-loading): only the presets channels select are read from disk.
 class MidiPlayer {
   public:
     // Not thread-safe without mutex, but in my case, why would it need one?
