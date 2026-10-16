@@ -12,8 +12,14 @@ set( CMAKE_CXX_STANDARD 20 )
 set( CMAKE_CXX_STANDARD_REQUIRED ON )
 set( CMAKE_EXPORT_COMPILE_COMMANDS ON )
 if ( NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES )
-  set( CMAKE_BUILD_TYPE Debug )  # same as the old Makefile's -g
+  # Optimized with debug info, the debug info split off into o.debug (BICYCLE_SPLIT_DEBUG below): a small, fast
+  # executable that's still debuggable. It used to be Debug, which made o.exe ~16 MB, ~11 MB of it DWARF (a slower
+  # first start: more to read from disk and for antivirus to scan). -DCMAKE_BUILD_TYPE=Debug for -O0 stepping.
+  set( CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "Debug, Release, RelWithDebInfo or MinSizeRel" FORCE )
 endif()
+option( BICYCLE_SPLIT_DEBUG "Move the executable's debug info into o.debug next to it (GCC/clang, not MSVC)" ON )
+option( BICYCLE_LTO "Link-time optimization for the engine (smaller, slower to link)" OFF )
+option( BICYCLE_SIZE "Optimize the engine for size (-Os)" OFF )
 
 # How the game is drawn: ASCII (terminal, curses), 2D (SDL3 pixel graphics) or 3D (SDL3 + OpenGL 3.3).
 set( BICYCLE_RENDER ASCII CACHE STRING "Render mode: ASCII, 2D or 3D" )
@@ -293,6 +299,33 @@ if ( MSVC )
 else()
   target_compile_options( o PRIVATE -Wall -Wno-switch )
 endif()
+if ( NOT MSVC )
+  # Unused code and data dropped at link time; exported (FFI) functions are roots, so they stay.
+  target_compile_options( o PRIVATE -ffunction-sections -fdata-sections $<$<BOOL:${BICYCLE_SIZE}>:-Os> )
+  if ( APPLE )
+    target_link_options( o PRIVATE -Wl,-dead_strip )
+  else()
+    target_link_options( o PRIVATE -Wl,--gc-sections )
+  endif()
+  # Release (zero-I/O) builds ship: no symbols or debug info at all.
+  if ( BICYCLE_RELEASE AND NOT APPLE )
+    target_link_options( o PRIVATE -s )
+  endif()
+endif()
+if ( BICYCLE_LTO )
+  set_property( TARGET o PROPERTY INTERPROCEDURAL_OPTIMIZATION ON )
+endif()
+# Debug info out of the executable into o.debug (o-2d.debug, ...), linked back with a .gnu_debuglink, which gdb
+# and lldb follow. Builds without -g skip it.
+if ( BICYCLE_SPLIT_DEBUG AND NOT MSVC AND NOT APPLE AND NOT BICYCLE_RELEASE AND CMAKE_BUILD_TYPE MATCHES "Deb" )
+  find_program( BICYCLE_OBJCOPY NAMES llvm-objcopy ${CMAKE_OBJCOPY} objcopy )
+  if ( BICYCLE_OBJCOPY )
+    add_custom_command( TARGET o POST_BUILD
+      COMMAND "${BICYCLE_OBJCOPY}" --only-keep-debug "$<TARGET_FILE:o>" "$<TARGET_FILE:o>.debug"
+      COMMAND "${BICYCLE_OBJCOPY}" --strip-debug "--add-gnu-debuglink=$<TARGET_FILE:o>.debug" "$<TARGET_FILE:o>"
+      WORKING_DIRECTORY "$<TARGET_FILE_DIR:o>" VERBATIM )
+  endif()
+endif()
 if ( MINGW )
   # Export the engine functions for the FFI, and link the compiler's runtime (libstdc++/libc++, winpthread)
   # statically so o.exe runs without MinGW's DLLs on PATH.
@@ -332,6 +365,13 @@ if ( NOT CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_NAME STREQUAL "Linux" )
     set( lifecyclePair "intro:house" )
   elseif ( lifecycleGame STREQUAL "plat3d" AND BICYCLE_RENDER STREQUAL "3D" )
     set( lifecyclePair "courtyard:bonus" )
+  endif()
+  # plat3d's coins (tests/coin_collect_test.sh): removing a body inside its collision dispatch. 3D dev builds run
+  # loose files; a release build needs plat3d packed.
+  if ( BICYCLE_RENDER STREQUAL "3D" AND ( NOT BICYCLE_RELEASE OR lifecycleGame STREQUAL "plat3d" ) )
+    add_test( NAME coin-collect COMMAND sh "${CMAKE_SOURCE_DIR}/tests/coin_collect_test.sh" "$<TARGET_FILE:o>"
+              WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}" )
+    set_tests_properties( coin-collect PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 400 )
   endif()
   if ( lifecyclePair )
     add_test( NAME scene-lifecycle COMMAND sh "${CMAKE_SOURCE_DIR}/tests/scene_lifecycle_test.sh" "$<TARGET_FILE:o>" ${modeLowerLc} 20

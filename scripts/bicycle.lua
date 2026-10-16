@@ -445,9 +445,11 @@ function getUpdates()
   if bridge.collisions.len > 0 then
     for i = 0, bridge.collisions.len - 1 do
       coll = bridge.collisions.arr[i]
+      if coll.lhs ~= 0 then  -- 0: voided (Trigger::forgetEntity), its entity went away
       entity = entities[coll.lhs]
       if not entity then error("Collision recorded for nonexistent entity "..tostring(coll.lhs)..".") end
       if entity.onCollision then entity:onCollision( coll.rhs, coll.type ) end
+      end
     end
     bridge.collisions.len = 0  -- consumed; C++ appends from len
   end
@@ -455,9 +457,11 @@ function getUpdates()
   if bridge.uncollisions.len > 0 then
     for i = 0, bridge.uncollisions.len - 1 do
       coll = bridge.uncollisions.arr[i]
+      if coll.lhs ~= 0 then
       entity = entities[coll.lhs]
       if not entity then error("Un-collision recorded for nonexistent entity "..tostring(coll.lhs)..".") end
       if entity.onUncollision then entity:onUncollision( coll.rhs, coll.type ) end
+      end
     end
     bridge.uncollisions.len = 0  -- consumed; C++ appends from len
   end
@@ -465,9 +469,11 @@ function getUpdates()
   if bridge.timeouts.len > 0 then
     for i = 0, bridge.timeouts.len - 1 do
       timeout = bridge.timeouts.arr[i]
+      if timeout.entity ~= 0 then
       entity = entities[timeout.entity]
       if not entity then error("Timeout recorded for nonexistent entity "..tostring(timeout.entity)..".") end
       if entity.onTimeout then entity:onTimeout( timeout.id, timeout.type ) end
+      end
     end
     bridge.timeouts.len = 0  -- consumed; C++ appends from len
   end

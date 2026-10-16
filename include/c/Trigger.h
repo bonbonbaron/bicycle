@@ -36,6 +36,11 @@ class Trigger {
     static void sendTimeout( const Timeout& timeout );  
     static void sendCollision( const Collision& collision );
     static void sendUncollision( const Collision& uncollision );
+    // An entity going away (despawned, or a 3D body removed mid-dispatch from inside an onCollision): every queued
+    // collision/uncollision to or from it and every queued timeout to it is voided in place (lhs/entity = 0, which
+    // getUpdates in scripts/bicycle.lua skips), so nothing reaches a dead entity or a later owner of its id, even
+    // while Lua is iterating the queue.
+    static void forgetEntity( Entity entity );
 
     void send();  // sends all the above
 
