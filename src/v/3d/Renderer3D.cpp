@@ -461,14 +461,6 @@ class Renderer3D final : public PixelRenderer {
       return t;
     }
 
-    auto spriteTexture( const std::shared_ptr<const BImg>& img ) -> GLuint {
-      auto it = _spriteTex.find( img.get() );
-      if ( it != _spriteTex.end() ) return it->second.second;
-      const GLuint t = texture( *img );
-      _spriteTex[img.get()] = { img, t };  // holding the image keeps its address unique
-      return t;
-    }
-
     // Dev builds load meshes straight from the exporter's OBJ (+ .mtl), uncompressed; texture names are mapped to
     // the .bimg next to the OBJ, as the packer does.
     auto loadLooseObj( const std::string& bmeshPath ) -> std::optional<MeshData> {
@@ -597,21 +589,36 @@ class Renderer3D final : public PixelRenderer {
           continue;
         }
         if ( !b.pixels ) continue;  // text art has no 3D form
-        // A billboard of the current frame: one image pixel = 1/8 unit; src rect cells -> pixels (2x1 cells each).
-        const BImg& img = *b.pixels;
-        const float u0 = ( b.src.x / 2.0f ) / img.w, u1 = ( ( b.src.x + b.src.w ) / 2.0f ) / img.w;
-        const float t0 = static_cast<float>( b.src.y ) / img.h, t1 = static_cast<float>( b.src.y + b.src.h ) / img.h;
+        // A billboard of the current frame: one image pixel = 1/8 unit; src rect cells -> pixels (2x1 cells each),
+        // offset to the image's place in the sprite atlas. Quads are batched into one draw below.
+        const auto at = _atlas.entry( b.pixels );
+        const float aw = static_cast<float>( _atlas.width() ), ah = static_cast<float>( _atlas.height() );
+        const float u0 = ( at.x + b.src.x / 2.0f ) / aw, u1 = ( at.x + ( b.src.x + b.src.w ) / 2.0f ) / aw;
+        const float t0 = ( at.y + static_cast<float>( b.src.y ) ) / ah, t1 = ( at.y + static_cast<float>( b.src.y + b.src.h ) ) / ah;
         const float w = b.w / 2 / ROWS_PER_UNIT_Y, h = b.h / ROWS_PER_UNIT_Y, z = -0.8f;
         // uv v points up in the shader's convention: v = 1 - row fraction
         const float quad[] = {
           x - w / 2, y,     z, 0, 0, 1, u0, 1 - t1,
           x + w / 2, y,     z, 0, 0, 1, u1, 1 - t1,
           x - w / 2, y + h, z, 0, 0, 1, u0, 1 - t0,
+          x + w / 2, y,     z, 0, 0, 1, u1, 1 - t1,
           x + w / 2, y + h, z, 0, 0, 1, u1, 1 - t0,
+          x - w / 2, y + h, z, 0, 0, 1, u0, 1 - t0,
         };
+        _bbVerts.insert( _bbVerts.end(), std::begin( quad ), std::end( quad ) );
+      }
+      // Every billboard in one draw with the atlas bound (uploaded again only when it was re-planned).
+      if ( !_bbVerts.empty() ) {
+        if ( _atlasTexVersion != _atlas.version() ) {
+          if ( !_atlasTex ) gl.GenTextures( 1, &_atlasTex );
+          texParams( _atlasTex, GL_CLAMP_TO_EDGE );
+          gl.PixelStorei( GL_UNPACK_ALIGNMENT, 4 );
+          gl.TexImage2D( GL_TEXTURE_2D, 0, GL_RGBA8, _atlas.width(), _atlas.height(), 0, GL_BGRA, GL_UNSIGNED_BYTE, _atlas.pixels().data() );
+          _atlasTexVersion = _atlas.version();
+        }
         gl.BindVertexArray( _quadVao );
         gl.BindBuffer( GL_ARRAY_BUFFER, _quadVbo );
-        gl.BufferData( GL_ARRAY_BUFFER, sizeof quad, quad, GL_DYNAMIC_DRAW );
+        gl.BufferData( GL_ARRAY_BUFFER, _bbVerts.size() * sizeof( float ), _bbVerts.data(), GL_DYNAMIC_DRAW );
         const Mat4 id = identity();
         gl.UniformMatrix4fv( gl.GetUniformLocation( _prog, "uMvp" ), 1, 0, viewProj.data() );
         gl.UniformMatrix4fv( gl.GetUniformLocation( _prog, "uModel" ), 1, 0, id.data() );
@@ -619,8 +626,11 @@ class Renderer3D final : public PixelRenderer {
         gl.Uniform4fv( gl.GetUniformLocation( _prog, "uColor" ), 1, white );
         gl.Uniform1i( gl.GetUniformLocation( _prog, "uTex" ), 1 );
         gl.Uniform1i( gl.GetUniformLocation( _prog, "uLit" ), 0 );
-        gl.BindTexture( GL_TEXTURE_2D, spriteTexture( b.pixels ) );
-        gl.DrawArrays( GL_TRIANGLE_STRIP, 0, 4 );
+        gl.BindTexture( GL_TEXTURE_2D, _atlasTex );
+        gl.DrawArrays( GL_TRIANGLES, 0, static_cast<GLsizei>( _bbVerts.size() / 8 ) );
+        ++_stats.billboardDraws;
+        _stats.billboards += _bbVerts.size() / 48;
+        _bbVerts.clear();
       }
       gl.Viewport( 0, 0, _fbW, _fbH );
     }
@@ -658,7 +668,10 @@ class Renderer3D final : public PixelRenderer {
     std::map<std::string, std::shared_ptr<GpuMesh>> _meshes;
     std::unordered_map<Entity, std::shared_ptr<GpuMesh>> _models;
     std::vector<std::shared_ptr<GpuMesh>> _statics;
-    std::map<const BImg*, std::pair<std::shared_ptr<const BImg>, GLuint>> _spriteTex;
+    mem::Vector<float, mem::GRAPHIC> _bbVerts;  // this frame's billboard quads (GL upload staging)
+    GLuint _atlasTex{};
+    uint32_t _atlasTexVersion{};
+    struct { size_t billboardDraws{}, billboards{}; } _stats;
     struct Motion { float x{}; float facing{}; int walk{}; bool seen{}; };
     std::unordered_map<Entity, Motion> _motion;
     gfx::Pixels _capture;

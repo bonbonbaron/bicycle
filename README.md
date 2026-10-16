@@ -176,6 +176,15 @@ fraction (green, then yellow/amber, then red), take optional bar sprites (`hp:sp
 `scripts/Hud.lua`), and render text with TrueType (`fonts/ui.ttf`, stb_truetype). In the pixel modes, ASCII-art
 images that have no pixel version are drawn as solid cell blocks, not characters.
 
+## Texture atlas (2D and 3D)
+
+Every sprite and tileset image is registered as it loads and packed into one atlas (`src/v/sdl/SpriteAtlas.cpp`)
+with jollybean's planner (`src/data/Atlas.cpp`, ported from `xRender.c`: sort by largest side, binary tree of
+right/lower placements, grow right or down). The atlas is re-planned once after a batch of loads, not per frame;
+its ARGB pixels live in GRAPHIC. 2D reads sprite pixels from it; 3D uploads it as one texture and draws all
+billboards in a single batched draw call. Mesh textures (which tile with GL_REPEAT) keep their own textures.
+`BICYCLE_ATLAS_INFO=1` prints the atlas size on each rebuild.
+
 ## Memory pools
 
 All engine memory comes from one arena cut into bump-allocated pools (`include/data/Mem.h`, after jollybean's

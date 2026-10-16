@@ -43,6 +43,7 @@ namespace bicycle {
     img.size.w = ( 2 * px->w ) << FIXEDPT_DEC_BITS;
     img.size.h = px->h << FIXEDPT_DEC_BITS;
     img.size.d = 1 << FIXEDPT_DEC_BITS;
+    gfx::renderer().preloadImage( px );  // into the pixel modes' texture atlas, at load
     img.pixels = std::move( px );
     return img;
   }

@@ -442,7 +442,9 @@ void PixelRenderer::drawLayer( WinHandle win, const Image& img, int offX, int of
     return;
   }
   // Window cell (r, c) shows image cell (r + offY, c + offX); an image pixel is 2 cells wide, 1 tall.
+  // Pixels come from the texture atlas (already ARGB).
   const BImg& p = *img.pixels;
+  const auto at = _atlas.entry( img.pixels );
   const int ox = w->x * CELL_W, oy = w->y * CELL_H;
   const int px0 = offX >= 0 ? offX / 2 : -( ( -offX + 1 ) / 2 );  // floor( offX / 2 )
   const int px1 = ( offX + winW + 1 ) / 2 + 1;
@@ -454,7 +456,7 @@ void PixelRenderer::drawLayer( WinHandle win, const Image& img, int offX, int of
       int ix = px;
       if ( wrap ) ix = wrapIdx( ix, p.w );
       else if ( ix < 0 || ix >= p.w ) continue;
-      const uint32_t argb = rgbaToArgb( p.pixel( ix, iy ) );
+      const uint32_t argb = _atlas.at( at.x + ix, at.y + iy );
       fillRect( w, ox + ( 2 * px - offX ) * CELL_W, oy + r * CELL_H, 2 * CELL_W, CELL_H, argb );
     }
   }
@@ -476,7 +478,9 @@ void PixelRenderer::drawEntity( WinHandle win, Entity entity, const Box& camBox 
     drawTextImage( w, img, sx, sy, sw, sh, ex, ey );
     return;
   }
+  // The sprite's src rect is a sub-rect of its image's place in the atlas.
   const BImg& p = *img.pixels;
+  const auto at = _atlas.entry( img.pixels );
   const int ox = w->x * CELL_W, oy = w->y * CELL_H;
   for ( int r = 0; r < sh; ++r ) {
     const int iy = sy + r;
@@ -484,7 +488,7 @@ void PixelRenderer::drawEntity( WinHandle win, Entity entity, const Box& camBox 
     for ( int c = 0; c < sw / 2; ++c ) {
       const int ix = sx / 2 + c;
       if ( ix < 0 || ix >= p.w ) continue;
-      fillRect( w, ox + ( ex + 2 * c ) * CELL_W, oy + ( ey + r ) * CELL_H, 2 * CELL_W, CELL_H, rgbaToArgb( p.pixel( ix, iy ) ) );
+      fillRect( w, ox + ( ex + 2 * c ) * CELL_W, oy + ( ey + r ) * CELL_H, 2 * CELL_W, CELL_H, _atlas.at( at.x + ix, at.y + iy ) );
     }
   }
 }

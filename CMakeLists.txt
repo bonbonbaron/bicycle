@@ -38,7 +38,7 @@ find_package( Threads REQUIRED )
 
 # --- assets: codecs (inflate, strips, Edgebreaker meshes) and the packer -------------------------------------------
 add_library( bicycle_data STATIC
-  src/data/tinfl.c src/data/Mem.cpp src/data/Pack.cpp src/data/Obj.cpp src/data/Strip.cpp src/data/BImg.cpp src/data/Mesh.cpp
+  src/data/tinfl.c src/data/Mem.cpp src/data/Pack.cpp src/data/Obj.cpp src/data/Atlas.cpp src/data/Strip.cpp src/data/BImg.cpp src/data/Mesh.cpp
   src/data/Edgebreaker.cpp )
 target_include_directories( bicycle_data PUBLIC include )
 # Memory pool sizes in MB (include/data/Mem.h); the same names as environment variables override them at run time.
@@ -102,7 +102,11 @@ if ( NOT CMAKE_CROSSCOMPILING )
   add_executable( bicycle-tests tests/codec_test.cpp )
   target_link_libraries( bicycle-tests PRIVATE bicycle_pack_codecs )
   enable_testing()
+  # The pack round-trip needs test/assets.bpak, which dev builds don't make: pack it first.
+  add_test( NAME pack-assets COMMAND "${CMAKE_COMMAND}" --build "${CMAKE_BINARY_DIR}" --target package )
+  set_tests_properties( pack-assets PROPERTIES FIXTURES_SETUP packed )
   add_test( NAME codecs COMMAND bicycle-tests test WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}" )
+  set_tests_properties( codecs PROPERTIES FIXTURES_REQUIRED packed )
 endif()
 
 set( BICYCLE_SOURCES
@@ -116,9 +120,9 @@ set( BICYCLE_SOURCES
 if ( BICYCLE_RENDER STREQUAL "ASCII" )
   list( APPEND BICYCLE_SOURCES src/v/ascii/AsciiRenderer.cpp src/c/SshInputListener.cpp )
 elseif ( BICYCLE_RENDER STREQUAL "2D" )
-  list( APPEND BICYCLE_SOURCES src/v/sdl/PixelRenderer.cpp src/v/sdl/UiFont.cpp src/v/2d/Renderer2D.cpp )
+  list( APPEND BICYCLE_SOURCES src/v/sdl/PixelRenderer.cpp src/v/sdl/UiFont.cpp src/v/sdl/SpriteAtlas.cpp src/v/2d/Renderer2D.cpp )
 elseif ( BICYCLE_RENDER STREQUAL "3D" )
-  list( APPEND BICYCLE_SOURCES src/v/sdl/PixelRenderer.cpp src/v/sdl/UiFont.cpp src/v/3d/Renderer3D.cpp )
+  list( APPEND BICYCLE_SOURCES src/v/sdl/PixelRenderer.cpp src/v/sdl/UiFont.cpp src/v/sdl/SpriteAtlas.cpp src/v/3d/Renderer3D.cpp )
 endif()
 
 add_executable( o ${BICYCLE_SOURCES} )

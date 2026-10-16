@@ -89,6 +89,8 @@ class Renderer {
     // Paths are asset paths of .bmesh files (see include/data/Mesh.h).
     virtual auto setModel( Entity entity, const std::string& bmeshPath ) -> bool { return false; }
     virtual auto addStaticModel( const std::string& bmeshPath ) -> bool { return false; }
+    // A sprite/tileset image just loaded: the pixel modes pack it into their texture atlas (ASCII ignores it).
+    virtual void preloadImage( const std::shared_ptr<const BImg>& img ) {}
 };
 
 auto renderer() -> Renderer&;  // the build's renderer (BICYCLE_RENDER)

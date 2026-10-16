@@ -6,6 +6,7 @@
 #include "data/BImg.h"
 #include "data/Mesh.h"
 #include "data/Edgebreaker.h"
+#include "data/Atlas.h"
 #include "../tools/pack/Deflate.h"
 #include "../tools/pack/StripEncode.h"
 #include "../tools/pack/MeshEncode.h"
@@ -250,7 +251,41 @@ static void testPack( const std::string& game ) {
   }
 }
 
+// The atlas port: every image placed inside the atlas, none overlapping, for many random sets.
+static void atlasTests() {
+  std::mt19937 rng( 7 );
+  double worstFill = 1;
+  for ( int trial = 0; trial < 300; ++trial ) {
+    const int n = 1 + static_cast<int>( rng() % 60 );
+    std::vector<atlas::Size> sizes;
+    uint64_t area = 0;
+    for ( int i = 0; i < n; ++i ) {
+      const bool strip = rng() % 4 == 0;  // animation strips are wide
+      atlas::Size sz{ 1 + rng() % ( strip ? 200 : 48 ), 1 + rng() % 48 };
+      sizes.push_back( sz );
+      area += uint64_t( sz.w + 1 ) * ( sz.h + 1 );
+    }
+    auto a = atlas::atlasNew( sizes, 1 );
+    atlas::atlasPlanPlacements( a );
+    const auto rects = atlas::atlasPlacements( a, 1 );
+    bool ok = true;
+    for ( int i = 0; i < n && ok; ++i ) {
+      const auto& r = rects[i];
+      ok &= r.w == int( sizes[i].w ) && r.h == int( sizes[i].h ) && r.x >= 0 && r.y >= 0 &&
+            uint32_t( r.x + r.w ) <= a.width() && uint32_t( r.y + r.h ) <= a.height();
+      for ( int j = 0; j < i && ok; ++j ) {
+        const auto& q = rects[j];
+        ok &= r.x + r.w + 1 <= q.x || q.x + q.w + 1 <= r.x || r.y + r.h + 1 <= q.y || q.y + q.h + 1 <= r.y;
+      }
+    }
+    CHECK( ok, "atlas trial %d (%d images): out of bounds or overlapping", trial, n );
+    worstFill = std::min( worstFill, double( area ) / ( double( a.width() ) * a.height() ) );
+  }
+  std::printf( "atlas: 300 random sets packed without overlap; worst fill %.0f%%\n", worstFill * 100 );
+}
+
 int main( int argc, char** argv ) {
+  atlasTests();
   testDeflate();
   testStrip();
   testMeshes();

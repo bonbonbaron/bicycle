@@ -10,6 +10,7 @@
 #include <vector>
 #include "data/Mem.h"
 #include "v/sdl/UiFont.h"
+#include "v/sdl/SpriteAtlas.h"
 
 struct SDL_Window;
 union SDL_Event;
@@ -48,6 +49,7 @@ class PixelRenderer : public Renderer {
 
     void drawLayer( WinHandle win, const Image& img, int offX, int offY, bool wrap, int winW, int winH ) override;
     void drawEntity( WinHandle win, Entity entity, const Box& camBox ) override;
+    void preloadImage( const std::shared_ptr<const BImg>& img ) override { _atlas.add( img ); }
 
   protected:
     struct Win {
@@ -92,6 +94,7 @@ class PixelRenderer : public Renderer {
     auto measureString( const std::string& s, int sizePx, bool bold = false ) -> int;
     static constexpr int UI_TEXT_PX = 15;  // body text size: fits a 16-pixel cell row
     UiFont _font, _fontBold;
+    SpriteAtlas _atlas;  // every sprite/tileset image, packed at load (see SpriteAtlas.h)
     void drawTextImage( const Win* win, const Image& img, int srcX, int srcY, int srcW, int srcH, int dstX, int dstY );
     void saveScreenshotIfDue();
     auto screenshotDue() const -> bool;  // this frame will be saved (BICYCLE_SCREENSHOT)
