@@ -71,6 +71,7 @@ function Scene:addFg( Genome, fg )
     genome.tbl.id = genome.id
 
     register( genome.id, genome.tbl )
+    if genome.tbl.onSpawn then genome.tbl:onSpawn() end
   end
 end
 
@@ -107,6 +108,7 @@ function Scene.new( tbl )
   local id = ffi.C.pushScene()  -- bicycle::pushScene() returns an entity ID of that scene
   local instance = { name=tbl.name, id=tbl.id, bg=tbl.bg, fg=tbl.fg }
   local Genome = require("Genome")
+  require("Sound").load( tbl.music, tbl.sfx )
   setmetatable( instance, Scene )  -- inherit Scene
   setmetatable( Scene, Window )    -- have Scene in turn inherit Window (its supertype)
   -- Push window to bicycle's internal stack of window

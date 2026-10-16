@@ -350,6 +350,9 @@ function Animation:frameIdx()
   return ffi.C.getAnimFrameIdx( self.entity )
 end
 
+-- Collision types games can refer to by name in coll genes; onCollision( other, type ) receives the number.
+local COLL = { hero = 1, solid = 2, coin = 3 }
+
 Gene["GeneLoader"] = {
   scene = function(entity, gene)
     checkType( entity, "number" )
@@ -380,7 +383,19 @@ Gene["GeneLoader"] = {
       end
     end
   end,
+  -- coll = { type = "solid", layer = 0, box = { x, y, w, h } }: collide with entities on the same layer.
+  -- type is a name from Genome.COLL (or a number); box is relative to the entity, in cells (default: whole entity).
+  coll = function(entity, gene)
+    local c = gene.val
+    checkType( c, "table" )
+    local collType = type( c.type ) == "number" and c.type or COLL[c.type or "solid"]
+    if not collType then error( "Unknown collision type '"..tostring( c.type ).."'." ) end
+    local box = c.box or { 0, 0, 0, 0 }
+    ffi.C.addCollider( entity, c.layer or 0, collType, box[1], box[2], box[3], box[4] )
+  end,
   initAnim = 0,  -- do nothing; read by the sprite loader
+  onSpawn = 0,  -- do nothing; called by Scene once the entity is placed
+  onUncollision = 0,  -- do nothing, just allow it to exist
   spriteData = 0,  -- do nothing; set by the sprite loader
   onTimeout = 0,  -- do nothing, just allow it to exist
   anim = function(entity, gene)
@@ -404,6 +419,7 @@ function Gene:load( entity, genomeName, tbl )
     return  -- gene is game-specific; TODO consider making this a lua loader
   end
   local loader = Gene.GeneLoader[self.type]
+  if not loader and type( self.val ) == "function" then return end  -- genome-specific methods are fine
   if loader == 0 then return end  -- placeholder gene with nothing to load
 
   -- Error-handling
@@ -448,15 +464,21 @@ Genome.new = function( name )
   return instance
 end
 
+-- Returns a fresh copy of the genome's table so several instances (e.g. coins) each keep their own state.
 function Genome.get(genomeName)
   checkType(genomeName, "string")
-  return require("./"..gameName.."/genome/"..genomeName)
+  local proto = require("./"..gameName.."/genome/"..genomeName)
+  local tbl = {}
+  for k, v in pairs( proto ) do tbl[k] = v end
+  return tbl
 end
 
 -- TODO call this from the loader to put a different position, dialogue, etc. on every instance of the same genome (e.g. shopkeepers w/ different items)
 function Genome.inject(entity, tbl)
   -- TODO
 end
+
+Genome.COLL = COLL
 
 Genome.Sprite = Sprite
 Genome.Animation = Animation

@@ -222,6 +222,8 @@ ffi.cdef([[
   void addFgEntity( Entity entity );
   void newImage( Entity entity, const char* imgStr );
   void setPos( Entity entity, Position pos );
+  void addCollider( Entity entity, unsigned layer, unsigned type, int x, int y, int w, int h );
+  void setVelocity( Entity entity, int vx, int vy );
   void newAnimStrip( Entity entity, const char* stripName, bool repeat );
   void addAnimFrame( Entity entity, const char* stripName, unsigned durationMs, int x, int y, int w, int h );
   bool setAnim( Entity entity, const char* stripName );
@@ -239,8 +241,10 @@ ffi.cdef([[
   void stopSong();
   void pauseSong();
   void unpauseSong();
-  void loadMidi( const char* midiFilepath );
-  void loadSoundfont( const char* sfFilepath );
+  bool loadMidi( const char* midiFilepath );
+  int loadSoundfont( const char* sfFilepath );
+  bool selectProgram( const int chan, const int sfontId, const int bank, const int program );
+  int getSfxChannel();
 
   Entity pop() {
     auto& wm = WindowManager::getInstance();
@@ -252,6 +256,15 @@ ffi.cdef([[
 
   int rollDice( const int min, const int max );
 ]])
+
+-- Set BICYCLE_DEBUG_LOG=<file> to have games log events (dbglog) for testing; otherwise a no-op.
+local debugLogFile = os.getenv( "BICYCLE_DEBUG_LOG" ) and io.open( os.getenv( "BICYCLE_DEBUG_LOG" ), "w" )
+function dbglog( fmt, ... )
+  if debugLogFile then
+    debugLogFile:write( string.format( "%.3f ", os.clock() ), string.format( fmt, ... ), "\n" )
+    debugLogFile:flush()
+  end
+end
 
 function checkType( arg, expType )
   if type(arg) ~= expType then 
@@ -306,7 +319,7 @@ function getUpdates()
       coll = bridge.collisions.arr[i]
       entity = entities[coll.lhs]
       if not entity then error("Collision recorded for nonexistent entity "..tostring(coll.lhs)..".") end
-      entity:onCollision( coll.rhs, coll.type )
+      if entity.onCollision then entity:onCollision( coll.rhs, coll.type ) end
     end
     bridge.collisions.len = 0  -- consumed; C++ appends from len
   end
@@ -316,7 +329,7 @@ function getUpdates()
       coll = bridge.uncollisions.arr[i]
       entity = entities[coll.lhs]
       if not entity then error("Un-collision recorded for nonexistent entity "..tostring(coll.lhs)..".") end
-      entity:onCollision( coll.rhs, coll.type )
+      if entity.onUncollision then entity:onUncollision( coll.rhs, coll.type ) end
     end
     bridge.uncollisions.len = 0  -- consumed; C++ appends from len
   end
@@ -326,7 +339,7 @@ function getUpdates()
       timeout = bridge.timeouts.arr[i]
       entity = entities[timeout.entity]
       if not entity then error("Timeout recorded for nonexistent entity "..tostring(timeout.entity)..".") end
-      entity:onTimeout( timeout.id, timeout.type )
+      if entity.onTimeout then entity:onTimeout( timeout.id, timeout.type ) end
     end
     bridge.timeouts.len = 0  -- consumed; C++ appends from len
   end
