@@ -1,0 +1,31 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "linux",
+      "displayName": "Linux (system packages via pkg-config)",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build/cmake"
+    },
+    {
+      "name": "windows-msvc",
+      "displayName": "Windows, Visual Studio + vcpkg",
+      "generator": "Visual Studio 17 2022",
+      "architecture": "x64",
+      "binaryDir": "${sourceDir}/build/msvc",
+      "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+      "cacheVariables": { "VCPKG_TARGET_TRIPLET": "x64-windows" }
+    },
+    {
+      "name": "windows-mingw",
+      "displayName": "Windows, MSYS2 MinGW-w64 (UCRT64) packages",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/mingw"
+    }
+  ],
+  "buildPresets": [
+    { "name": "linux", "configurePreset": "linux" },
+    { "name": "windows-msvc", "configurePreset": "windows-msvc", "configuration": "Debug" },
+    { "name": "windows-mingw", "configurePreset": "windows-mingw" }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "name": "bicycle",
+  "version-string": "0.1.0",
+  "description": "Terminal game engine: ncurses/PDCurses graphics, LuaJIT scripting, fluidsynth audio.",
+  "dependencies": [
+    { "name": "pdcurses", "platform": "windows" },
+    "luajit",
+    { "name": "fluidsynth", "default-features": false }
+  ]
+}

@@ -3,3 +3,7 @@ tags
 build/**
 config/
 o
+o.exe
+*.dll
+*.pdb
+sf2/
