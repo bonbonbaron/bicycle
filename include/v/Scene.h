@@ -95,6 +95,7 @@ class Scene : public Window {
 
     void render() override;
     void onInput( Input& input ) override;
+    void onTermResize() override;
     void setFocus( Entity entity );
 
     auto getBackLayer() -> std::optional<Layer>;

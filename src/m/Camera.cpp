@@ -48,25 +48,34 @@ void Camera::pan( const int dy, const int dx ) {
 }
 
 // Pans just enough to keep the whole focused-on entity at least _margin inside the field of view
-// (within the limits set by setLims()).
+// (within the limits set by setLims()). Each axis is followed on its own:
+// * If the view is too small for both margins plus the entity, the margin shrinks to fit, and an entity
+//   taller (or wider) than the view is centered. Otherwise the low and high margins can't both be met,
+//   and the camera would pan to one, then back to the other, every frame (a shaking screen).
+// * The camera only ever moves toward the side the entity crossed, so it never undoes its own pan.
+static auto followAxis( const int camPos, const int camLen, const int margin, const int lo, const int hi ) -> int {
+  const int entityLen = hi - lo;
+  if ( entityLen >= camLen ) {
+    return lo + entityLen / 2 - camLen / 2;  // too big to fit: center it
+  }
+  const int m = std::min( margin, ( camLen - entityLen ) / 2 );
+  if ( lo < camPos + m ) {
+    return lo - m;
+  }
+  if ( hi > camPos + camLen - m ) {
+    return hi - camLen + m;
+  }
+  return camPos;
+}
+
 void Camera::followFocus() {
   const auto& focusBox = World::get<Box>( getFocus() );
-  const int left = focusBox.pos.x;
-  const int right = focusBox.pos.x + static_cast<int>( focusBox.size.w );
-  const int top = focusBox.pos.y;
-  const int bottom = focusBox.pos.y + static_cast<int>( focusBox.size.h );
-  if ( left < getLxMargin() ) {
-    pan( 0, left - getLxMargin() );
-  }
-  else if ( right > getHxMargin() ) {
-    pan( 0, right - getHxMargin() );
-  }
-  if ( top < getLyMargin() ) {
-    pan( top - getLyMargin(), 0 );
-  }
-  else if ( bottom > getHyMargin() ) {
-    pan( bottom - getHyMargin(), 0 );
-  }
+  const auto& camBox = World::get<Box>( _id );
+  const int x = followAxis( camBox.pos.x, static_cast<int>( camBox.size.w ), _margin,
+                            focusBox.pos.x, focusBox.pos.x + static_cast<int>( focusBox.size.w ) );
+  const int y = followAxis( camBox.pos.y, static_cast<int>( camBox.size.h ), _margin,
+                            focusBox.pos.y, focusBox.pos.y + static_cast<int>( focusBox.size.h ) );
+  pan( y - camBox.pos.y, x - camBox.pos.x );
 }
 
 // TODO this assumes single-character symbols. Handle multi-char later.

@@ -179,6 +179,13 @@ void Scene::render() {
 void Scene::onInput( Input& input ) {
 }
 
+// A full-screen scene grows or shrinks with the terminal, e.g. when a terminal is maximized after the game started.
+void Scene::onTermResize() {
+  setWidth( COLS - 4 );  // same size the default constructor gives
+  setHeight( LINES );
+  _camera.setDims( getHeight(), getWidth() );
+}
+
 void Scene::setFocus( Entity entity ) {
   auto layerIdx = _grid.getLayer( entity ); 
   if ( layerIdx.has_value() ) {

@@ -1,4 +1,6 @@
 #include "c/WindowManager.h"
+#include <sys/ioctl.h>
+#include <unistd.h>
 
 auto WindowManager::back() const -> const std::shared_ptr<Window> {
   if ( _population > 0 ) {
@@ -31,7 +33,29 @@ Entity WindowManager::pop() {
   return nextWindowId;
 }
 
+// ncurses only notices a resized terminal through getch(), which bicycle doesn't use, so check for it here.
+static auto termResized() -> bool {
+  winsize ws{};
+  if ( ioctl( STDOUT_FILENO, TIOCGWINSZ, &ws ) != 0 || ws.ws_row == 0 || ws.ws_col == 0 ) {
+    return false;
+  }
+  if ( ws.ws_row == LINES && ws.ws_col == COLS ) {
+    return false;
+  }
+  resizeterm( ws.ws_row, ws.ws_col );
+  clear();
+  return true;
+}
+
 void WindowManager::refreshAll() {
+  if ( termResized() ) {
+    for ( unsigned i = 0; i < _population; ++i ) {
+      if ( _windows.at(i) != nullptr ) {
+        _windows.at(i)->onTermResize();
+      }
+    }
+    wnoutrefresh( stdscr );
+  }
   for (unsigned i = 0; i < _population; ++i ) {
     if ( _windows.at(i) != nullptr ) {
       _windows.at(i)->clear();
