@@ -1,6 +1,6 @@
 #pragma once
 #include <string>
-#include "v/Window.h"
+#include "v/common/Window.h"
 
 // A labeled meter (health, stamina, a progress bar...) drawn glued to a window, i.e. in screen cells:
 //   HP [#######---] 7/10

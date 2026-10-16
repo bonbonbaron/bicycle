@@ -1,8 +1,7 @@
 #pragma once
-#include "v/Bar.h"
+#include "v/common/Bar.h"
 #include <string>
 #include <vector>
-#include "curses_compat.h"
 #include <optional>
 #include <unordered_map>
 
@@ -10,8 +9,8 @@
 #include "m/Box.h"
 #include "m/Entity.h"
 
-#include "v/Window.h"
-#include "v/Image.h"
+#include "v/common/Window.h"
+#include "v/common/Image.h"
 
 #include "array2d.h"
 
@@ -19,7 +18,7 @@ enum LayerType { FIXED, GLUED, PARALLAX, LOOP, AUTOLOOP };
 
 struct TileStage {
   // TileStage( int c, Color color, char duration, char collType
-  const chtype img{};           // includes color
+  const unsigned img{};         // glyph and color
   const char duration{};        // only ONE timer gets created for all homogeneous tiles on-screen
   const char collType{};        // can be assigned FIRE, WATER, NORMAL, etc. Lua-side
 };
@@ -111,7 +110,6 @@ class Scene : public Window {
     Grid _grid{};    // This has layers of BGs and FGs.
     Camera _camera{};  // TODO  when we have minimaps, the input needs to go to a window BELOW the top of WindowManager's stack.
     void renderFg( const Layer& layer );
-    void renderBg( const Layer& layer, const int offX, const int offY, const bool wrap );
     void updateCameraLimits();
     std::vector<Bar> _hud{};
     std::unordered_map<Entity, bool> _hidden{};

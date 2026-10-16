@@ -5,10 +5,10 @@
 #include <memory>
 #include <variant>
 
-#include "v/Image.h"
+#include "v/common/Image.h"
 #include "m/Position.h"
 #include "m/Entity.h"
-#include "v/Window.h"
+#include "v/common/Window.h"
 
 static std::string CURSOR{ " > " };
 

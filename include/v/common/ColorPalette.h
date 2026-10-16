@@ -1,5 +1,4 @@
 #pragma once
-#include "curses_compat.h"
 #include <unordered_map>
 #include <string>
 
@@ -35,7 +34,6 @@ class ColorPalette {
       const static ColorPalette cp;
       return cp;
     }
-    static void init();
 };
 
 

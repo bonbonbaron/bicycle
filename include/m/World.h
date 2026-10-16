@@ -10,7 +10,7 @@
 
 #include "m/Box.h"
 #include "c/Collision.h"
-#include "v/Image.h"
+#include "v/common/Image.h"
 #include "m/Rect.h"   // used for animation and rendering
 
 using ArrayVar = std::variant<

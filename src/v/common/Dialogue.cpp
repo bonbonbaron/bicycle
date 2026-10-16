@@ -1,14 +1,14 @@
-#include "v/Dialogue.h"
+#include "v/common/Dialogue.h"
 #include <cassert>
 #include <iostream>
 #include <algorithm>
 
 // This constructor's meant for short strings since it prints it all on one row.
-Dialogue::Dialogue( const std::string&& s ) : Window( COLS / 2 - s.length() / 2, LINES / 2, s.length() + WINDOW_PADDING, WINDOW_PADDING + 1 ), _content( s ) {
+Dialogue::Dialogue( const std::string&& s ) : Window( gfx::cols() / 2 - s.length() / 2, gfx::lines() / 2, s.length() + WINDOW_PADDING, WINDOW_PADDING + 1 ), _content( s ) {
   init();
 }
 
-Dialogue::Dialogue( const std::string& s ) : Window( COLS / 2 - s.length() / 2, LINES / 2, s.length() + WINDOW_PADDING, WINDOW_PADDING + 1 ), _content( s ) {
+Dialogue::Dialogue( const std::string& s ) : Window( gfx::cols() / 2 - s.length() / 2, gfx::lines() / 2, s.length() + WINDOW_PADDING, WINDOW_PADDING + 1 ), _content( s ) {
   init();
 }
 

@@ -15,8 +15,19 @@ if ( NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES )
   set( CMAKE_BUILD_TYPE Debug )  # same as the old Makefile's -g
 endif()
 
+# How the game is drawn: ASCII (terminal, curses), 2D (SDL3 pixel graphics) or 3D (SDL3 + OpenGL 3.3).
+set( BICYCLE_RENDER ASCII CACHE STRING "Render mode: ASCII, 2D or 3D" )
+set_property( CACHE BICYCLE_RENDER PROPERTY STRINGS ASCII 2D 3D )
+string( TOUPPER "${BICYCLE_RENDER}" BICYCLE_RENDER )
+if ( NOT BICYCLE_RENDER MATCHES "^(ASCII|2D|3D)$" )
+  message( FATAL_ERROR "BICYCLE_RENDER must be ASCII, 2D or 3D (got '${BICYCLE_RENDER}')." )
+endif()
+message( STATUS "bicycle: render mode ${BICYCLE_RENDER}" )
+
 include( cmake/BicycleDeps.cmake )
-bicycle_curses()
+if ( BICYCLE_RENDER STREQUAL "ASCII" )
+  bicycle_curses()
+endif()
 bicycle_luajit()
 bicycle_fluidsynth()
 bicycle_gm_soundfont()
@@ -25,15 +36,22 @@ find_package( Threads REQUIRED )
 set( BICYCLE_SOURCES
   src/main.cpp src/bicycle.cpp src/trigLUT.cpp
   src/m/Entity.cpp src/m/Box.cpp src/m/Camera.cpp src/m/World.cpp
-  src/v/Image.cpp src/v/ColorPalette.cpp src/v/Window.cpp src/v/Dialogue.cpp src/v/Menu.cpp src/v/TextMenu.cpp
-  src/v/Scene.cpp src/v/Bar.cpp
-  src/c/Trigger.cpp src/c/Timer.cpp src/c/SshInputListener.cpp src/c/WindowManager.cpp src/c/CollisionDetector.cpp
+  src/v/common/Image.cpp src/v/common/ColorPalette.cpp src/v/common/Window.cpp src/v/common/Dialogue.cpp
+  src/v/common/Menu.cpp src/v/common/TextMenu.cpp src/v/common/Scene.cpp src/v/common/Bar.cpp
+  src/c/Trigger.cpp src/c/Timer.cpp src/c/WindowManager.cpp src/c/CollisionDetector.cpp
   src/c/Kinematics.cpp src/c/Animator.cpp src/c/MidiPlayer.cpp src/c/Dice.cpp )
-# Not built (unfinished or replaced): src/c/Input.cpp (Linux evdev keyboard), src/c/RenderSystem.cpp, src/v/Graph.cpp
+# Not built (unfinished or replaced): src/c/Input.cpp (Linux evdev keyboard), src/c/RenderSystem.cpp, src/v/common/Graph.cpp
+if ( BICYCLE_RENDER STREQUAL "ASCII" )
+  list( APPEND BICYCLE_SOURCES src/v/ascii/AsciiRenderer.cpp src/c/SshInputListener.cpp )
+endif()
 
 add_executable( o ${BICYCLE_SOURCES} )
 target_include_directories( o PRIVATE include )
-target_link_libraries( o PRIVATE bicycle_curses bicycle_luajit bicycle_fluidsynth Threads::Threads )
+target_link_libraries( o PRIVATE bicycle_luajit bicycle_fluidsynth Threads::Threads )
+target_compile_definitions( o PRIVATE BICYCLE_RENDER_${BICYCLE_RENDER} )
+if ( BICYCLE_RENDER STREQUAL "ASCII" )
+  target_link_libraries( o PRIVATE bicycle_curses )
+endif()
 set_target_properties( o PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}
   RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_SOURCE_DIR}

@@ -1,7 +1,7 @@
 #pragma once
 #include <string>
 #include <vector>
-#include "Window.h"
+#include "v/common/Window.h"
 #include "LineLimits.h"
 
 class Dialogue : public Window {

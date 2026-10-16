@@ -2,42 +2,33 @@
 #include "bicycle.h"
 #include "Constants.h"
 #include "c/Trigger.h"
-#include "c/SshInputListener.h"
 #include "c/CollisionDetector.h"
-#include "v/Dialogue.h"
-#include "v/TextMenu.h"
-#include "v/Scene.h"
+#include "v/common/Dialogue.h"
+#include "v/common/TextMenu.h"
+#include "v/common/Scene.h"
 #include "c/MidiPlayer.h"
 #include "c/Dice.h"
 #include "c/Animator.h"
+#include "v/common/Renderer.h"
 
 namespace bicycle {
 
   void die( const std::string&& s ) {
     std::unique_lock<std::mutex> l( bike_mtx );
-    endwin();
+    gfx::renderer().shutdown();
     std::cerr << "\e[91m" << s << "\e[0m\n";
     exit(1);
   }
 
   void die( const std::string& s ) {
     std::unique_lock<std::mutex> l( bike_mtx );
-    endwin();
+    gfx::renderer().shutdown();
     std::cerr << "\e[91m" << s << "\e[0m\n";
     exit(1);
   }
 
   void init( const std::string& gameName ) {
-    // Init ncurses
-    setlocale(LC_ALL, "");
-    initscr();
-    start_color();
-    cbreak();  // reads each character as they're typed instead of waiting for newline
-    noecho();  // doesn't echo user's input back to them
-    curs_set(0);
-    ColorPalette::init();
-    clear();
-    refresh();
+    gfx::renderer().init( gameName );
     auto& trig = Trigger::getInstance();
     trig.init( gameName );
   }
@@ -61,11 +52,11 @@ namespace bicycle {
     }
 
     int getScreenWidth() {
-      return COLS;
+      return gfx::cols();
     }
 
     int getScreenHeight() {
-      return LINES;
+      return gfx::lines();
     }
 
     // MENUS
@@ -302,7 +293,10 @@ namespace bicycle {
     while ( wm.size() > 0 ) {
       // Inputs
       Timer::run();
-      SshInput::listen();
+      gfx::renderer().pollInput();
+      if ( gfx::renderer().quitRequested() ) {
+        break;
+      }
       Kinematics::getInstance().run();
       CollisionDetector::check();
       // Process inputs
@@ -310,18 +304,11 @@ namespace bicycle {
       // Outputs
       wm.render();   // TODO make this internally only change dirty windows
 
-      // This is dummy-code for testing colors.
-      // std::array<chtype, 100> chs{};
-      // chs.fill( 'H' | COLOR_PAIR(RED) );
-      // chs.at(chs.size() - 1 ) = '\0';
-      // move(10,10);
-      // addchstr(chs.data());
-      // refresh();
-
       Timer::sleepFrame();  // burn off excess frame time
     }
 
-    return endwin();
+    gfx::renderer().shutdown();
+    return 0;
   }
 
 }

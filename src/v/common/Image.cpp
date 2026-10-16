@@ -1,4 +1,4 @@
-#include "v/Image.h"
+#include "v/common/Image.h"
 #include "m/World.h"
 
 // Determine the widest row.

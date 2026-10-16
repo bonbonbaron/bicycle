@@ -1,29 +1,28 @@
 #pragma once
 #include <string>
-#include "ColorPalette.h"
+#include "v/common/ColorPalette.h"
+#include "v/common/Renderer.h"
 #include "c/Input.h"
 #include "m/Entity.h"
 
 static constexpr int WINDOW_PADDING{2};
 
+// A rectangle of cells on screen (a curses window in ASCII mode). Drawing goes through gfx::renderer().
 class Window {
   public:
     // i know this doesn't align with ncurses' paramter order, but I like my order better :)
     Window();
     Window( const int w, const int h );
     Window( const int x, const int y, const int w, const int h );
-    ~Window();
+    virtual ~Window();
     void create();
     void show();
     void hide();
     void clear();
-    void move( int y, int x );
     virtual void render() = 0;
     virtual void onInput( Input& input ) = 0;
-    virtual void onTermResize() {}  // the terminal changed size (LINES and COLS are already updated)
+    virtual void onTermResize() {}  // the screen changed size (gfx::cols() and gfx::lines() are already updated)
     void repaint();
-    const char* getCurrItemName() const;
-    const char* getCurrItemDesc() const;
 
     auto getX() const -> int;
     auto getY() const -> int;
@@ -38,18 +37,15 @@ class Window {
     void setBorder( const bool showBorder );
     auto isBorderShowing() const -> bool;
     void mvprint( const int y, const int x, const std::string& s ) const;
-    void addmvch( const int y, const int x, char c ) const;  // mvaddch() might be a macro, blows compilation
-    void putc( const char c ) const;
-    void print( const std::string& s ) const;
 
     auto getContext() const -> Entity; // window's an entity now
     auto getId() const -> Entity;
-    void setAttr( const int attr );
+    void setAttr( const int attr );    // gfx::Attr flags
     void unsetAttr( const int attr );
+    auto getHandle() const -> gfx::WinHandle { return _win; }
 
   private:
-    WINDOW* _win;
-    chtype _colorPair;
+    gfx::WinHandle _win{};
     bool _showBorder{true};
     std::string name;
     int _w{};

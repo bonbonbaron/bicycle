@@ -1,6 +1,6 @@
 #pragma once
 #include "m/Position.h"
-#include "v/ColorPalette.h"
+#include "v/common/ColorPalette.h"
 #include "m/Size.h"
 #include <vector>
 #include "LineLimits.h"

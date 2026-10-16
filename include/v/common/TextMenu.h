@@ -1,4 +1,4 @@
-#include "v/Menu.h"
+#include "v/common/Menu.h"
 #include "c/Input.h"
 
 class TextMenu : public Menu {

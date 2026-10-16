@@ -2,7 +2,7 @@
 #include "m/Entity.h"
 #include <vector>
 #include <list>
-#include "v/Window.h"
+#include "v/common/Window.h"
 #include "m/Box.h"
 
 class Camera {

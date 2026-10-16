@@ -1,42 +1,14 @@
 #include "m/Camera.h"
-#include "v/Window.h"
+#include "v/common/Window.h"
 #include <algorithm>
 #include "m/World.h"
+#include "v/common/Renderer.h"
 
 
-/* TODO: consider using these functions:
- * int add_wchstr(const cchar_t *wchstr);
- * int add_wchnstr(const cchar_t *wchstr, int n);
- * int wadd_wchstr(WINDOW * win, const cchar_t *wchstr);
- * int wadd_wchnstr(WINDOW * win, const cchar_t *wchstr, int n);
- *
- * int mvadd_wchstr(int y, int x, const cchar_t *wchstr);
- * int mvadd_wchnstr(int y, int x, const cchar_t *wchstr, int n);
- * int mvwadd_wchstr(WINDOW *win, int y, int x, const cchar_t *wchstr);
- * int mvwadd_wchnstr(WINDOW *win, int y, int x, const cchar_t *wchstr, int n);
- *
- *
- * These functions copy the (null-terminated) array of complex characters wchstr into the window image structure starting at the current cursor position.  The four  functions
- * with  n  as  the last argument copy at most n elements, but no more than will fit on the line.  If n=-1 then the whole array is copied, to the maximum number of characters
- * that will fit on the line.
- *
- * The window cursor is not advanced.  These functions work faster than waddnstr.  On the other hand:
- *
- * •   they do not perform checking (such as for the newline, backspace, or carriage return characters),
- *
- * •   they do not advance the current cursor position,
- *
- * •   they do not expand other control characters to ^-escapes, and
- *
- * •   they truncate the string if it crosses the right margin, rather than wrapping it around to the new line.
- *
- * These functions end successfully on encountering a null cchar_t, or when they have filled the current line.  If a complex character cannot completely fit at the end of the
- * current line, the remaining columns are filled with the background character and rendition.
- */
 Camera::Camera() : _id( newEntityId() ) {}
 
 Camera::Camera( const int x, const int y, const int margin ) : _id( newEntityId() ), _margin(margin) {
-  World::set<Box>( _id, { { x, y, 0 }, { static_cast<unsigned>(COLS << FIXEDPT_DEC_BITS), static_cast<unsigned>(LINES << FIXEDPT_DEC_BITS), 0 } } );
+  World::set<Box>( _id, { { x, y, 0 }, { static_cast<unsigned>(gfx::cols() << FIXEDPT_DEC_BITS), static_cast<unsigned>(gfx::lines() << FIXEDPT_DEC_BITS), 0 } } );
 }
 
 void Camera::pan( const int dy, const int dx ) {
@@ -144,31 +116,5 @@ void Camera::draw( const Entity entity, Window& tgt ) {
   if ( ! camBox.overlaps( entityBox ) ) {  // TODO let camera track what it sees via onCollision(), not Scene
     return;
   }
-  const auto& entityImg = World::get<Image>( entity );
-  // Animated entities draw only their current frame: the src rect (in character cells) of their image.
-  // A zero-width rect means "draw the whole image".
-  const auto& srcRect = World::get<Rect>( entity );
-  const bool hasSrcRect = srcRect.w > 0;
-  auto croppedBox = camBox.crop( entityBox ) >> FIXEDPT_DEC_BITS;  // portion of entityBox in FOV
-  auto entityPosWrtCamera = ( entityBox.pos - camBox.pos ) >> FIXEDPT_DEC_BITS;
-  // If the image's top row is out of FOV, then get the first row to draw.
-  // imgRowIdx is the row of the image itself we're drawing.
-  unsigned imgRowIdx = std::abs( std::min( 0, entityPosWrtCamera.y ) ) + ( hasSrcRect ? srcRect.y : 0 );
-  const int clipLeft = std::abs( std::min( entityPosWrtCamera.x, 0 ) );
-  for ( unsigned croppedBoxRowIdx{}; croppedBoxRowIdx < croppedBox.size.h; ++croppedBoxRowIdx, ++imgRowIdx ) {
-    if ( imgRowIdx >= entityImg.lineLimits.size() ) {
-      break;
-    }
-    const auto& lineLims = entityImg.lineLimits.at( imgRowIdx );
-    int rowStart = hasSrcRect ? srcRect.x : 0;
-    int rowLen = hasSrcRect ? std::min( srcRect.w, lineLims.len - srcRect.x ) : lineLims.len;
-    int stringLength = std::min( static_cast<int>( croppedBox.size.w ), rowLen - clipLeft );
-    if ( stringLength <= 0 ) {
-      continue;
-    }
-    auto rowStr = std::string( entityImg.string, lineLims.start + rowStart + clipLeft, stringLength );
-    // croppedBox is in world cells; the window is in screen cells.
-    tgt.mvprint( croppedBox.pos.y - ( camBox.pos.y >> FIXEDPT_DEC_BITS ) + croppedBoxRowIdx,
-                 croppedBox.pos.x - ( camBox.pos.x >> FIXEDPT_DEC_BITS ), rowStr );  // layerRow + 1 to skip the stop border 
-  }
+  gfx::renderer().drawEntity( tgt.getHandle(), entity, camBox );
 }

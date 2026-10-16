@@ -1,4 +1,4 @@
-#include "v/TextMenu.h"
+#include "v/common/TextMenu.h"
 #include <algorithm>
 #include "bicycle.h"
 #include "Constants.h"
@@ -16,11 +16,11 @@ void TextMenu::render() {
   for ( int currRow = 1, dispIdx = _firstDispIdx; dispIdx < LAST_DISP_IDX; ++dispIdx ) {
     // CURSOR_WIDTH leaves room for cursor to the left of this menu item
     if ( dispIdx == _cursor.currItemIdx ) {
-      setAttr( A_STANDOUT );
+      setAttr( gfx::ATTR_STANDOUT );
     }
 
     mvprint( currRow++, WINDOW_PADDING/2 + CURSOR_WIDTH, _items.at( dispIdx ) );  
-    unsetAttr( A_STANDOUT );
+    unsetAttr( gfx::ATTR_STANDOUT );
   }
   mvprint( _cursor.currItemIdx - _firstDispIdx + WINDOW_PADDING / 2, WINDOW_PADDING / 2, _cursor.img.string  );
 }

@@ -1,5 +1,5 @@
-#include "v/ColorPalette.h"
-#include "v/Menu.h"
+#include "v/common/ColorPalette.h"
+#include "v/common/Menu.h"
 #include "c/WindowManager.h"
 
 Menu::Menu( 

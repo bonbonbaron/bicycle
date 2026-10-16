@@ -1,4 +1,4 @@
-#include "v/Bar.h"
+#include "v/common/Bar.h"
 #include <algorithm>
 
 Bar::Bar( const std::string& label, const int max, const int len, const int x, const int y ) :
