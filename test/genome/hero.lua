@@ -33,6 +33,13 @@ function hero:onSpawn()
   self.hp = Hud.bar( "HP", MAX_HEALTH )
   self.invulnerable = 0
   ffi.C.createTimer( TICK_MS, self.id, TICK, true, ffi.C.TO_BRIDGE )
+  -- The camera is a kinematic body tracking us (Camera.track in scripts/bicycle.lua). It glides after us with a
+  -- dead zone; BICYCLE_CAMERA=hard makes it hard-track instead (snap, no dead zone).
+  if os.getenv( "BICYCLE_CAMERA" ) == "hard" then
+    Camera.track( self.id, { mode = "hard" } )
+  else
+    Camera.track( self.id, { mode = "lerp", rate = 5, deadzone = { 10, 3 } } )
+  end
 end
 
 -- While touching something solid (e.g. it walked into us), refuse moves toward its center.
