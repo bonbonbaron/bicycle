@@ -63,6 +63,12 @@ write(f"{kit}/120_sfx/60.wav", bump)
 x = t(0.8)
 neigh = np.sin(2 * np.pi * (600 + 250 * np.sin(2 * np.pi * 9 * x)) * x) * np.exp(-x * 3) * np.minimum(1, x * 30)
 write(f"{kit}/120_sfx/64.wav", neigh)
+x = t(0.4)
+hurt = np.sign(np.sin(2 * np.pi * (330 - 400 * x) * x)) * 0.6 * np.exp(-x * 7)       # descending square "oof"
+write(f"{kit}/120_sfx/55.wav", hurt)
+x = t(0.07)
+blip = np.sin(2 * np.pi * 1760 * x) * np.exp(-x * 30)                                  # dialogue page blip
+write(f"{kit}/120_sfx/76.wav", blip)
 with open(f"{kit}/120_sfx/instrument.json", "w") as f:
     json.dump({"name": "Game SFX", "kit": True}, f, indent=2)
 

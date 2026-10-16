@@ -126,4 +126,21 @@ check( goldcoin.kind == Sprite.CHARACTER and #goldcoin.character.frames == 4, "g
 check( goldcoin.character.strips.spin and #goldcoin.character.strips.spin.frames == 4, "goldcoin should have a 4-frame spin strip" )
 check( Genome.COLL and Genome.COLL.hero and Genome.COLL.solid and Genome.COLL.coin, "Genome.COLL should name collider types" )
 
+-- 7. NPC sprite (test/aseprite/elder.aseprite): one layer, a 2-frame idle.
+local elder = Sprite.load( "elder" )
+describe( elder )
+check( elder.kind == Sprite.CHARACTER and elder.character.strips.idle and #elder.character.strips.idle.frames == 2, "elder should idle in 2 frames" )
+check( Genome.COLL.enemy and Genome.COLL.npc, "Genome.COLL should name enemy and npc colliders" )
+
+-- 8. Dialogue text: word wrap and paging (scripts/TextBox.lua).
+local TextBox = require( "TextBox" )
+local rows = TextBox.wrap( "the quick brown fox jumps over the lazy dog", 10 )
+check( table.concat( rows, "|" ) == "the quick|brown fox|jumps over|the lazy|dog", "wrap at 10: "..table.concat( rows, "|" ) )
+for _, r in ipairs( rows ) do check( #r <= 10, "wrapped row too long: "..r ) end
+check( table.concat( TextBox.wrap( "abcdefghijkl xy", 5 ), "|" ) == "abcde|fghij|kl xy", "long words hard-break" )
+check( #TextBox.wrap( "", 5 ) == 1, "empty text is one empty row" )
+local pages = TextBox.paginate( { "the quick brown fox jumps over the lazy dog", "hi" }, 10, 3 )
+check( #pages == 3 and #pages[1] == 3 and #pages[2] == 2 and pages[3][1] == "hi", "5 rows + 1 row at 3 rows/page = 3 pages, each text starts a page" )
+print( "dialogue wrap/paging ok" )
+
 print( "ALL GENOME SPRITE TESTS PASSED" )

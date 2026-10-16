@@ -10,11 +10,12 @@ intro.fg = {
     { genome = "coin", pos = {20, 42} },
     { genome = "coin", pos = {64, 43} },
     { genome = "coin", pos = {140, 42} },
+    { genome = "villager", pos = {2, 38} },
     { genome = "hero", pos = {40, 38}, focus = true }
   }
 }
 -- Music and sound effects (see tools/audio/README.md for making these from FL Studio, LMMS or midish).
 intro.music = { soundfont = "music/meadow.sf2", song = "music/meadow.mid" }
-intro.sfx = { soundfont = "music/meadow.sf2", program = 120, sounds = { bump = 60, neigh = 64, coin = 72 } }
+intro.sfx = { soundfont = "music/meadow.sf2", program = 120, sounds = { bump = 60, neigh = 64, coin = 72, hurt = 55, blip = 76 } }
 -- TODO: Demonstrate that you can populate the bg and fg with onTimer() too.
 return intro

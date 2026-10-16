@@ -3,3 +3,4 @@ scripts/aseprite/sprite.lua, both with the Aseprite CLI in batch mode (from the 
 
   aseprite -b --script test/aseprite/make_pilgrim.lua
   aseprite -b test/aseprite/pilgrim.aseprite --script scripts/aseprite/sprite.lua
+elder.aseprite (the villager NPC, 2-frame "idle") is made the same way with make_elder.lua.
