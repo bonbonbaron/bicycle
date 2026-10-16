@@ -15,6 +15,6 @@
 #include "data/BImg.h"
 
 namespace strip {
-// Decodes to a .bimg byte string.
-auto decode( const std::string& encoded ) -> std::optional<std::string>;
+// Decodes to .bimg bytes in the given pool (scratch goes to TEMPORARY).
+auto decode( std::string_view encoded, mem::PoolId pool = mem::GRAPHIC ) -> std::optional<mem::Blob>;
 }  // namespace strip

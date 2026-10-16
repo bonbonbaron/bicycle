@@ -3,14 +3,15 @@
 #include <cstdint>
 #include <cstring>
 #include <string>
+#include <string_view>
 
 namespace bytes {
 
 struct Reader {
-  const std::string& s;
+  std::string_view s;
   size_t pos{};
   bool ok{true};
-  explicit Reader( const std::string& str, size_t start = 0 ) : s( str ), pos( start ) {}
+  explicit Reader( std::string_view str, size_t start = 0 ) : s( str ), pos( start ) {}
   auto need( size_t n ) -> bool {
     if ( !ok || pos + n > s.size() ) { ok = false; return false; }
     return true;
@@ -19,7 +20,7 @@ struct Reader {
   auto u16() -> uint16_t { uint16_t v = u8(); v |= static_cast<uint16_t>( u8() ) << 8; return v; }
   auto u32() -> uint32_t { uint32_t v = u16(); v |= static_cast<uint32_t>( u16() ) << 16; return v; }
   auto f32() -> float { uint32_t v = u32(); float f; std::memcpy( &f, &v, 4 ); return f; }
-  auto str( size_t n ) -> std::string { if ( !need( n ) ) return {}; auto r = s.substr( pos, n ); pos += n; return r; }
+  auto str( size_t n ) -> std::string_view { if ( !need( n ) ) return {}; auto r = s.substr( pos, n ); pos += n; return r; }
   auto varint() -> uint32_t {
     uint32_t v{}; int shift{};
     while ( ok ) {

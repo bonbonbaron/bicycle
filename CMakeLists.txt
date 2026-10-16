@@ -38,8 +38,17 @@ find_package( Threads REQUIRED )
 
 # --- assets: codecs (inflate, strips, Edgebreaker meshes) and the packer -------------------------------------------
 add_library( bicycle_data STATIC
-  src/data/tinfl.c src/data/Pack.cpp src/data/Strip.cpp src/data/BImg.cpp src/data/Mesh.cpp src/data/Edgebreaker.cpp )
+  src/data/tinfl.c src/data/Mem.cpp src/data/Pack.cpp src/data/Strip.cpp src/data/BImg.cpp src/data/Mesh.cpp
+  src/data/Edgebreaker.cpp )
 target_include_directories( bicycle_data PUBLIC include )
+# Memory pool sizes in MB (include/data/Mem.h); the same names as environment variables override them at run time.
+foreach( pool_default PERMANENT=16 GENERAL=128 TEXT=64 GRAPHIC=96 AUDIO=96 TEMPORARY=64 )
+  string( REPLACE "=" ";" pd "${pool_default}" )
+  list( GET pd 0 pool )
+  list( GET pd 1 mb )
+  set( BICYCLE_MEM_${pool}_MB ${mb} CACHE STRING "Size of the ${pool} memory pool in MB" )
+  target_compile_definitions( bicycle_data PRIVATE BICYCLE_MEM_${pool}_MB=${BICYCLE_MEM_${pool}_MB} )
+endforeach()
 
 set( MINIZ_DIR "${BICYCLE_MINIZ_DIR}" )
 if ( CMAKE_CROSSCOMPILING )
@@ -88,7 +97,7 @@ if ( NOT CMAKE_CROSSCOMPILING )
 endif()
 
 set( BICYCLE_SOURCES
-  src/main.cpp src/bicycle.cpp src/trigLUT.cpp
+  src/main.cpp src/bicycle.cpp src/trigLUT.cpp src/data/MemNew.cpp
   src/m/Entity.cpp src/m/Box.cpp src/m/Camera.cpp src/m/World.cpp
   src/v/common/Image.cpp src/v/common/ColorPalette.cpp src/v/common/Window.cpp src/v/common/Dialogue.cpp
   src/v/common/Menu.cpp src/v/common/TextMenu.cpp src/v/common/Scene.cpp src/v/common/Bar.cpp

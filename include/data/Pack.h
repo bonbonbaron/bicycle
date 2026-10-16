@@ -16,7 +16,9 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
+#include "data/Mem.h"
 
 namespace assets {
 
@@ -35,15 +37,18 @@ auto mount( const std::string& gameName ) -> bool;
 auto mounted() -> bool;
 // Reads an asset by path, e.g. "./test/genome/hero.lua" or "test/genome/music/meadow.sf2": inflated from the
 // pack if it's there, else read from disk. nullopt if neither has it.
-auto read( const std::string& path ) -> std::optional<std::string>;
+// The bytes land straight in `pool` (TEXT for Lua, GRAPHIC for images and meshes, AUDIO for sf2/MIDI, ...).
+auto read( const std::string& path, mem::PoolId pool = mem::GENERAL ) -> std::optional<mem::Blob>;
 auto exists( const std::string& path ) -> bool;
 // Pack entries under a folder (e.g. "./test/genome/scene/bg/level1"), as paths like the argument's; empty
 // without a pack.
 auto list( const std::string& dir ) -> std::vector<std::string>;
 
 // Pack file helpers shared by the engine, tools/pack and the tests.
-auto parsePack( const std::string& bytes, std::vector<Entry>& entries ) -> bool;
-auto unpackEntry( const std::string& pack, const Entry& e ) -> std::optional<std::string>;
-auto inflateZlib( const uint8_t* src, size_t srcLen, size_t rawLen ) -> std::optional<std::string>;
+auto parsePack( std::string_view bytes, std::vector<Entry>& entries ) -> bool;
+auto unpackEntry( std::string_view pack, const Entry& e, mem::PoolId pool = mem::GENERAL ) -> std::optional<mem::Blob>;
+auto inflateZlib( const uint8_t* src, size_t srcLen, size_t rawLen, mem::PoolId pool = mem::GENERAL ) -> std::optional<mem::Blob>;
+// A whole file read straight into a pool.
+auto readFile( const std::string& path, mem::PoolId pool ) -> std::optional<mem::Blob>;
 
 }  // namespace assets

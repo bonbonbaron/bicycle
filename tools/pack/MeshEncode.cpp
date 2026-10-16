@@ -117,7 +117,7 @@ auto readObj( const std::string& objPath, MeshData& out, std::string& err ) -> b
       else out.uvs.insert( out.uvs.end(), { 0, 0 } );
     }
   }
-  out.triMat = triMat;
+  out.triMat.assign( triMat.begin(), triMat.end() );
   return true;
 }
 
@@ -131,7 +131,7 @@ static auto stream( std::string& o, const std::string& raw ) -> size_t {
 
 auto meshEncode( const MeshData& m, int qbits, MeshEncodeInfo* info ) -> std::string {
   const uint32_t nVerts = static_cast<uint32_t>( m.nVerts() ), nTris = static_cast<uint32_t>( m.nTris() );
-  eb::Encoded enc = eb::encode( m.tris, nVerts );
+  eb::Encoded enc = eb::encode( std::vector<uint32_t>( m.tris.begin(), m.tris.end() ), nVerts );
   eb::Decoded d;
   eb::decode( enc.conn, d );
   float bmin[3] = { 1e30f, 1e30f, 1e30f }, bmax[3] = { -1e30f, -1e30f, -1e30f };

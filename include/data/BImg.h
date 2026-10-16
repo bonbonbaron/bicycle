@@ -7,20 +7,23 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
+#include "data/Mem.h"
 
 struct BImg {
   int w{};
   int h{};
-  std::vector<uint32_t> palette;  // empty for true color
-  std::vector<uint8_t> indices;   // w*h, indexed images
-  std::vector<uint32_t> rgba;     // w*h, true color images
+  // Pixels live in the GRAPHIC pool.
+  mem::Vector<uint32_t, mem::GRAPHIC> palette;  // empty for true color
+  mem::Vector<uint8_t, mem::GRAPHIC> indices;   // w*h, indexed images
+  mem::Vector<uint32_t, mem::GRAPHIC> rgba;     // w*h, true color images
 
   auto indexed() const -> bool { return !palette.empty(); }
   auto pixel( int x, int y ) const -> uint32_t {  // RGBA, R in the low byte
     const size_t i = static_cast<size_t>( y ) * w + x;
     return indexed() ? palette[indices[i]] : rgba[i];
   }
-  static auto parse( const std::string& bytes ) -> std::optional<BImg>;
+  static auto parse( std::string_view bytes ) -> std::optional<BImg>;
   auto serialize() const -> std::string;
 };

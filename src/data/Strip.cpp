@@ -4,7 +4,7 @@
 
 namespace strip {
 
-auto decode( const std::string& enc ) -> std::optional<std::string> {
+auto decode( std::string_view enc, mem::PoolId pool ) -> std::optional<mem::Blob> {
   bytes::Reader r( enc );
   if ( r.str( 4 ) != "STRP" ) return std::nullopt;
   BImg img;
@@ -21,13 +21,13 @@ auto decode( const std::string& enc ) -> std::optional<std::string> {
   if ( !r.ok || nColors == 0 || unitsPerStrip == 0 || !( bpu == 1 || bpu == 2 || bpu == 4 || bpu == 8 ) ) return std::nullopt;
   if ( !r.need( ssComp + static_cast<size_t>( smComp ) ) ) return std::nullopt;
   // 1. Inflate the stripset and stripmap.
-  auto ss = assets::inflateZlib( reinterpret_cast<const uint8_t*>( enc.data() + r.pos ), ssComp, ssRaw );
-  auto sm = assets::inflateZlib( reinterpret_cast<const uint8_t*>( enc.data() + r.pos + ssComp ), smComp, smRaw );
+  auto ss = assets::inflateZlib( reinterpret_cast<const uint8_t*>( enc.data() + r.pos ), ssComp, ssRaw, mem::TEMPORARY );
+  auto sm = assets::inflateZlib( reinterpret_cast<const uint8_t*>( enc.data() + r.pos + ssComp ), smComp, smRaw, mem::TEMPORARY );
   if ( !ss || !sm || sm->size() != nIndices * 2u ) return std::nullopt;
   // 2. Unpack the stripset's units (LSB first).
   const size_t nUnits = static_cast<size_t>( nStrips ) * unitsPerStrip;
   if ( ss->size() * 8 < nUnits * bpu ) return std::nullopt;
-  std::vector<uint8_t> units( nUnits );
+  mem::Vector<uint8_t, mem::TEMPORARY> units( nUnits );
   const uint8_t mask = static_cast<uint8_t>( ( 1u << bpu ) - 1 );
   const int perByte = 8 / bpu;
   for ( size_t i = 0; i < nUnits; ++i ) {
@@ -50,7 +50,8 @@ auto decode( const std::string& enc ) -> std::optional<std::string> {
       }
     }
   }
-  return img.serialize();
+  const std::string s = img.serialize();
+  return mem::Blob( s.data(), s.size(), mem::Allocator<char>( pool ) );
 }
 
 }  // namespace strip

@@ -14,7 +14,7 @@ namespace assets {
 namespace {
   struct Mount {
     std::string game;
-    std::string bytes;  // the whole pack (packs are small; the GM SoundFont isn't in it)
+    mem::Blob bytes{ mem::Allocator<char>( mem::PERMANENT ) };  // the whole pack (packs are small; the GM SoundFont isn't in it)
     std::unordered_map<std::string, Entry> entries;
     bool on{};
   };
@@ -24,13 +24,6 @@ namespace {
   }
   std::mutex mtx;
 
-  auto readFile( const std::string& path ) -> std::optional<std::string> {
-    std::ifstream f( path, std::ios::binary );
-    if ( !f ) return std::nullopt;
-    std::ostringstream ss;
-    ss << f.rdbuf();
-    return ss.str();
-  }
 
   // "./test/genome/x.lua" -> "genome/x.lua" if it's under the mounted game's folder.
   auto packName( const std::string& path ) -> std::optional<std::string> {
@@ -53,20 +46,30 @@ namespace {
   }
 }
 
-auto inflateZlib( const uint8_t* src, size_t srcLen, size_t rawLen ) -> std::optional<std::string> {
-  std::string out( rawLen, '\0' );
+auto readFile( const std::string& path, mem::PoolId pool ) -> std::optional<mem::Blob> {
+  std::ifstream f( path, std::ios::binary | std::ios::ate );
+  if ( !f ) return std::nullopt;
+  const auto size = static_cast<size_t>( f.tellg() );
+  f.seekg( 0 );
+  mem::Blob out( size, '\0', mem::Allocator<char>( pool ) );
+  if ( size && !f.read( out.data(), static_cast<std::streamsize>( size ) ) ) return std::nullopt;
+  return out;
+}
+
+auto inflateZlib( const uint8_t* src, size_t srcLen, size_t rawLen, mem::PoolId pool ) -> std::optional<mem::Blob> {
+  mem::Blob out( rawLen, '\0', mem::Allocator<char>( pool ) );
   if ( rawLen == 0 ) return out;
   if ( !bicycleInflate( src, srcLen, reinterpret_cast<unsigned char*>( out.data() ), rawLen ) ) return std::nullopt;
   return out;
 }
 
-auto parsePack( const std::string& bytes, std::vector<Entry>& entries ) -> bool {
+auto parsePack( std::string_view bytes, std::vector<Entry>& entries ) -> bool {
   bytes::Reader r( bytes );
   if ( r.str( 4 ) != "BPAK" || r.u32() != 1 ) return false;
   const uint32_t n = r.u32();
   for ( uint32_t i = 0; i < n && r.ok; ++i ) {
     Entry e;
-    e.name = r.str( r.u16() );
+    e.name = std::string( r.str( r.u16() ) );
     e.method = static_cast<Method>( r.u8() );
     e.rawLen = r.u32();
     e.dataLen = r.u32();
@@ -77,15 +80,15 @@ auto parsePack( const std::string& bytes, std::vector<Entry>& entries ) -> bool 
   return r.ok;
 }
 
-auto unpackEntry( const std::string& pack, const Entry& e ) -> std::optional<std::string> {
+auto unpackEntry( std::string_view pack, const Entry& e, mem::PoolId pool ) -> std::optional<mem::Blob> {
   const auto* p = reinterpret_cast<const uint8_t*>( pack.data() + e.offset );
   switch ( e.method ) {
     case STORE:
-      return pack.substr( e.offset, e.dataLen );
+      return mem::Blob( pack.substr( e.offset, e.dataLen ), mem::Allocator<char>( pool ) );
     case DEFLATE:
-      return inflateZlib( p, e.dataLen, e.rawLen );
+      return inflateZlib( p, e.dataLen, e.rawLen, pool );
     case STRIP: {
-      auto img = strip::decode( pack.substr( e.offset, e.dataLen ) );
+      auto img = strip::decode( pack.substr( e.offset, e.dataLen ), pool );
       if ( img && img->size() != e.rawLen ) return std::nullopt;
       return img;
     }
@@ -99,7 +102,7 @@ auto mount( const std::string& gameName ) -> bool {
   m = Mount{};
   m.game = gameName;
   if ( const char* loose = std::getenv( "BICYCLE_LOOSE_ASSETS" ); loose && *loose && *loose != '0' ) return false;
-  auto bytes = readFile( gameName + "/assets.bpak" );
+  auto bytes = readFile( gameName + "/assets.bpak", mem::PERMANENT );
   if ( !bytes ) return false;
   std::vector<Entry> entries;
   if ( !parsePack( *bytes, entries ) ) return false;
@@ -113,19 +116,19 @@ auto mounted() -> bool {
   return theMount().on;
 }
 
-auto read( const std::string& path ) -> std::optional<std::string> {
+auto read( const std::string& path, mem::PoolId pool ) -> std::optional<mem::Blob> {
   {
     std::unique_lock<std::mutex> l( mtx );
     auto& m = theMount();
     if ( m.on ) {
       if ( auto name = packName( path ) ) {
         if ( auto it = m.entries.find( *name ); it != m.entries.end() ) {
-          return unpackEntry( m.bytes, it->second );
+          return unpackEntry( m.bytes, it->second, pool );
         }
       }
     }
   }
-  return readFile( path );
+  return readFile( path, pool );
 }
 
 auto list( const std::string& dir ) -> std::vector<std::string> {

@@ -1,7 +1,7 @@
 #include "data/BImg.h"
 #include "Bytes.h"
 
-auto BImg::parse( const std::string& bytes ) -> std::optional<BImg> {
+auto BImg::parse( std::string_view bytes ) -> std::optional<BImg> {
   bytes::Reader r( bytes );
   if ( r.str( 4 ) != "BIMG" ) return std::nullopt;
   BImg img;

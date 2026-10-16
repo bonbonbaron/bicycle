@@ -16,7 +16,9 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
+#include "data/Mem.h"
 
 struct MeshMaterial {
   std::string name;
@@ -25,11 +27,12 @@ struct MeshMaterial {
 };
 
 struct MeshData {
-  std::vector<float> pos;       // 3 per vertex
-  std::vector<uint32_t> tris;   // 3 per triangle (counter-clockwise)
-  std::vector<float> normals;   // 3 per corner (3 corners per triangle), or empty
-  std::vector<float> uvs;       // 2 per corner, or empty
-  std::vector<uint8_t> triMat;  // 1 per triangle
+  // Geometry lives in the GRAPHIC pool.
+  mem::Vector<float, mem::GRAPHIC> pos;       // 3 per vertex
+  mem::Vector<uint32_t, mem::GRAPHIC> tris;   // 3 per triangle (counter-clockwise)
+  mem::Vector<float, mem::GRAPHIC> normals;   // 3 per corner (3 corners per triangle), or empty
+  mem::Vector<float, mem::GRAPHIC> uvs;       // 2 per corner, or empty
+  mem::Vector<uint8_t, mem::GRAPHIC> triMat;  // 1 per triangle
   std::vector<MeshMaterial> materials;
   auto nVerts() const -> size_t { return pos.size() / 3; }
   auto nTris() const -> size_t { return tris.size() / 3; }
@@ -37,7 +40,7 @@ struct MeshData {
 
 namespace mesh {
 constexpr int DEFAULT_QBITS = 14;
-auto decode( const std::string& bmesh ) -> std::optional<MeshData>;
+auto decode( std::string_view bmesh ) -> std::optional<MeshData>;
 // Octahedral normal coding shared by the encoder and decoder (bits per component).
 constexpr int NORMAL_BITS = 10;
 auto octEncode( const float n[3] ) -> std::array<int32_t, 2>;

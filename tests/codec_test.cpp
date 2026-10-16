@@ -28,7 +28,7 @@ static void testDeflate() {
     for ( auto& c : s ) c = static_cast<char>( "abcd"[rng() % 4] );
     const auto z = deflateZlib( s );
     const auto back = assets::inflateZlib( reinterpret_cast<const uint8_t*>( z.data() ), z.size(), s.size() );
-    CHECK( back && *back == s, "deflate round trip of %zu bytes", n );
+    CHECK( back && std::string_view( *back ) == s, "deflate round trip of %zu bytes", n );
   }
   std::printf( "deflate/tinfl: ok\n" );
 }
@@ -36,7 +36,7 @@ static void testDeflate() {
 static auto stripRoundTrip( const BImg& img, int n ) -> bool {
   const auto enc = stripEncode( img, n );
   const auto dec = strip::decode( enc );
-  return dec && *dec == img.serialize();
+  return dec && std::string_view( *dec ) == img.serialize();
 }
 
 static void testStrip() {
@@ -75,7 +75,7 @@ static auto icosphere( int subdiv ) -> MeshData {
       const uint32_t ab = midpoint( a, b ), bc = midpoint( b, c ), ca = midpoint( c, a );
       nt.insert( nt.end(), { a, ab, ca, b, bc, ab, c, ca, bc, ab, bc, ca } );
     }
-    m.tris = nt;
+    m.tris.assign( nt.begin(), nt.end() );
   }
   return m;
 }
@@ -237,7 +237,7 @@ static void testPack( const std::string& game ) {
       auto src = readFile( game + "/" + e.name );
       CHECK( src.has_value(), "%s: no source file", e.name.c_str() );
       if ( src ) {
-        CHECK( *src == *data, "%s: unpacked bytes differ from the source", e.name.c_str() );
+        CHECK( std::string_view( *src ) == std::string_view( *data ), "%s: unpacked bytes differ from the source", e.name.c_str() );
         byType[ext].first += src->size();
       }
     }

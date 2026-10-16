@@ -49,7 +49,7 @@ auto predict( const std::vector<int32_t>& q, const std::vector<uint8_t>& known, 
   return std::clamp( p, 0, ( 1 << qbits ) - 1 );
 }
 
-auto decode( const std::string& s ) -> std::optional<MeshData> {
+auto decode( std::string_view s ) -> std::optional<MeshData> {
   bytes::Reader r( s );
   if ( r.str( 4 ) != "BMSH" || r.u32() != 1 ) return std::nullopt;
   const uint32_t nVerts = r.u32(), nTris = r.u32();
