@@ -1001,10 +1001,10 @@ local meadow_hills_tilemap = {
   [998] = 0,
   [999] = 0,
   [1000] = 0,
-  tileWidth = 4,
-  numTilesHigh = 25,
   tileHeight = 2,
-  numTilesWide = 40
+  numTilesWide = 40,
+  tileWidth = 4,
+  numTilesHigh = 25
 }
 
 return meadow_hills_tilemap

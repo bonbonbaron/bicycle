@@ -2,7 +2,8 @@ require('bicycle')
 local Sound = require('Sound')
 -- A horse that wanders on a timer (Timer -> onTimeout), moves with the motion system (Kinematics),
 -- picks directions with dice, and kicks the hero (an "enemy" collider: blocks and hurts) with a neigh.
-local horse = { img="horse", coll={ type="enemy" } }
+-- img is the hand-drawn ASCII horse; sprite2d is its pixel version (test/aseprite/make_horse.lua) for 2D/3D.
+local horse = { img="horse", sprite2d="horse_sprite", initAnim="walk", coll={ type="enemy" } }
 
 local SPEED = 48  -- fixed point per frame (~5.6 cells/second)
 local HERO = 1    -- Genome.COLL.hero

@@ -1001,10 +1001,10 @@ local meadow_ground_tilemap = {
   [998] = 1,
   [999] = 1,
   [1000] = 1,
-  tileWidth = 4,
-  numTilesHigh = 25,
   tileHeight = 2,
-  numTilesWide = 40
+  numTilesWide = 40,
+  tileWidth = 4,
+  numTilesHigh = 25
 }
 
 return meadow_ground_tilemap

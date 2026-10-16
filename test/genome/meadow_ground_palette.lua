@@ -1,7 +1,7 @@
 --auto-generated table by generate_table.lua
 
 local meadow_ground_palette = {
-  idx = 7,
+  name = "meadow_ground_palette",
   members = {
     [0] = 0,
     [4283321934] = 6,
@@ -11,7 +11,7 @@ local meadow_ground_palette = {
     [4282598211] = 1,
     [4279900698] = 2
   },
-  name = "meadow_ground_palette"
+  idx = 7
 }
 
 return meadow_ground_palette
