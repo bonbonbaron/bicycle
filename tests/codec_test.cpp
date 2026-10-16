@@ -124,15 +124,17 @@ static void addAttributes( MeshData& m ) {
 }
 
 // Returns the maximum position error, or -1 on a mismatch.
-static auto meshRoundTrip( const char* name, MeshData m, int qbits, bool expectEdgebreaker ) -> double {
-  addAttributes( m );
+// expectEdgebreaker: 1 must use Edgebreaker, 0 must fall back to raw, -1 either. Synthetic meshes get synthetic
+// normals/uvs/materials; real ones (Blender exports) keep theirs.
+static auto meshRoundTrip( const char* name, MeshData m, int qbits, int expectEdgebreaker, bool synthAttributes = true ) -> double {
+  if ( synthAttributes ) addAttributes( m );
   MeshEncodeInfo info;
   const auto bytes = meshEncode( m, qbits, &info );
   auto d = mesh::decode( bytes );
   CHECK( d.has_value(), "%s: decode failed", name );
   if ( !d ) return -1;
   CHECK( d->nVerts() == m.nVerts() && d->nTris() == m.nTris(), "%s: counts %zu/%zu vs %zu/%zu", name, d->nVerts(), d->nTris(), m.nVerts(), m.nTris() );
-  CHECK( info.raw != expectEdgebreaker, "%s: Edgebreaker %s", name, info.raw ? "fell back to raw" : "was used" );
+  CHECK( expectEdgebreaker < 0 || info.raw != bool( expectEdgebreaker ), "%s: Edgebreaker %s", name, info.raw ? "fell back to raw" : "was used" );
   // Decoded vertex i (compacted) -> original vertex.
   std::vector<int32_t> origOf;
   for ( auto o : info.enc.vertexOrigin ) if ( o >= 0 ) origOf.push_back( o );
@@ -159,15 +161,18 @@ static auto meshRoundTrip( const char* name, MeshData m, int qbits, bool expectE
   for ( size_t t = 0; t < info.enc.triOrigin.size(); ++t ) {
     const int32_t o = info.enc.triOrigin[t];
     if ( o < 0 ) continue;
-    CHECK( d->triMat[k] == m.triMat[o], "%s: material of triangle %zu", name, k );
+    CHECK( m.triMat.empty() || d->triMat[k] == m.triMat[o], "%s: material of triangle %zu", name, k );
     for ( int j = 0; j < 3; ++j ) {
       const size_t oc = 3 * o + ( j + info.enc.triRotation[t] ) % 3, dc = 3 * k + j;
-      for ( int a = 0; a < 3; ++a ) nErr = std::max( nErr, double( std::fabs( d->normals[3 * dc + a] - m.normals[3 * oc + a] ) ) );
-      for ( int a = 0; a < 2; ++a ) uvErr = std::max( uvErr, double( std::fabs( d->uvs[2 * dc + a] - m.uvs[2 * oc + a] ) ) );
+      if ( !m.normals.empty() ) for ( int a = 0; a < 3; ++a ) nErr = std::max( nErr, double( std::fabs( d->normals[3 * dc + a] - m.normals[3 * oc + a] ) ) );
+      if ( !m.uvs.empty() ) for ( int a = 0; a < 2; ++a ) uvErr = std::max( uvErr, double( std::fabs( d->uvs[2 * dc + a] - m.uvs[2 * oc + a] ) ) );
     }
     ++k;
   }
-  CHECK( nErr < 0.01 && uvErr < 0.001, "%s: normal error %g, uv error %g", name, nErr, uvErr );
+  // uv tolerance: 16-bit quantization over the uv bounding box
+  float uvSpan = 0;
+  for ( size_t i = 0; i + 1 < m.uvs.size(); i += 2 ) uvSpan = std::max( { uvSpan, std::fabs( m.uvs[i] ), std::fabs( m.uvs[i + 1] ) } );
+  CHECK( nErr < 0.01 && uvErr < 0.001 * std::max( 1.0f, 2 * uvSpan ), "%s: normal error %g, uv error %g", name, nErr, uvErr );
   const double raw = m.nVerts() * 12.0 + m.nTris() * 12.0;
   std::printf( "  %-16s %6zu verts %6zu tris  %s  conn %.2f bits/tri  pos %.1f bits/vert  max err %.2g (allowed %.2g)  %zu -> %zu bytes geometry+conn (%.1fx)\n",
                name, m.nVerts(), m.nTris(), info.raw ? "raw" : "EB ", 8.0 * info.opsBytes / m.nTris(), 8.0 * info.posBytes / m.nVerts(),
@@ -177,11 +182,11 @@ static auto meshRoundTrip( const char* name, MeshData m, int qbits, bool expectE
 
 static void testMeshes() {
   std::printf( "edgebreaker meshes:\n" );
-  meshRoundTrip( "icosahedron", icosphere( 0 ), 14, true );
-  meshRoundTrip( "icosphere(4)", icosphere( 4 ), 14, true );
-  meshRoundTrip( "grid 30x20", grid( 30, 20 ), 12, true );
-  meshRoundTrip( "two islands", merge( icosphere( 2 ), grid( 5, 5 ) ), 14, true );
-  meshRoundTrip( "torus (genus 1)", torus( 24, 12 ), 14, false );
+  meshRoundTrip( "icosahedron", icosphere( 0 ), 14, 1 );
+  meshRoundTrip( "icosphere(4)", icosphere( 4 ), 14, 1 );
+  meshRoundTrip( "grid 30x20", grid( 30, 20 ), 12, 1 );
+  meshRoundTrip( "two islands", merge( icosphere( 2 ), grid( 5, 5 ) ), 14, 1 );
+  meshRoundTrip( "torus (genus 1)", torus( 24, 12 ), 14, 0 );
   // Edgebreaker's decoder alone on a hand-made connectivity: a tetrahedron is C,C? No: init + C... just check
   // that a corrupted stream is rejected rather than crashing.
   eb::Connectivity bad;
@@ -222,6 +227,9 @@ static void testPack( const std::string& game ) {
       std::string err;
       if ( m && readObj( src, orig, err ) ) {
         CHECK( m->nVerts() == orig.nVerts() && m->nTris() == orig.nTris(), "%s: counts differ from %s", e.name.c_str(), src.c_str() );
+        // Full round trip of the real (e.g. Blender-exported) mesh: triangles, positions within quantization,
+        // per-corner normals and uvs, materials.
+        meshRoundTrip( e.name.c_str(), orig, mesh::DEFAULT_QBITS, -1, false );
       }
       byType[ext].first += readFile( src ).value_or( "" ).size();
     }
