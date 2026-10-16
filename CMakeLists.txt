@@ -38,7 +38,7 @@ find_package( Threads REQUIRED )
 
 # --- assets: codecs (inflate, strips, Edgebreaker meshes) and the packer -------------------------------------------
 add_library( bicycle_data STATIC
-  src/data/tinfl.c src/data/Mem.cpp src/data/Pack.cpp src/data/Obj.cpp src/data/Atlas.cpp src/data/Strip.cpp src/data/BImg.cpp src/data/Mesh.cpp
+  src/data/tinfl.c src/data/Mem.cpp src/data/Pack.cpp src/data/Obj.cpp src/data/Atlas.cpp src/data/Skin.cpp src/data/Strip.cpp src/data/BImg.cpp src/data/Mesh.cpp
   src/data/Edgebreaker.cpp )
 target_include_directories( bicycle_data PUBLIC include )
 # Memory pool sizes in MB (include/data/Mem.h); the same names as environment variables override them at run time.

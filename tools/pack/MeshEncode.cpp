@@ -87,11 +87,22 @@ auto meshEncode( const MeshData& m, int qbits, MeshEncodeInfo* info ) -> std::st
       }
     }
   }
+  // Skin: joints/weights per vertex, in decoded order (the order mesh::decode produces: non-dummy decoded ids).
+  std::string skinS;
+  const bool skinned = m.joints.size() == 4 * static_cast<size_t>( nVerts ) && m.weights.size() == m.joints.size();
+  if ( skinned ) {
+    for ( uint32_t i = 0; i < d.nVerts; ++i ) {
+      const int32_t src = enc.vertexOrigin[i];
+      if ( d.dummy[i] || src < 0 ) continue;
+      for ( int k = 0; k < 4; ++k ) skinS.push_back( static_cast<char>( m.joints[4 * src + k] ) );
+      for ( int k = 0; k < 4; ++k ) skinS.push_back( static_cast<char>( m.weights[4 * src + k] ) );
+    }
+  }
   std::string o = "BMSH";
   bytes::u32( o, 1 );
   bytes::u32( o, nVerts );
   bytes::u32( o, nTris );
-  bytes::u8( o, ( enc.conn.raw ? 1 : 0 ) | ( m.normals.empty() ? 0 : 2 ) | ( m.uvs.empty() ? 0 : 4 ) );
+  bytes::u8( o, ( enc.conn.raw ? 1 : 0 ) | ( m.normals.empty() ? 0 : 2 ) | ( m.uvs.empty() ? 0 : 4 ) | ( skinned ? 8 : 0 ) );
   bytes::u8( o, qbits );
   for ( float f : bmin ) bytes::f32( o, f );
   for ( float f : bmax ) bytes::f32( o, f );
@@ -107,12 +118,14 @@ auto meshEncode( const MeshData& m, int qbits, MeshEncodeInfo* info ) -> std::st
   size_t sz[7];
   sz[0] = stream( o, ops ); sz[1] = stream( o, offs ); sz[2] = stream( o, rawTris );
   sz[3] = stream( o, posS ); sz[4] = stream( o, nrmS ); sz[5] = stream( o, uvS ); sz[6] = stream( o, matS );
+  const size_t skinBytes = skinned ? stream( o, skinS ) : 0;
   if ( info ) {
     info->raw = enc.conn.raw;
     info->opsBytes = sz[0] + sz[1] + sz[2];
     info->posBytes = sz[3];
     info->nrmBytes = sz[4];
     info->uvBytes = sz[5];
+    info->skinBytes = skinBytes;
     info->enc = std::move( enc );
   }
   return o;

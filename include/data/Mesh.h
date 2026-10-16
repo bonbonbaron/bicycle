@@ -8,10 +8,13 @@
 //   materials     per triangle (u8) + a table of { name, diffuse RGBA, texture asset }
 // Every stream is then deflated (zlib; inflated with tinfl).
 //
-// Layout: "BMSH" u32 version(1) u32 nVerts u32 nTris u8 flags(1 raw connectivity, 2 normals, 4 uvs) u8 qbits
+//   skin          (flag 8) per vertex 4 joint indices + 4 weights (u8), in decoded vertex order: Edgebreaker
+//                 renumbers vertices, so the encoder writes them through its decoded-to-input mapping
+// Layout: "BMSH" u32 version(1) u32 nVerts u32 nTris u8 flags(1 raw connectivity, 2 normals, 4 uvs, 8 skin) u8 qbits
 //         f32 bmin[3] f32 bmax[3] f32 uvmin[2] f32 uvmax[2] u32 nDecodedVerts (incl. hole dummies)
 //         u16 nMaterials { u16 len name, f32 rgba[4], u16 len texture }
 //         7 streams { u32 rawLen u32 compLen bytes }: ops, offsets, rawTris, positions, normals, uvs, materials
+//         (+ an 8th, skin, with flag 8)
 #include <array>
 #include <cstdint>
 #include <optional>
@@ -33,6 +36,10 @@ struct MeshData {
   mem::Vector<float, mem::GRAPHIC> normals;   // 3 per corner (3 corners per triangle), or empty
   mem::Vector<float, mem::GRAPHIC> uvs;       // 2 per corner, or empty
   mem::Vector<uint8_t, mem::GRAPHIC> triMat;  // 1 per triangle
+  // Skinned meshes: 4 joint indices and 4 weights (summing to 255) per vertex, or empty.
+  mem::Vector<uint8_t, mem::GRAPHIC> joints, weights;
+  // readObj only: the OBJ "v" index each vertex came from (to apply a .bskin's per-OBJ-vertex weights).
+  mem::Vector<uint32_t, mem::GRAPHIC> srcVertex;
   std::vector<MeshMaterial> materials;
   auto nVerts() const -> size_t { return pos.size() / 3; }
   auto nTris() const -> size_t { return tris.size() / 3; }

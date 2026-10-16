@@ -10,7 +10,7 @@ endif()
 add_library( bicycle_pack_codecs STATIC
   ${MINIZ_DIR}/miniz.c
   ${BICYCLE_ROOT}/tools/pack/Deflate.cpp ${BICYCLE_ROOT}/tools/pack/StripEncode.cpp ${BICYCLE_ROOT}/tools/pack/MeshEncode.cpp
-  ${BICYCLE_ROOT}/src/data/tinfl.c ${BICYCLE_ROOT}/src/data/Mem.cpp ${BICYCLE_ROOT}/src/data/Pack.cpp ${BICYCLE_ROOT}/src/data/Obj.cpp ${BICYCLE_ROOT}/src/data/Atlas.cpp ${BICYCLE_ROOT}/src/data/Strip.cpp
+  ${BICYCLE_ROOT}/src/data/tinfl.c ${BICYCLE_ROOT}/src/data/Mem.cpp ${BICYCLE_ROOT}/src/data/Pack.cpp ${BICYCLE_ROOT}/src/data/Obj.cpp ${BICYCLE_ROOT}/src/data/Atlas.cpp ${BICYCLE_ROOT}/src/data/Skin.cpp ${BICYCLE_ROOT}/src/data/Strip.cpp
   ${BICYCLE_ROOT}/src/data/BImg.cpp ${BICYCLE_ROOT}/src/data/Mesh.cpp ${BICYCLE_ROOT}/src/data/Edgebreaker.cpp )
 target_include_directories( bicycle_pack_codecs PUBLIC ${BICYCLE_ROOT}/include ${MINIZ_DIR} )
 set_source_files_properties( ${MINIZ_DIR}/miniz.c PROPERTIES COMPILE_OPTIONS "$<$<C_COMPILER_ID:GNU,Clang,AppleClang>:-w>" )

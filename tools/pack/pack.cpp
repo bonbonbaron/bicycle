@@ -9,6 +9,9 @@
 #include "data/Pack.h"
 #include "data/BImg.h"
 #include "data/Mesh.h"
+#include "data/Skin.h"
+#include "data/Obj.h"
+#include <optional>
 #include "Deflate.h"
 #include "StripEncode.h"
 #include "MeshEncode.h"
@@ -87,6 +90,7 @@ int main( int argc, char** argv ) {
     const std::string rel = fs::relative( f, game ).generic_string();
     const std::string ext = f.extension().string();
     if ( ext == ".mtl" || ext == ".blend" || ext == ".blend1" ) continue;
+    if ( ext == ".bskin" && fs::exists( fs::path( f ).replace_extension( ".obj" ) ) ) continue;  // with its .obj
     if ( ext == ".png" && fs::exists( fs::path( f ).replace_extension( ".bimg" ) ) ) continue;
     if ( ext == ".obj" ) {
       MeshData m;
@@ -101,6 +105,26 @@ int main( int argc, char** argv ) {
         fs::path tex = f.parent_path() / fs::path( mat.texture ).filename();
         tex.replace_extension( ".bimg" );
         mat.texture = fs::exists( tex ) ? fs::relative( tex, game ).generic_string() : "";
+      }
+      // Skinned: the per-vertex joints/weights go into the .bmesh (through Edgebreaker's reordering), and the
+      // skeleton + actions into a quantized .bskin (deflated like any other entry).
+      const fs::path skinPath = fs::path( f ).replace_extension( ".bskin" );
+      std::optional<Skin> sk;
+      if ( fs::exists( skinPath ) ) {
+        const std::string sb = readFile( skinPath );
+        sk = skin::decode( sb );
+        if ( !sk || !applySkinVertices( m, *sk ) ) {
+          std::fprintf( stderr, "bicycle-pack: %s doesn't match %s\n", skinPath.string().c_str(), f.string().c_str() );
+          return 1;
+        }
+        const std::string q = skin::encode( *sk, true, false );
+        Packed sp = packGeneric( rel.substr( 0, rel.size() - 4 ) + ".bskin", q );
+        sp.srcLen = fs::file_size( skinPath );
+        char sn[160];
+        std::snprintf( sn, sizeof sn, "%zu joints, %zu actions, quantized %zu -> %zu bytes", sk->joints.size(),
+                       sk->actions.size(), sb.size(), q.size() );
+        sp.note = sn;
+        packed.push_back( sp );
       }
       MeshEncodeInfo info;
       const std::string enc = meshEncode( m, mesh::DEFAULT_QBITS, &info );
@@ -157,7 +181,7 @@ int main( int argc, char** argv ) {
     if ( std::getenv( "BICYCLE_PACK_VERBOSE" ) ) {
       std::printf( "  %-48s %-7s %8zu -> %8zu  %s\n", p.name.c_str(), methodName[p.method], p.srcLen, p.data.size(), p.note.c_str() );
     }
-    else if ( p.name.size() > 6 && p.name.substr( p.name.size() - 6 ) == ".bmesh" ) {
+    else if ( p.name.size() > 6 && ( p.name.substr( p.name.size() - 6 ) == ".bmesh" || p.name.substr( p.name.size() - 6 ) == ".bskin" ) ) {
       std::printf( "  %s: %s\n", p.name.c_str(), p.note.c_str() );
     }
   }

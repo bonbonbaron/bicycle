@@ -10,6 +10,7 @@ struct MeshEncodeInfo {
   size_t posBytes{};
   size_t nrmBytes{};
   size_t uvBytes{};
+  size_t skinBytes{};
   eb::Encoded enc;     // decoded-order mapping, for tests
 };
 

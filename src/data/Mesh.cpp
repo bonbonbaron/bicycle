@@ -68,8 +68,9 @@ auto decode( std::string_view s ) -> std::optional<MeshData> {
     for ( auto& c : mat.rgba ) c = r.f32();
     mat.texture = r.str( r.u16() );
   }
-  std::string streams[7];
-  for ( auto& st : streams ) {
+  std::string streams[8];
+  for ( int si = 0; si < ( flags & 8 ? 8 : 7 ); ++si ) {
+    auto& st = streams[si];
     const uint32_t raw = r.u32(), comp = r.u32();
     if ( !r.need( comp ) ) return std::nullopt;
     auto inflated = assets::inflateZlib( reinterpret_cast<const uint8_t*>( s.data() + r.pos ), comp, raw );
@@ -150,6 +151,15 @@ auto decode( std::string_view s ) -> std::optional<MeshData> {
       m.uvs[2 * c + 1] = uvmin[1] + ( uvmax[1] - uvmin[1] ) * pv / 65535.f;
     }
     if ( !ur.ok ) return std::nullopt;
+  }
+  if ( flags & 8 ) {
+    if ( streams[7].size() != 8 * static_cast<size_t>( nVerts ) ) return std::nullopt;
+    m.joints.resize( 4 * static_cast<size_t>( nVerts ) );
+    m.weights.resize( 4 * static_cast<size_t>( nVerts ) );
+    for ( size_t v = 0; v < nVerts; ++v ) {
+      for ( int k = 0; k < 4; ++k ) m.joints[4 * v + k] = static_cast<uint8_t>( streams[7][8 * v + k] );
+      for ( int k = 0; k < 4; ++k ) m.weights[4 * v + k] = static_cast<uint8_t>( streams[7][8 * v + 4 + k] );
+    }
   }
   m.triMat.assign( streams[6].begin(), streams[6].end() );
   if ( m.triMat.size() != nTris ) m.triMat.assign( nTris, 0 );

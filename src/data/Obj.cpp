@@ -104,6 +104,7 @@ auto readObj( const std::string& objPath, MeshData& out, std::string& err ) -> b
     if ( c.v < 0 || c.v >= static_cast<int>( remap.size() ) ) { err = "bad vertex index"; return false; }
     if ( remap[c.v] < 0 ) {
       remap[c.v] = static_cast<int32_t>( out.pos.size() / 3 );
+      out.srcVertex.push_back( static_cast<uint32_t>( c.v ) );
       out.pos.insert( out.pos.end(), { v[3 * c.v], v[3 * c.v + 1], v[3 * c.v + 2] } );
     }
     out.tris.push_back( remap[c.v] );
@@ -117,5 +118,21 @@ auto readObj( const std::string& objPath, MeshData& out, std::string& err ) -> b
     }
   }
   out.triMat.assign( triMat.begin(), triMat.end() );
+  return true;
+}
+
+auto applySkinVertices( MeshData& m, const Skin& s ) -> bool {
+  const size_t nObj = s.vJoints.size() / 4;
+  if ( nObj == 0 || m.srcVertex.size() != m.nVerts() ) return false;
+  m.joints.resize( 4 * m.nVerts() );
+  m.weights.resize( 4 * m.nVerts() );
+  for ( size_t v = 0; v < m.nVerts(); ++v ) {
+    const uint32_t src = m.srcVertex[v];
+    if ( src >= nObj ) return false;
+    for ( int k = 0; k < 4; ++k ) {
+      m.joints[4 * v + k] = s.vJoints[4 * src + k];
+      m.weights[4 * v + k] = s.vWeights[4 * src + k];
+    }
+  }
   return true;
 }
