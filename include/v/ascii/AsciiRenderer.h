@@ -31,6 +31,9 @@ class AsciiRenderer : public Renderer {
     void drawEntity( WinHandle win, Entity entity, const Box& camBox ) override;
   private:
     bool _up{};
+    bool _inFrame{};
+    long long _frameStart{}, _renderNs{}, _maxNs{};
+    long _frames{};
 };
 
 }  // namespace gfx

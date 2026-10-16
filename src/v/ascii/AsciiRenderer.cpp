@@ -8,7 +8,10 @@
 #include "v/common/Image.h"
 #include "v/common/ColorPalette.h"
 #include "Constants.h"
+#include <algorithm>
+#include <chrono>
 #include <clocale>
+#include <cstdio>
 #include <cstdlib>
 #ifdef _WIN32
 #ifndef NOMINMAX
@@ -34,6 +37,15 @@ void AsciiRenderer::init( const std::string& ) {
   cbreak();  // reads each character as they're typed instead of waiting for newline
   noecho();  // doesn't echo user's input back to them
   curs_set( 0 );
+  // Output: the cursor's position doesn't matter (no moving it back after each update), hardware line/char
+  // insert-delete may be used for scrolling diffs, and doupdate() never stops to poll stdin for typeahead (input
+  // is read by SshInputListener, not curses). Input: getch() never blocks.
+  leaveok( stdscr, TRUE );
+  idlok( stdscr, TRUE );
+  idcok( stdscr, TRUE );
+  typeahead( -1 );
+  nodelay( stdscr, TRUE );
+  timeout( 0 );
   init_pair( BLACK, COLOR_BLACK, COLOR_BLACK );
   init_pair( RED, COLOR_RED, COLOR_BLACK );
   init_pair( GREEN, COLOR_GREEN, COLOR_BLACK );
@@ -51,6 +63,11 @@ void AsciiRenderer::shutdown() {
   if ( _up ) {
     endwin();
     _up = false;
+    // BICYCLE_FRAME_STATS=1: how long drawing a frame took (clearing the first window to doupdate() returning).
+    if ( const char* s = std::getenv( "BICYCLE_FRAME_STATS" ); s && *s == '1' && _frames > 0 ) {
+      std::fprintf( stderr, "bicycle ascii: %ld frames, render %.3f ms/frame avg, %.3f ms max\n", _frames,
+                    _renderNs / 1e6 / _frames, _maxNs / 1e6 );
+    }
   }
 }
 
@@ -92,8 +109,17 @@ void AsciiRenderer::pollInput() {
   SshInput::listen();
 }
 
+// Each window is an off-screen buffer: frames werase() and redraw it, wnoutrefresh() copies it to curses' virtual
+// screen, and the one doupdate() per frame sends only the cells that changed.
 auto AsciiRenderer::createWindow( int x, int y, int w, int h ) -> WinHandle {
-  return newwin( h, w, y, x );
+  WINDOW* win = newwin( h, w, y, x );
+  if ( win ) {
+    leaveok( win, TRUE );
+    idlok( win, TRUE );
+    idcok( win, TRUE );
+    nodelay( win, TRUE );
+  }
+  return win;
 }
 
 void AsciiRenderer::destroyWindow( WinHandle win ) {
@@ -119,6 +145,10 @@ auto AsciiRenderer::windowY( WinHandle win ) const -> int {
 }
 
 void AsciiRenderer::clearWindow( WinHandle win ) {
+  if ( !_inFrame ) {
+    _inFrame = true;
+    _frameStart = std::chrono::steady_clock::now().time_since_epoch().count();
+  }
   werase( W( win ) );
 }
 
@@ -140,7 +170,7 @@ void AsciiRenderer::drawMenuCursor( WinHandle win, int y, int x, const std::stri
 }
 
 void AsciiRenderer::text( WinHandle win, int y, int x, const std::string& s ) {
-  mvwprintw( W( win ), y, x, "%s", s.c_str() );
+  mvwaddnstr( W( win ), y, x, s.data(), static_cast<int>( s.size() ) );  // no printf formatting per string
 }
 
 void AsciiRenderer::setAttr( WinHandle win, int attr, bool on ) {
@@ -161,6 +191,13 @@ void AsciiRenderer::presentWindow( WinHandle win ) {
 
 void AsciiRenderer::endFrame() {
   doupdate();  // displays results of the window painting
+  if ( _inFrame ) {
+    const long long ns = std::chrono::steady_clock::now().time_since_epoch().count() - _frameStart;
+    _renderNs += ns;
+    _maxNs = std::max( _maxNs, ns );
+    ++_frames;
+    _inFrame = false;
+  }
 }
 
 static auto wrapIdx( const int i, const int n ) -> int {
