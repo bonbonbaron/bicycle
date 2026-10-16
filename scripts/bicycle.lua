@@ -483,7 +483,11 @@ function getUpdates()
     bridge.keys.len = 0
     bridge.input.lastPressed = ffi.C.NOTHING
   end
+  -- Real-time games: a per-frame hook after the events (Constants::MILLISECONDS_PER_FRAME apart).
+  if onFrame then onFrame( frameDt ) end
   -- The frame's end, after every callback: queued scene changes and transitions run here (scripts/Scene.lua).
   if sceneHooks then sceneHooks.frame() end
 
 end
+
+frameDt = 1 / 30

@@ -156,6 +156,14 @@ if ( NOT CMAKE_CROSSCOMPILING )
   add_executable( bicycle-mem-scene-tests tests/mem_scene_test.cpp src/data/Mem.cpp )
   target_include_directories( bicycle-mem-scene-tests PRIVATE include )
   add_test( NAME mem-scene COMMAND bicycle-mem-scene-tests )
+  # True 3D: math (include/m/Math3D.h), level collision, character physics and raycasts (src/c/Physics3D.cpp).
+  add_executable( bicycle-3d-tests tests/math3d_test.cpp src/c/Physics3D.cpp )
+  target_link_libraries( bicycle-3d-tests PRIVATE bicycle_data )
+  if ( BICYCLE_RELEASE )  # release bicycle_data reads only the embedded pack
+    target_sources( bicycle-3d-tests PRIVATE src/data/EmbeddedPack.c )
+    add_dependencies( bicycle-3d-tests embedded-pack )
+  endif()
+  add_test( NAME math3d COMMAND bicycle-3d-tests )
   set_tests_properties( codecs PROPERTIES FIXTURES_REQUIRED packed )
 endif()
 
@@ -165,7 +173,8 @@ set( BICYCLE_SOURCES
   src/v/common/Image.cpp src/v/common/ColorPalette.cpp src/v/common/Window.cpp src/v/common/Dialogue.cpp
   src/v/common/Menu.cpp src/v/common/TextMenu.cpp src/v/common/Scene.cpp src/v/common/Bar.cpp
   src/c/Trigger.cpp src/c/Timer.cpp src/c/WindowManager.cpp src/c/CollisionDetector.cpp
-  src/c/Kinematics.cpp src/c/Animator.cpp src/c/MidiPlayer.cpp src/c/Dice.cpp )
+  src/c/Kinematics.cpp src/c/Animator.cpp src/c/MidiPlayer.cpp src/c/Dice.cpp
+  src/c/Physics3D.cpp src/c/World3DApi.cpp src/c/InputState.cpp )
 # Not built (unfinished or replaced): src/c/Input.cpp (Linux evdev keyboard), src/c/RenderSystem.cpp, src/v/common/Graph.cpp
 if ( BICYCLE_RENDER STREQUAL "ASCII" )
   list( APPEND BICYCLE_SOURCES src/v/ascii/AsciiRenderer.cpp src/c/SshInputListener.cpp )
@@ -240,13 +249,29 @@ if ( BICYCLE_RELEASE AND NOT CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_NAME STREQUAL
   string( TOLOWER "${BICYCLE_RENDER}" modeLower )
   add_test( NAME release-zero-io COMMAND sh "${CMAKE_SOURCE_DIR}/tests/release_io_test.sh" "$<TARGET_FILE:o>" ${modeLower} 120 )
   set_tests_properties( release-zero-io PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 300 )
+  # Games with scenes change scenes during the run too (loads after start-up must come from the pack as well).
+  if ( BICYCLE_RELEASE_GAME STREQUAL "test" )
+    set_tests_properties( release-zero-io PROPERTIES ENVIRONMENT "BICYCLE_SCENE_CYCLE=2:intro:house:20" )
+  elseif ( BICYCLE_RELEASE_GAME STREQUAL "plat3d" AND BICYCLE_RENDER STREQUAL "3D" )
+    set_tests_properties( release-zero-io PROPERTIES ENVIRONMENT "BICYCLE_SCENE_CYCLE=2:courtyard:bonus:20" )
+  endif()
 endif()
 
 # Scene changes: back and forth between the test game's two scenes; the SCENE pool must empty on every unload and
 # its high-water mark stay flat (tests/scene_lifecycle_test.sh). Dev and release builds alike.
 if ( NOT CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_NAME STREQUAL "Linux" )
   string( TOLOWER "${BICYCLE_RENDER}" modeLowerLc )
-  add_test( NAME scene-lifecycle COMMAND sh "${CMAKE_SOURCE_DIR}/tests/scene_lifecycle_test.sh" "$<TARGET_FILE:o>" ${modeLowerLc} 20
-            WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}" )
-  set_tests_properties( scene-lifecycle PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 400 )
+  # Which two scenes to walk between, per game (the first of BICYCLE_GAMES; games without scenes skip the test).
+  list( GET BICYCLE_GAMES 0 lifecycleGame )
+  set( lifecyclePair "" )
+  if ( lifecycleGame STREQUAL "test" )
+    set( lifecyclePair "intro:house" )
+  elseif ( lifecycleGame STREQUAL "plat3d" AND BICYCLE_RENDER STREQUAL "3D" )
+    set( lifecyclePair "courtyard:bonus" )
+  endif()
+  if ( lifecyclePair )
+    add_test( NAME scene-lifecycle COMMAND sh "${CMAKE_SOURCE_DIR}/tests/scene_lifecycle_test.sh" "$<TARGET_FILE:o>" ${modeLowerLc} 20
+              ${lifecycleGame} ${lifecyclePair} WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}" )
+    set_tests_properties( scene-lifecycle PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 400 )
+  endif()
 endif()

@@ -17,6 +17,8 @@
 #include "m/Box.h"
 #include "m/Rect.h"
 #include "Constants.h"
+#include "c/Physics3D.h"
+#include "m/Math3D.h"
 #include <SDL3/SDL.h>
 #include <array>
 #include <cmath>
@@ -58,7 +60,11 @@ enum : GLenum {
   GL_NEAREST = 0x2600, GL_TEXTURE_WRAP_S = 0x2802, GL_TEXTURE_WRAP_T = 0x2803, GL_REPEAT = 0x2901,
   GL_CLAMP_TO_EDGE = 0x812F, GL_TRIANGLES = 0x0004, GL_TRIANGLE_STRIP = 0x0005, GL_TEXTURE0 = 0x84C0,
   GL_LEQUAL = 0x0203, GL_PACK_ALIGNMENT = 0x0D05, GL_UNPACK_ALIGNMENT = 0x0CF5, GL_VERSION = 0x1F02,
-  GL_RENDERER = 0x1F01,
+  GL_RENDERER = 0x1F01, GL_FRAMEBUFFER = 0x8D40, GL_DEPTH_ATTACHMENT = 0x8D00, GL_DEPTH_COMPONENT = 0x1902,
+  GL_DEPTH_COMPONENT24 = 0x81A6, GL_NONE = 0, GL_POLYGON_OFFSET_FILL = 0x8037, GL_LINEAR = 0x2601,
+  GL_TEXTURE_COMPARE_MODE = 0x884C, GL_COMPARE_REF_TO_TEXTURE = 0x884E, GL_TEXTURE_COMPARE_FUNC = 0x884D,
+  GL_CLAMP_TO_BORDER = 0x812D, GL_TEXTURE_BORDER_COLOR = 0x1004, GL_TEXTURE1 = 0x84C1, GL_FRAMEBUFFER_COMPLETE = 0x8CD5,
+  GL_CULL_FACE = 0x0B44, GL_BACK = 0x0405,
 };
 
 #define BGL_FUNCS( X ) \
@@ -102,7 +108,18 @@ enum : GLenum {
   X( void, DrawArrays, GLenum, GLint, GLsizei ) \
   X( void, ReadPixels, GLint, GLint, GLsizei, GLsizei, GLenum, GLenum, void* ) \
   X( void, PixelStorei, GLenum, GLint ) \
-  X( const unsigned char*, GetString, GLenum )
+  X( const unsigned char*, GetString, GLenum ) \
+  X( void, GenFramebuffers, GLsizei, GLuint* ) \
+  X( void, BindFramebuffer, GLenum, GLuint ) \
+  X( void, FramebufferTexture2D, GLenum, GLenum, GLenum, GLuint, GLint ) \
+  X( GLenum, CheckFramebufferStatus, GLenum ) \
+  X( void, DrawBuffer, GLenum ) \
+  X( void, ReadBuffer, GLenum ) \
+  X( void, PolygonOffset, GLfloat, GLfloat ) \
+  X( void, TexParameterfv, GLenum, GLenum, const GLfloat* ) \
+  X( void, Uniform3fv, GLint, GLsizei, const GLfloat* ) \
+  X( void, Uniform1f, GLint, GLfloat ) \
+  X( void, Uniform2fv, GLint, GLsizei, const GLfloat* )
 
 struct GL {
 #define BGL_DECL( ret, name, ... ) ret( BGL_API* name )( __VA_ARGS__ ) = nullptr;
@@ -180,8 +197,11 @@ uniform mat4 uMvp;
 uniform mat4 uModel;
 uniform int uSkinned;
 uniform mat4 uBones[32];  // skin::MAX_JOINTS
+uniform mat4 uLightVP;    // true 3D: world -> shadow map clip space
 out vec3 vN;
 out vec2 vUv;
+out vec3 vWorld;
+out vec4 vLight;
 void main() {
   vec4 p = vec4(aPos, 1.0);
   vec3 n = aNrm;
@@ -194,23 +214,74 @@ void main() {
   gl_Position = uMvp * p;
   vN = mat3(uModel) * n;
   vUv = aUv;
+  vec4 w = uModel * p;
+  vWorld = w.xyz;
+  vLight = uLightVP * w;
 })";
 
 const char* FS = R"(#version 330 core
 in vec3 vN;
 in vec2 vUv;
+in vec3 vWorld;
+in vec4 vLight;
 uniform vec4 uColor;
 uniform int uTex;
 uniform int uLit;
 uniform sampler2D tex;
+// True 3D (uWorld3D == 1): directional light (uLightDir: the way it travels) with a 3x3 PCF shadow map, ambient,
+// distance fog. Otherwise the 2.5D side view's fixed light.
+uniform int uWorld3D;
+uniform vec3 uLightDir;
+uniform vec3 uLightColor;
+uniform float uAmbient;
+uniform int uShadows;
+uniform sampler2DShadow uShadowMap;
+uniform float uShadowTexel;
+uniform vec3 uCamPos;
+uniform vec3 uFogColor;
+uniform vec2 uFog;  // near, far
 out vec4 o;
+float shadow(vec3 n) {
+  vec3 p = vLight.xyz / vLight.w * 0.5 + 0.5;
+  if (p.x < 0.0 || p.x > 1.0 || p.y < 0.0 || p.y > 1.0 || p.z > 1.0) return 1.0;
+  float bias = max(0.0025 * (1.0 - dot(n, -uLightDir)), 0.0008);
+  float s = 0.0;
+  for (int y = -1; y <= 1; ++y)
+    for (int x = -1; x <= 1; ++x) s += texture(uShadowMap, vec3(p.xy + vec2(x, y) * uShadowTexel, p.z - bias));
+  return s / 9.0;
+}
 void main() {
   vec4 c = uColor;
   if (uTex == 1) c *= texture(tex, vec2(vUv.x, 1.0 - vUv.y));  // uv v points up (OBJ); images are stored top row first
   if (c.a < 0.5) discard;
-  float l = 1.0;
-  if (uLit == 1) l = 0.45 + 0.55 * max(dot(normalize(vN), normalize(vec3(0.4, 0.8, 0.5))), 0.0);
-  o = vec4(c.rgb * l, c.a);
+  if (uWorld3D == 0) {
+    float l = 1.0;
+    if (uLit == 1) l = 0.45 + 0.55 * max(dot(normalize(vN), normalize(vec3(0.4, 0.8, 0.5))), 0.0);
+    o = vec4(c.rgb * l, c.a);
+    return;
+  }
+  vec3 rgb = c.rgb;
+  float sh = uShadows == 1 ? shadow(normalize(vN)) : 1.0;
+  if (uLit == 1) {
+    vec3 n = normalize(vN);
+    if (!gl_FrontFacing) n = -n;
+    float d = max(dot(n, -uLightDir), 0.0);
+    rgb = c.rgb * (uAmbient + (1.0 - uAmbient) * d * sh * uLightColor);
+  }
+  else {
+    rgb = c.rgb * mix(uAmbient + 0.25, 1.0, sh);  // billboards: shadowed but unlit
+  }
+  float f = clamp((length(vWorld - uCamPos) - uFog.x) / max(uFog.y - uFog.x, 0.001), 0.0, 1.0);
+  o = vec4(mix(rgb, uFogColor, f), c.a);
+})";
+
+const char* DEPTH_FS = R"(#version 330 core
+in vec2 vUv;
+uniform vec4 uColor;
+uniform int uTex;
+uniform sampler2D tex;
+void main() {
+  if (uTex == 1 && texture(tex, vec2(vUv.x, 1.0 - vUv.y)).a < 0.5) discard;
 })";
 
 const char* OVERLAY_VS = R"(#version 330 core
@@ -232,6 +303,8 @@ struct GpuMesh {
   std::shared_ptr<const Skin> skin;  // skinned meshes: skeleton + actions (.bskin)
   struct Range { int first{}, count{}; std::array<float, 4> rgba{}; GLuint tex{}; };
   std::vector<Range> ranges;  // one per material
+  m3::Vec3 center{};          // bounding sphere (model space), for frustum culling
+  float radius{};
 };
 
 struct Billboard {
@@ -413,6 +486,31 @@ class Renderer3D final : public PixelRenderer {
         std::fprintf( stderr, "GL %s on %s\n", gl.GetString( GL_VERSION ), gl.GetString( GL_RENDERER ) );
       }
       _prog = program( VS, FS );
+      _depthProg = program( VS, DEPTH_FS );
+      // The color texture is on unit 0 and the shadow map on unit 1, always (two sampler types may not share a unit).
+      gl.UseProgram( _prog );
+      gl.Uniform1i( gl.GetUniformLocation( _prog, "tex" ), 0 );
+      gl.Uniform1i( gl.GetUniformLocation( _prog, "uShadowMap" ), 1 );
+      // Shadow map: a depth texture compared in the shader (sampler2DShadow, hardware PCF where available).
+      gl.GenTextures( 1, &_shadowTex );
+      gl.BindTexture( GL_TEXTURE_2D, _shadowTex );
+      gl.TexImage2D( GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, SHADOW_SIZE, SHADOW_SIZE, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr );
+      gl.TexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
+      gl.TexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
+      gl.TexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER );
+      gl.TexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER );
+      const float border[4] = { 1, 1, 1, 1 };
+      gl.TexParameterfv( GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, border );
+      gl.TexParameteri( GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE );
+      gl.TexParameteri( GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL );
+      gl.GenFramebuffers( 1, &_shadowFbo );
+      gl.BindFramebuffer( GL_FRAMEBUFFER, _shadowFbo );
+      gl.FramebufferTexture2D( GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, _shadowTex, 0 );
+      gl.DrawBuffer( GL_NONE );
+      gl.ReadBuffer( GL_NONE );
+      _shadowOk = gl.CheckFramebufferStatus( GL_FRAMEBUFFER ) == GL_FRAMEBUFFER_COMPLETE;
+      gl.BindFramebuffer( GL_FRAMEBUFFER, 0 );
+      if ( !_shadowOk ) std::fprintf( stderr, "bicycle 3D: no shadow map framebuffer; shadows off\n" );
       _overlayProg = program( OVERLAY_VS, OVERLAY_FS );
       // Billboard quad: rewritten per sprite. Overlay quad: the whole screen.
       gl.GenVertexArrays( 1, &_quadVao );
@@ -440,9 +538,14 @@ class Renderer3D final : public PixelRenderer {
 
     void presentFramebuffer() override {
       gl.Viewport( 0, 0, _fbW, _fbH );
-      gl.ClearColor( 0.45f, 0.65f, 0.90f, 1.0f );  // sky
+      auto& w3 = phys3d::World3D::get();
+      const m3::Vec3 sky = w3.active() ? w3.view().sky : m3::Vec3{ 0.45f, 0.65f, 0.90f };
+      gl.ClearColor( sky.x, sky.y, sky.z, 1.0f );
       gl.Clear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
-      if ( _haveScene ) drawWorld();
+      if ( _haveScene ) {
+        if ( w3.active() ) drawWorld3D();
+        else drawWorld();
+      }
       drawOverlay();
       if ( screenshotDue() ) readBack();
       SDL_GL_SwapWindow( _window );
@@ -609,6 +712,16 @@ class Renderer3D final : public PixelRenderer {
         }
         if ( r.count > 0 ) g->ranges.push_back( r );
       }
+      {
+        m3::Vec3 lo{ 1e30f, 1e30f, 1e30f }, hi{ -1e30f, -1e30f, -1e30f };
+        for ( size_t v = 0; v < m->nVerts(); ++v ) {
+          const m3::Vec3 p{ m->pos[3 * v], m->pos[3 * v + 1], m->pos[3 * v + 2] };
+          lo = { std::min( lo.x, p.x ), std::min( lo.y, p.y ), std::min( lo.z, p.z ) };
+          hi = { std::max( hi.x, p.x ), std::max( hi.y, p.y ), std::max( hi.z, p.z ) };
+        }
+        g->center = ( lo + hi ) * 0.5f;
+        g->radius = m3::length( hi - lo ) * 0.5f;
+      }
       gl.GenVertexArrays( 1, &g->vao );
       gl.GenBuffers( 1, &g->vbo );
       gl.BindVertexArray( g->vao );
@@ -619,19 +732,20 @@ class Renderer3D final : public PixelRenderer {
       return g;
     }
 
-    void drawMesh( const GpuMesh& m, const Mat4& viewProj, const Mat4& model, const float* bones = nullptr ) {
+    void drawMesh( const GpuMesh& m, const Mat4& viewProj, const Mat4& model, const float* bones = nullptr, GLuint prog = 0 ) {
+      if ( !prog ) prog = _prog;
       const Mat4 mvp = mul( viewProj, model );
-      gl.Uniform1i( gl.GetUniformLocation( _prog, "uSkinned" ), bones && m.skin ? 1 : 0 );
+      gl.Uniform1i( gl.GetUniformLocation( prog, "uSkinned" ), bones && m.skin ? 1 : 0 );
       if ( bones && m.skin ) {
-        gl.UniformMatrix4fv( gl.GetUniformLocation( _prog, "uBones" ), static_cast<GLsizei>( m.skin->joints.size() ), 0, bones );
+        gl.UniformMatrix4fv( gl.GetUniformLocation( prog, "uBones" ), static_cast<GLsizei>( m.skin->joints.size() ), 0, bones );
       }
-      gl.UniformMatrix4fv( gl.GetUniformLocation( _prog, "uMvp" ), 1, 0, mvp.data() );
-      gl.UniformMatrix4fv( gl.GetUniformLocation( _prog, "uModel" ), 1, 0, model.data() );
-      gl.Uniform1i( gl.GetUniformLocation( _prog, "uLit" ), 1 );
+      gl.UniformMatrix4fv( gl.GetUniformLocation( prog, "uMvp" ), 1, 0, mvp.data() );
+      gl.UniformMatrix4fv( gl.GetUniformLocation( prog, "uModel" ), 1, 0, model.data() );
+      gl.Uniform1i( gl.GetUniformLocation( prog, "uLit" ), 1 );
       gl.BindVertexArray( m.vao );
       for ( const auto& r : m.ranges ) {
-        gl.Uniform4fv( gl.GetUniformLocation( _prog, "uColor" ), 1, r.rgba.data() );
-        gl.Uniform1i( gl.GetUniformLocation( _prog, "uTex" ), r.tex ? 1 : 0 );
+        gl.Uniform4fv( gl.GetUniformLocation( prog, "uColor" ), 1, r.rgba.data() );
+        gl.Uniform1i( gl.GetUniformLocation( prog, "uTex" ), r.tex ? 1 : 0 );
         gl.BindTexture( GL_TEXTURE_2D, r.tex );
         gl.DrawArrays( GL_TRIANGLES, r.first, r.count );
       }
@@ -652,6 +766,7 @@ class Renderer3D final : public PixelRenderer {
       gl.DepthFunc( GL_LEQUAL );
       gl.Disable( GL_BLEND );
       gl.UseProgram( _prog );
+      gl.Uniform1i( gl.GetUniformLocation( _prog, "uWorld3D" ), 0 );
       gl.ActiveTexture( GL_TEXTURE0 );
       gl.Uniform1i( gl.GetUniformLocation( _prog, "tex" ), 0 );
       for ( const auto& s : _statics ) drawMesh( *s, viewProj, identity() );
@@ -742,6 +857,212 @@ class Renderer3D final : public PixelRenderer {
       gl.Viewport( 0, 0, _fbW, _fbH );
     }
 
+
+    // --- true 3D (a camera rig is active: include/c/Physics3D.h) -------------------------------------------------------
+    struct Item { const GpuMesh* mesh; m3::Mat4 model; bool skinned; std::array<float, 16 * skin::MAX_JOINTS>* bones; };
+
+    auto modelMatrix( const phys3d::Transform& t ) -> m3::Mat4 {
+      const m3::Quat q = t.useQuat ? t.rot * m3::axisAngle( { 0, 1, 0 }, t.modelYaw )
+                                   : m3::axisAngle( { 0, 1, 0 }, t.yaw + t.modelYaw ) * m3::axisAngle( { 1, 0, 0 }, t.pitch ) * m3::axisAngle( { 0, 0, 1 }, t.roll );
+      return m3::trs( t.pos, q, t.scale );
+    }
+
+    void setWorldUniforms( const phys3d::View& v, const m3::Vec3& eye, const m3::Mat4& lightVP, bool shadows ) {
+      auto u = [&]( const char* n ) { return gl.GetUniformLocation( _prog, n ); };
+      gl.Uniform1i( u( "uWorld3D" ), 1 );
+      const m3::Vec3 ld = m3::normalize( v.lightDir );
+      gl.Uniform3fv( u( "uLightDir" ), 1, &ld.x );
+      gl.Uniform3fv( u( "uLightColor" ), 1, &v.lightColor.x );
+      gl.Uniform1f( u( "uAmbient" ), v.ambient );
+      gl.Uniform1i( u( "uShadows" ), shadows ? 1 : 0 );
+      gl.Uniform1i( u( "uShadowMap" ), 1 );
+      gl.Uniform1f( u( "uShadowTexel" ), 1.0f / SHADOW_SIZE );
+      gl.Uniform3fv( u( "uCamPos" ), 1, &eye.x );
+      gl.Uniform3fv( u( "uFogColor" ), 1, &v.fogColor.x );
+      const float fog[2] = { v.fogNear, v.fogFar };
+      gl.Uniform2fv( u( "uFog" ), 1, fog );
+      gl.UniformMatrix4fv( u( "uLightVP" ), 1, 0, lightVP.data() );
+    }
+
+    void drawWorld3D() {
+      auto& w3 = phys3d::World3D::get();
+      const auto& v = w3.view();
+      const auto& cam = w3.transform( w3.cameraEntity() );
+      const int vw = _fbW, vh = _fbH;
+      const m3::Vec3 eye = cam.pos, fwd = m3::forward( cam.yaw, cam.pitch );
+      const m3::Mat4 view = m3::lookAt( eye, eye + fwd );
+      const m3::Mat4 proj = m3::perspective( v.fovDeg * m3::PI / 180.f, static_cast<float>( vw ) / std::max( 1, vh ), v.nearZ, v.farZ );
+      const m3::Mat4 viewProj = m3::mul( proj, view );
+      const m3::Planes planes = m3::frustumPlanes( viewProj );
+      _stats3d = {};
+      ++_tick;
+
+      // What to draw: the level's static meshes, then every visible 3D entity's model (posed if rigged).
+      _items.clear();
+      for ( const auto& st : _statics ) _items.push_back( { st.get(), m3::identity(), false, nullptr } );
+      size_t nPosed = 0;
+      for ( auto& [entity, mesh] : _models ) {
+        const auto& t = w3.transform( entity );
+        if ( !t.on || !t.visible ) continue;
+        Item it{ mesh.get(), modelMatrix( t ), false, nullptr };
+        auto& st = _motion[entity];
+        const float dx = t.pos.x - st.x, dz = t.pos.z - st.z3;
+        const bool moving = st.seen && dx * dx + dz * dz > 1e-6f;
+        st.x = t.pos.x;
+        st.z3 = t.pos.z;
+        st.seen = true;
+        st.still = moving ? 0 : st.still + 1;
+        if ( mesh->skin ) {
+          std::string act = st.action;
+          if ( act == "walk" && st.still > 3 ) act = "idle";
+          if ( act == "idle" && moving ) act = "walk";
+          static const char* forced = std::getenv( "BICYCLE_MODEL_ACTION" );
+          if ( forced && *forced ) act = forced;
+          if ( act != st.playing ) { st.playing = act; st.since = now(); }
+          const SkinAction* a = mesh->skin->action( act );
+          if ( !a && !mesh->skin->actions.empty() ) a = &mesh->skin->actions.front();
+          if ( _poses.size() <= nPosed ) _poses.resize( nPosed + 1 );
+          auto& bones = _poses[nPosed++];
+          if ( a ) skin::pose( *mesh->skin, *a, static_cast<float>( now() - st.since ), bones.data() );
+          else skin::restPose( *mesh->skin, bones.data() );
+          it.skinned = true;
+          it.bones = &bones;
+        }
+        _items.push_back( it );
+      }
+      auto worldSphere = [&]( const Item& it, m3::Vec3& c, float& r ) {
+        c = m3::transformPoint( it.model, it.mesh->center );
+        const float sx = m3::length( { it.model[0], it.model[1], it.model[2] } ), sy = m3::length( { it.model[4], it.model[5], it.model[6] } ),
+                    sz = m3::length( { it.model[8], it.model[9], it.model[10] } );
+        r = it.mesh->radius * std::max( { sx, sy, sz } );
+      };
+
+      // Shadow pass: an orthographic light view around what the camera looks at.
+      static const bool noShadows = std::getenv( "BICYCLE_NO_SHADOWS" ) != nullptr;  // debugging / slow GPUs
+      const bool shadows = v.shadows && _shadowOk && !noShadows;
+      m3::Mat4 lightVP = m3::identity();
+      if ( shadows ) {
+        const phys3d::Transform* focus = w3.rig().target ? &w3.transform( w3.rig().target ) : nullptr;
+        const m3::Vec3 center = focus && focus->on ? focus->pos + fwd * 6.f : eye + fwd * 12.f;
+        const m3::Vec3 ld = m3::normalize( v.lightDir );
+        const m3::Vec3 up = std::fabs( ld.y ) > 0.99f ? m3::Vec3{ 0, 0, 1 } : m3::Vec3{ 0, 1, 0 };
+        const float ext = SHADOW_EXTENT;
+        // Snap the center to shadow-map texels so the shadows don't shimmer as the camera moves.
+        const m3::Mat4 lv0 = m3::lookAt( { 0, 0, 0 }, ld, up );
+        m3::Vec3 lc = m3::transformPoint( lv0, center );
+        const float texel = 2 * ext / SHADOW_SIZE;
+        lc.x = std::floor( lc.x / texel ) * texel;
+        lc.y = std::floor( lc.y / texel ) * texel;
+        const m3::Mat4 lightProj = m3::ortho( lc.x - ext, lc.x + ext, lc.y - ext, lc.y + ext, -lc.z - 80, -lc.z + 80 );
+        lightVP = m3::mul( lightProj, lv0 );
+        const m3::Planes lp = m3::frustumPlanes( lightVP );
+        gl.BindFramebuffer( GL_FRAMEBUFFER, _shadowFbo );
+        gl.Viewport( 0, 0, SHADOW_SIZE, SHADOW_SIZE );
+        gl.Clear( GL_DEPTH_BUFFER_BIT );
+        gl.Enable( GL_DEPTH_TEST );
+        gl.DepthFunc( GL_LEQUAL );
+        gl.Enable( GL_POLYGON_OFFSET_FILL );
+        gl.PolygonOffset( 1.5f, 3.0f );
+        gl.UseProgram( _depthProg );
+        gl.ActiveTexture( GL_TEXTURE0 );
+        gl.Uniform1i( gl.GetUniformLocation( _depthProg, "tex" ), 0 );
+        gl.UniformMatrix4fv( gl.GetUniformLocation( _depthProg, "uLightVP" ), 1, 0, lightVP.data() );
+        for ( const auto& it : _items ) {
+          m3::Vec3 c;
+          float r;
+          worldSphere( it, c, r );
+          if ( !m3::sphereVisible( lp, c, r ) ) continue;
+          drawMesh( *it.mesh, lightVP, it.model, it.skinned ? it.bones->data() : nullptr, _depthProg );
+        }
+        gl.Disable( GL_POLYGON_OFFSET_FILL );
+        gl.BindFramebuffer( GL_FRAMEBUFFER, 0 );
+      }
+
+      // Main pass.
+      gl.Viewport( 0, 0, vw, vh );
+      gl.Enable( GL_DEPTH_TEST );
+      gl.DepthFunc( GL_LEQUAL );
+      gl.Disable( GL_BLEND );
+      gl.UseProgram( _prog );
+      gl.ActiveTexture( GL_TEXTURE1 );
+      gl.BindTexture( GL_TEXTURE_2D, _shadowTex );
+      gl.ActiveTexture( GL_TEXTURE0 );
+      gl.Uniform1i( gl.GetUniformLocation( _prog, "tex" ), 0 );
+      setWorldUniforms( v, eye, lightVP, shadows );
+      for ( const auto& it : _items ) {
+        m3::Vec3 c;
+        float r;
+        worldSphere( it, c, r );
+        if ( !m3::sphereVisible( planes, c, r ) ) { ++_stats3d.culled; continue; }
+        drawMesh( *it.mesh, viewProj, it.model, it.skinned ? it.bones->data() : nullptr );
+        ++_stats3d.meshes;
+      }
+
+      // Billboards: 3D entities with a sprite and no model, upright and turned to the camera (cylindrical).
+      const m3::Vec3 right = m3::flatRight( cam.yaw );
+      for ( Entity e = 1; e < NUM_SUPPORTED_ENTITIES; ++e ) {
+        const auto& t = w3.transform( e );
+        if ( !t.on || !t.visible || _models.count( e ) || e == w3.cameraEntity() ) continue;
+        const auto& img = World::get<Image>( e );
+        if ( !img.pixels ) continue;
+        Rect src = World::get<Rect>( e );
+        if ( src.w <= 0 ) src = Rect( 0, 0, img.size.w >> FIXEDPT_DEC_BITS, img.size.h >> FIXEDPT_DEC_BITS );
+        const float pw = src.w / 2.0f, ph = static_cast<float>( src.h );  // pixels (a pixel is 2x1 cells)
+        const float w = pw * v.billboardPixel * t.scale.x, h = ph * v.billboardPixel * t.scale.y;
+        if ( !m3::sphereVisible( planes, t.pos + m3::Vec3{ 0, h / 2, 0 }, std::max( w, h ) ) ) { ++_stats3d.culled; continue; }
+        const auto at = _atlas.entry( img.pixels );
+        const float aw = static_cast<float>( _atlas.width() ), ah = static_cast<float>( _atlas.height() );
+        const float u0 = ( at.x + src.x / 2.0f ) / aw, u1 = ( at.x + ( src.x + src.w ) / 2.0f ) / aw;
+        const float t0 = ( at.y + static_cast<float>( src.y ) ) / ah, t1 = ( at.y + static_cast<float>( src.y + src.h ) ) / ah;
+        const m3::Vec3 a = t.pos - right * ( w / 2 ), b = t.pos + right * ( w / 2 );
+        const m3::Vec3 n = -m3::flatForward( cam.yaw );
+        auto vtx = [&]( m3::Vec3 p, float uu, float vv ) {
+          _bbVerts.insert( _bbVerts.end(), { p.x, p.y, p.z, n.x, n.y, n.z, uu, vv } );
+        };
+        const m3::Vec3 up{ 0, h, 0 };
+        vtx( a, u0, 1 - t1 ); vtx( b, u1, 1 - t1 ); vtx( a + up, u0, 1 - t0 );
+        vtx( b, u1, 1 - t1 ); vtx( b + up, u1, 1 - t0 ); vtx( a + up, u0, 1 - t0 );
+        ++_stats3d.billboards;
+      }
+      if ( !_bbVerts.empty() ) {
+        if ( _atlasTexVersion != _atlas.version() ) {
+          if ( !_atlasTex ) gl.GenTextures( 1, &_atlasTex );
+          texParams( _atlasTex, GL_CLAMP_TO_EDGE );
+          gl.PixelStorei( GL_UNPACK_ALIGNMENT, 4 );
+          gl.TexImage2D( GL_TEXTURE_2D, 0, GL_RGBA8, _atlas.width(), _atlas.height(), 0, GL_BGRA, GL_UNSIGNED_BYTE, _atlas.pixels().data() );
+          _atlasTexVersion = _atlas.version();
+        }
+        gl.BindVertexArray( _quadVao );
+        gl.BindBuffer( GL_ARRAY_BUFFER, _quadVbo );
+        gl.BufferData( GL_ARRAY_BUFFER, _bbVerts.size() * sizeof( float ), _bbVerts.data(), GL_DYNAMIC_DRAW );
+        const m3::Mat4 id = m3::identity();
+        gl.UniformMatrix4fv( gl.GetUniformLocation( _prog, "uMvp" ), 1, 0, viewProj.data() );
+        gl.UniformMatrix4fv( gl.GetUniformLocation( _prog, "uModel" ), 1, 0, id.data() );
+        const float white[4] = { 1, 1, 1, 1 };
+        gl.Uniform4fv( gl.GetUniformLocation( _prog, "uColor" ), 1, white );
+        gl.Uniform1i( gl.GetUniformLocation( _prog, "uTex" ), 1 );
+        gl.Uniform1i( gl.GetUniformLocation( _prog, "uLit" ), 0 );
+        gl.Uniform1i( gl.GetUniformLocation( _prog, "uSkinned" ), 0 );
+        gl.BindTexture( GL_TEXTURE_2D, _atlasTex );
+        gl.DrawArrays( GL_TRIANGLES, 0, static_cast<GLsizei>( _bbVerts.size() / 8 ) );
+        _bbVerts.clear();
+      }
+      if ( v.crosshair ) {
+        const int cx = _fbW / 2, cy = _fbH / 2;
+        for ( int d = -9; d <= 9; ++d ) {
+          if ( std::abs( d ) < 3 ) continue;
+          for ( int k = -1; k <= 1; ++k ) {
+            blendPixel( cx + d, cy + k, k == 0 ? 0xFFFFFFFFu : 0xFF000000u, 200 );
+            blendPixel( cx + k, cy + d, k == 0 ? 0xFFFFFFFFu : 0xFF000000u, 200 );
+          }
+        }
+      }
+      if ( std::getenv( "BICYCLE_FRAME_STATS" ) && _tick % 30 == 0 ) {
+        std::fprintf( stderr, "3D: %zu meshes drawn, %zu culled, %zu billboards, %zu level tris\n", _stats3d.meshes,
+                      _stats3d.culled, _stats3d.billboards, w3.levelTriangles() );
+      }
+    }
+
     void drawOverlay() {
       gl.Disable( GL_DEPTH_TEST );
       gl.Enable( GL_BLEND );
@@ -767,6 +1088,13 @@ class Renderer3D final : public PixelRenderer {
 
     static GL gl;
     SDL_GLContext _ctx{};
+    static constexpr int SHADOW_SIZE = 2048;
+    static constexpr float SHADOW_EXTENT = 22.f;  // meters each side of the shadow focus
+    std::vector<Item> _items;
+    std::vector<std::array<float, 16 * skin::MAX_JOINTS>> _poses;
+    GLuint _depthProg{}, _shadowTex{}, _shadowFbo{};
+    bool _shadowOk{};
+    struct Stats3D { size_t meshes{}, culled{}, billboards{}; } _stats3d;
     GLuint _prog{}, _overlayProg{}, _quadVao{}, _quadVbo{}, _overlayVao{}, _overlayVbo{}, _overlayTex{};
     Box _cam{};
     bool _haveScene{};
@@ -784,7 +1112,7 @@ class Renderer3D final : public PixelRenderer {
     }
     // walk: frames moving in a row; still: frames standing; action: the model's action (setModelAction), and
     // when it started, in seconds.
-    struct Motion { float x{}; float facing{}; int walk{}; int still{}; bool seen{}; std::string action{ "idle" }; double since{}; };
+    struct Motion { float x{}; float facing{}; int walk{}; int still{}; bool seen{}; std::string action{ "idle" }; double since{}; float z3{}; std::string playing; };
     std::unordered_map<Entity, Motion> _motion;
     gfx::Pixels _capture;
     long _tick{};

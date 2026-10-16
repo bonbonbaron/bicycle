@@ -7,6 +7,7 @@
 #include <unordered_set>
 #include "c/MotionMath.h"
 #include "data/Mem.h"
+#include "m/Math3D.h"
 
 class Kinematics : public Controllable {
   public:
@@ -43,7 +44,18 @@ class Kinematics : public Controllable {
     // snap(e) makes a follower jump to its goal on the next frame (e.g. a fairy arriving with the hero).
     void forget( Entity e );
     void snap( Entity e );
-    // The follow settings of e (for carrying the camera's tracking into the next scene); false if not following.
+
+    // 3D motions of an entity's transform (meters, seconds, degrees; positions are feet / box centers).
+    void linear3D( Entity e, float speed, bool pingPong );   // along addWaypoint3D points
+    void addWaypoint3D( Entity e, float x, float y, float z );
+    // Around center entity (0: the point c) on a horizontal circle of radius r, plus a vertical bob.
+    void orbit3D( Entity e, Entity center, m3::Vec3 c, float r, float degPerSec, float phaseDeg, float bobAmp, float bobHz );
+    // The entity's position eases to tgt's + offset (rate 0 = hard).
+    void follow3D( Entity e, Entity tgt, m3::Vec3 offset, float rate );
+    void spin3D( Entity e, float yawDegPerSec );  // continuous yaw (pickups), with any motion or none
+    // The 3D camera: a kinematic body driven by the rig in World3D (Physics3D.h) toward its target, like any
+    // follower; Lua sets the mode and feeds yaw/pitch, the camera never positions itself.
+    void runCamera3D( float dt );
     auto motionType( Entity e ) const -> int;  // -1 if not driven
   private:
     Kinematics() = default;
@@ -86,6 +98,10 @@ class Kinematics : public Controllable {
       int facing{ 1 };
       bool mirror{}, bounded{}, started{};
       motion::Vec2 dead{}, deadWant{}, lo{}, hi{};
+      // 3D
+      m3::Vec3 pos3{}, center3{}, offset3{};
+      mem::Vector<m3::Vec3> path3{ mem::Allocator<m3::Vec3>( mem::GENERAL ) };
+      float radius3{}, bobAmp{}, spin{};
     };
     auto driven( Entity e ) -> Driven&;
     void runDriven();

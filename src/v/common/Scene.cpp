@@ -1,4 +1,5 @@
 #include "v/common/Scene.h"
+#include "c/Physics3D.h"
 #include "c/Kinematics.h"
 #include "m/World.h"
 #include "v/common/Renderer.h"
@@ -101,6 +102,7 @@ Scene::~Scene() {
   }
   const Entity cam = _camera.getId();
   Kinematics::getInstance().forget( cam );
+  phys3d::World3D::get().removeEntity( cam );
   World::set<Box>( cam, Box{} );
   delEntityId( cam );
 }

@@ -126,6 +126,7 @@ end
 -- background layer, each with its mode) or a directory of .txt layers under genome/scene/bg/.
 -- fg[i] holds the entities that live in background layer i.
 function Scene:readLayers(Genome)
+  if not self.bg then return end  -- e.g. a true-3D scene: no background layers
   local Sprite = Genome.Sprite
   if Sprite.exists( self.bg ) then
     local spr = Sprite.load( self.bg )
@@ -164,10 +165,33 @@ function Scene.new( tbl )
   Scene.withScope( true, function()
     require("Sound").load( tbl.music, tbl.sfx, Scene.musicMode == "keep" )
     instance:readLayers(Genome)
-    instance:loadScenery3d(Genome, tbl)
+    if tbl.world3d then instance:loadWorld3d( tbl ) else instance:loadScenery3d(Genome, tbl) end
   end )
   Scene.enteredFrame = Scene.frameNo
   return instance
+end
+
+-- True-3D scenes (docs/true-3d.md): tbl.world3d = { level = "models/scene3d.lua" (collision + drawing),
+--   sky = { r, g, b }, fog = { r, g, b, near, far }, light = { dir, color, ambient, shadows },
+--   spawns = { <name> = { x, y, z, yaw } }, build = function( scene ) ... end  (makes the scene's own bodies,
+--   doors (W.door) and anything else) }. Persistent bodies (W.Body.new{ persist = true }) are carried over.
+Scene.world3d = false  -- the current scene's world3d table (false for 2D / 2.5D scenes)
+function Scene:loadWorld3d( tbl )
+  local W = require( "World3D" )
+  local w = tbl.world3d
+  if w.level then W.level( "./"..gameName.."/genome/"..w.level, w.cell ) end
+  if w.sky then W.View.sky( w.sky[1], w.sky[2], w.sky[3] ) end
+  if w.fog then W.View.fog( w.fog[1], w.fog[2], w.fog[3], w.fog[4], w.fog[5] ) end
+  if w.light then W.View.light( w.light[1], w.light[2], w.light[3], w.light[4] ) end
+  Scene.world3d = w
+  if w.build then w.build( self ) end
+end
+
+-- Starts the game in genome/scene/<name>.lua (instead of Scene.new on a table you required yourself).
+function Scene.start( name )
+  local tbl = require( "./"..gameName.."/genome/scene/"..name )
+  tbl.file = name
+  return Scene.new( tbl )
 end
 
 -- 3D mode: static scenery from scripts/blender/export.py's scene3d.lua (ground, props), or the file the scene names
@@ -365,6 +389,24 @@ local function swap( name, opts )
   local gone = {}
   for _, g in ipairs( Scene.live ) do despawn( g, gone ) end
   Scene.live, S.removals, S.nearDoor = {}, {}, false
+  -- true 3D: the scene's bodies, then its level collision (persistent bodies stay)
+  local W = package.loaded["World3D"]
+  local rel3d = {}
+  if W and type( W ) == "table" then
+    if W.player then
+      local px, py, pz = W.player:pos()
+      for id, b in pairs( W.persistent ) do
+        local x, y, z = b:pos()
+        rel3d[id] = { x - px, y - py, z - pz }
+      end
+      local c = ffi.C.xfGet( ffi.C.cameraEntity() )  -- the camera keeps its place relative to the player
+      rel3d.camera = { c.x - px, c.y - py, c.z - pz }
+    end
+    for _, b in ipairs( W.live ) do despawn( { id = b.id, tbl = b }, gone ) end
+    W.live = {}
+    ffi.C.levelClear()
+  end
+  Scene.world3d = false
   -- 3. the scene window, then its memory
   local old = Scene.current
   if old then
@@ -401,7 +443,34 @@ local function swap( name, opts )
     ffi.C.focusCamOn( player.id )
     if Camera.target == player.id and Camera.opts then Camera.track( player.id, Camera.opts ) end
   end
+  -- true 3D: the player body on the spawn point, companions at their offsets, the camera rig again
+  if W and type( W ) == "table" and W.player and tbl.world3d then
+    local spawns = tbl.world3d.spawns or {}
+    local sp = ( opts.spawn and spawns[opts.spawn] ) or spawns.default or select( 2, next( spawns ) )
+    if opts.spawn and not spawns[opts.spawn] then
+      local msg = "Scene.go: scene '"..name.."' has no spawn point '"..opts.spawn.."'"
+      if not ffi.C.assetPacked() then error( msg, 0 ) end
+      io.stderr:write( "bicycle: "..msg.."\n" )
+    end
+    if sp then
+      for id, b in pairs( W.persistent ) do
+        local r = rel3d[id] or { 0, 0, 0 }
+        b:setPos( sp[1] + r[1], sp[2] + r[2], sp[3] + r[3] )
+        b:setVel( 0, 0, 0 )
+      end
+      if sp[4] then W.player:setYaw( sp[4] ) end
+    end
+    focusOn( W.player.id )
+    local px, py, pz = W.player:pos()
+    local rc = rel3d.camera or { 0, 2, 6 }
+    ffi.C.xfSet( ffi.C.cameraEntity(), px + rc[1], py + rc[2], pz + rc[3] )
+    W.Camera.reapply()
+  end
+  if W and type( W ) == "table" and not tbl.world3d and W.Camera.last then W.Camera.off() end  -- back to 2.5D
   require( "Hud" ).rebuild()
+  for _, b in pairs( W and type( W ) == "table" and W.persistent or {} ) do
+    if b.onSceneEnter then b:onSceneEnter( name, opts.spawn ) end
+  end
   for _, g in pairs( Scene.persistent ) do
     if g.tbl.onSceneEnter then g.tbl:onSceneEnter( name, opts.spawn ) end
   end
@@ -500,7 +569,7 @@ do
         return
       end
       done = done + 1
-      Scene.go( Scene.file == a and b or a, { duration = 0.2 } )
+      Scene.go( Scene.file == a and b or a, { duration = 0.2, transition = os.getenv( "BICYCLE_SCENE_CYCLE_TRANSITION" ) } )
     end
   end
 end

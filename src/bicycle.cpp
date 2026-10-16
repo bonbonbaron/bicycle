@@ -4,6 +4,7 @@
 #include "Constants.h"
 #include "c/Trigger.h"
 #include "c/CollisionDetector.h"
+#include "c/Physics3D.h"
 #include "v/common/Dialogue.h"
 #include "v/common/TextMenu.h"
 #include "v/common/Scene.h"
@@ -14,9 +15,12 @@
 #include "data/Pack.h"
 #include "data/BImg.h"
 #include <sstream>
+#include <chrono>
+#include <array>
 #include <cctype>
 #include <cstdio>
 #include "c/Input.h"
+#include "c/InputState.h"
 
 namespace bicycle {
 
@@ -371,6 +375,7 @@ namespace bicycle {
       Animator::getInstance().forget( entity );
       Kinematics::getInstance().forget( entity );
       CollisionDetector::getInstance().removeEntity( entity );
+      phys3d::World3D::get().removeEntity( entity );  // true 3D: transform, body, overlaps
       gfx::renderer().forgetEntity( entity );
       World::set<Image>( entity, Image{} );
       World::set<Box>( entity, Box{} );
@@ -576,10 +581,37 @@ namespace bicycle {
       }
     }
 
+    // BICYCLE_SCRIPTED_MOUSE="12:0@30-60;L@80-80;R@90-95": mouse motion (dx:dy pixels per frame) or a held button
+    // (L/R/M) over a frame range, into the polled input state (include/c/InputState.h), like a real mouse.
+    // Scripted key presses above also count as held keys on their frames.
+    struct MouseScript { float dx, dy; int button; long from, to; };
+    std::vector<MouseScript> mouseScript;
+    if ( const char* s = std::getenv( "BICYCLE_SCRIPTED_MOUSE" ) ) {
+      std::stringstream ss( s );
+      std::string item;
+      while ( std::getline( ss, item, ';' ) ) {
+        MouseScript m{};
+        char b{};
+        if ( std::sscanf( item.c_str(), "%f:%f@%ld-%ld", &m.dx, &m.dy, &m.from, &m.to ) == 4 ) { m.button = -1; mouseScript.push_back( m ); }
+        else if ( std::sscanf( item.c_str(), "%c@%ld-%ld", &b, &m.from, &m.to ) == 3 ) {
+          m.button = b == 'L' ? 0 : b == 'R' ? 1 : 2;
+          mouseScript.push_back( m );
+        }
+      }
+    }
+    unsigned scriptedButtons{};
+    const bool frameStats = std::getenv( "BICYCLE_FRAME_STATS" ) && *std::getenv( "BICYCLE_FRAME_STATS" ) == '1';
+    std::array<double, 3> acc{};
+
     while ( wm.size() > 0 ) {
       if ( maxFrames > 0 && frames >= maxFrames ) break;
       // Inputs
       Timer::run();
+      auto& held = inputState();
+      if ( gfx::renderer().mode() == gfx::Mode::Ascii ) {  // terminals report presses only: no held state
+        held.beginFrame();
+        held.held.reset();
+      }
       gfx::renderer().pollInput();
       for ( const auto& p : script ) {
         if ( frames >= p.from && frames <= p.to && ( frames - p.from ) % p.every == 0 ) {
@@ -587,19 +619,45 @@ namespace bicycle {
           in.currKeysPressed.set( static_cast<unsigned>( p.key ) );
           in.lastPressed = p.key;
           Trigger::sendInput( in );
+          if ( frames == p.from || p.every > 1 ) held.pressed.set( static_cast<unsigned>( p.key ) );
+          held.held.set( static_cast<unsigned>( p.key ) );
         }
       }
+      unsigned buttons{};
+      for ( const auto& m : mouseScript ) {
+        if ( frames < m.from || frames > m.to ) continue;
+        if ( m.button < 0 ) { held.mouseDx += m.dx; held.mouseDy += m.dy; }
+        else buttons |= 1u << m.button;
+      }
+      held.mouseButtons = ( held.mouseButtons & ~scriptedButtons ) | buttons;
+      held.mousePressed |= buttons & ~scriptedButtons;
+      scriptedButtons = buttons;
       ++frames;
       if ( gfx::renderer().quitRequested() ) {
         break;
       }
-      Kinematics::getInstance().run();
+      using clk = std::chrono::steady_clock;
+      const auto t0 = clk::now();
+      Kinematics::getInstance().run();  // 2D motions, then the 3D layer (physics, camera rig)
       MidiPlayer::getInstance().tickFade();
       CollisionDetector::check();
+      const auto t1 = clk::now();
       // Process inputs
       trigger.send();
+      const auto t2 = clk::now();
       // Outputs
       wm.render();   // TODO make this internally only change dirty windows
+      const auto t3 = clk::now();
+      // BICYCLE_FRAME_STATS=1: where a frame's time goes (ms, averaged over 90 frames): motion + physics, Lua
+      // (events + onFrame), rendering (including the GL work and the swap).
+      if ( frameStats ) {
+        auto ms = []( clk::duration d ) { return std::chrono::duration<double, std::milli>( d ).count(); };
+        acc[0] += ms( t1 - t0 ); acc[1] += ms( t2 - t1 ); acc[2] += ms( t3 - t2 );
+        if ( frames % 90 == 0 ) {
+          std::fprintf( stderr, "frame: physics %.2f ms, lua %.2f ms, render %.2f ms (avg of 90)\n", acc[0] / 90, acc[1] / 90, acc[2] / 90 );
+          acc = {};
+        }
+      }
 
       mem::memRst( mem::TEMPORARY );  // scratch never outlives a frame
       Timer::sleepFrame();  // burn off excess frame time

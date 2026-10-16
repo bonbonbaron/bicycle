@@ -1,3 +1,4 @@
+#include <algorithm>
 #include "data/Mem.h"
 #include <algorithm>
 #include <chrono>
@@ -239,6 +240,14 @@ void MidiPlayer::stopSoundFX() {
 void MidiPlayer::playSoundFX( const int key, const int vel ) {
   fluid_synth_noteoff( _synthP, SFX_CHANNEL, key );  // retrigger cleanly
   fluid_synth_noteon( _synthP, SFX_CHANNEL, key, vel );
+}
+
+void MidiPlayer::playSoundFXPanned( const int key, const int vel, const float pan, const float gain ) {
+  const int v = static_cast<int>( vel * std::clamp( gain, 0.f, 1.f ) + 0.5f );
+  if ( v <= 0 ) return;  // out of earshot
+  const int cc = std::clamp( static_cast<int>( 64 + pan * 63 + 0.5f ), 0, 127 );
+  fluid_synth_cc( _synthP, SFX_CHANNEL, 10, cc );
+  playSoundFX( key, std::min( 127, v ) );
 }
 
 void MidiPlayer::playSound( const int chan, const int key, const int vel ) const {

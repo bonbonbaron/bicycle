@@ -358,7 +358,8 @@ never leaves a dangling pointer; anything left is reported. SoundFonts and persi
 long-lived pools. `BICYCLE_SCENE_STATS=1` prints the pools on each change; `ctest -R scene-lifecycle` walks back and
 forth 20 times and fails if the SCENE pool isn't empty after each unload or its high-water mark grows.
 
-Release builds: the packer checks that every scene a door or `Scene.go( "..." )` names is in the pack.
+Release builds: the packer checks that every scene a door, `W.door{ to = ... }` or `Scene.go( "..." )` names is in
+the pack. True-3D games (plat3d) use scenes too: see docs/true-3d.md, "Scene changes in true 3D".
 
 The test game: walk the hero (WASD) right into the cottage door in the meadow; inside, walk left out of the
 doorway. The fairy follows both ways; the coin on the cottage floor stays gone once picked up.
@@ -380,7 +381,8 @@ still uses malloc. fluidsynth's cpp11 thread code is patched at fetch time (new 
 ## Environment variables
 
 * `BICYCLE_SCENE_STATS=1`: print the memory pools on every scene change. `BICYCLE_SCENE_CYCLE=<n>[:<a>:<b>:<frames>]`:
-  make n scene changes between scenes a and b (default intro and house), one every <frames> frames, then quit.
+  make n scene changes between scenes a and b (default intro and house), one every <frames> frames, then quit
+  (`BICYCLE_SCENE_CYCLE_TRANSITION=fade|wipe|dissolve|none` picks the transition).
 * `BICYCLE_MODEL_ACTION=<action>`: 3D, pin every rigged model to one action.
 
 `BICYCLE_MAX_FRAMES=<n>`: quit after n frames (headless tests).
@@ -393,3 +395,9 @@ ASCII the file is a text dump of the screen) (+ `BICYCLE_SCREENSHOT_FRAME`, defa
 
 and `BICYCLE_AUDIO_DRIVER`, `BICYCLE_AUDIO_FILE`, `BICYCLE_GM_SF2`, `BICYCLE_MUTE_MUSIC`, `BICYCLE_PROFILE` (audio
 start-up timings) and `BICYCLE_DEBUG_LOG` (Lua `dbglog`): see `include/c/MidiPlayer.h` and `tools/audio/README.md`.
+
+## True 3D
+
+The 3D build can run genuinely 3D games (third-person platformers, first-person shooters): 3D transforms and
+character physics, a level collision mesh from Blender, raycasts, camera rigs driven by Kinematics, mouse look and
+gamepads, shadows and fog. See [docs/true-3d.md](docs/true-3d.md); demos: `./o-3d plat3d`, `./o-3d fps3d`.

@@ -112,12 +112,13 @@ int main( int argc, char** argv ) {
       if ( rel.rfind( "genome/scene/", 0 ) == 0 && f.extension() == ".lua" ) scenes.insert( f.stem().string() );
     }
     static const std::regex doorTo( R"(door\s*=\s*\{[^}]*\bto\s*=\s*["']([A-Za-z0-9_]+)["'])" );
+    static const std::regex door3d( R"(W\.door\s*[\({]\s*\{?[^}]*\bto\s*=\s*["']([A-Za-z0-9_]+)["'])" );  // true-3D doors
     static const std::regex gotoCall( R"(Scene(?:\.go|\.goTo|\.goto|\[\s*["']goto["']\s*\])\s*\(\s*["']([A-Za-z0-9_]+)["'])" );
     int missing = 0;
     for ( auto& f : files ) {
       if ( f.extension() != ".lua" ) continue;
       const std::string src = readFile( f );
-      for ( const auto* re : { &doorTo, &gotoCall } ) {
+      for ( const auto* re : { &doorTo, &door3d, &gotoCall } ) {
         for ( std::sregex_iterator it( src.begin(), src.end(), *re ), end; it != end; ++it ) {
           const std::string name = ( *it )[1];
           if ( !scenes.count( name ) ) {

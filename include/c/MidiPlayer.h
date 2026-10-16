@@ -24,6 +24,9 @@ class MidiPlayer {
     void stopSound( const int chan );
     void stopSoundFX();
     void playSoundFX( const int key, const int vel );
+    // Positional SFX: pan -1 (left) .. 1 (right) as MIDI CC10 on the SFX channel, gain 0..1 scales the velocity.
+    // One channel: overlapping effects share the latest pan.
+    void playSoundFXPanned( const int key, const int vel, const float pan, const float gain );
     void playSong() const;
     void stopSong();
     void pauseSong();
