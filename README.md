@@ -50,6 +50,19 @@ cmake --preset windows-mingw && cmake --build --preset windows-mingw
 
 Run it from the UCRT64 shell (or put `C:\msys64\ucrt64\bin` on `PATH`) so it finds the DLLs.
 
+### MSYS2 CLANG64
+
+In an MSYS2 CLANG64 shell:
+
+```sh
+pacman -S --needed mingw-w64-clang-x86_64-{clang,cmake,ninja,pkgconf,pdcurses,luajit,fluidsynth}
+cmake --preset windows-clang64 && cmake --build --preset windows-clang64
+./o.exe test
+```
+
+Run it from the CLANG64 shell (or put `C:\msys64\clang64\bin` on `PATH`) so it finds the DLLs.
+Don't use `windows-msvc` from an MSYS2 shell: it needs Visual Studio 2022 and `VCPKG_ROOT`.
+
 ### Music on Windows
 
 The General MIDI fallback SoundFont is looked up at `BICYCLE_GM_SF2`, then `./sf2/default-GM.sf2` (the
