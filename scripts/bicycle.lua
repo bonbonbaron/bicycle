@@ -224,6 +224,10 @@ ffi.cdef([[
   void addBgLayerEx( const char* bgStr, int type, int parallaxPct, int parallaxPctY, int vx, int vy, int x, int y );
   void addFgEntity( Entity entity );
   void newImage( Entity entity, const char* imgStr );
+  int renderMode();
+  bool newPixelImage( Entity entity, const char* paths );
+  bool addBgLayerPixels( const char* tilesetPath, const int* tiles, int nw, int nh, int tileW, int tileH,
+                         int type, int parallaxPct, int parallaxPctY, int vx, int vy, int x, int y );
   void setPos( Entity entity, Position pos );
   void addCollider( Entity entity, unsigned layer, unsigned type, int x, int y, int w, int h );
   void setVelocity( Entity entity, int vx, int vy );

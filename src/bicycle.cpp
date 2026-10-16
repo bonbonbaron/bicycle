@@ -11,6 +11,8 @@
 #include "c/Animator.h"
 #include "v/common/Renderer.h"
 #include "data/Pack.h"
+#include "data/BImg.h"
+#include <sstream>
 
 namespace bicycle {
 
@@ -32,6 +34,22 @@ namespace bicycle {
     gfx::renderer().init( gameName );
     auto& trig = Trigger::getInstance();
     trig.init( gameName );
+  }
+
+  // Pixel images: one pixel is 2x1 cells (see Renderer.h).
+  static auto pixelImage( std::shared_ptr<const BImg> px ) -> Image {
+    Image img;
+    img.size.w = ( 2 * px->w ) << FIXEDPT_DEC_BITS;
+    img.size.h = px->h << FIXEDPT_DEC_BITS;
+    img.size.d = 1 << FIXEDPT_DEC_BITS;
+    img.pixels = std::move( px );
+    return img;
+  }
+
+  static auto loadBImg( const std::string& path ) -> std::optional<BImg> {
+    auto bytes = assets::read( path );
+    if ( !bytes ) return std::nullopt;
+    return BImg::parse( *bytes );
   }
 
   Entity push( std::shared_ptr<Window> shared ) {
@@ -130,6 +148,85 @@ namespace bicycle {
       const auto& img = World::get<Image>( entity );
       auto& box = World::get<Box>( entity );
       box.size = img.size;
+    }
+
+    // Which renderer this build has: 0 ASCII, 1 2D, 2 3D (Lua picks ASCII art or pixels by it).
+    int renderMode() {
+      return static_cast<int>( gfx::renderer().mode() );
+    }
+
+    // A pixel image from .bimg layers (newline-separated paths, bottom layer first) composited in order. Layers
+    // are frame strips of the same size (scripts/aseprite/sprite.lua pixel export). Returns false if one's missing.
+    bool newPixelImage( Entity entity, const char* paths ) {
+      std::istringstream in( paths );
+      std::string path;
+      std::optional<BImg> out;
+      int nLayers{};
+      while ( std::getline( in, path ) ) {
+        if ( path.empty() ) continue;
+        auto layer = loadBImg( path );
+        if ( !layer ) return false;
+        if ( !out ) {
+          out = std::move( *layer );
+        }
+        else {
+          if ( nLayers == 1 && out->indexed() ) {  // second layer: switch the result to true color
+            out->rgba.resize( static_cast<size_t>( out->w ) * out->h );
+            for ( int y = 0; y < out->h; ++y )
+              for ( int x = 0; x < out->w; ++x ) out->rgba[static_cast<size_t>( y ) * out->w + x] = out->pixel( x, y );
+            out->palette.clear();
+            out->indices.clear();
+          }
+          for ( int y = 0; y < std::min( out->h, layer->h ); ++y ) {
+            for ( int x = 0; x < std::min( out->w, layer->w ); ++x ) {
+              const uint32_t p = layer->pixel( x, y );
+              if ( p >> 24 ) out->rgba[static_cast<size_t>( y ) * out->w + x] = p;
+            }
+          }
+        }
+        ++nLayers;
+      }
+      if ( !out ) return false;
+      World::set<Image>( entity, pixelImage( std::make_shared<const BImg>( std::move( *out ) ) ) );
+      World::get<Box>( entity ).size = World::get<Image>( entity ).size;
+      return true;
+    }
+
+    // A tilemap background layer in pixels: tiles[] (row-major, nw x nh) index the tileset strip (tile i at
+    // x = i * tileW). Other parameters as addBgLayerEx. Returns false if the tileset is missing.
+    bool addBgLayerPixels( const char* tilesetPath, const int* tiles, int nw, int nh, int tileW, int tileH,
+                           int type, int parallaxPct, int parallaxPctY, int vx, int vy, int x, int y ) {
+      auto set = loadBImg( tilesetPath );
+      if ( !set || tileW <= 0 || tileH <= 0 ) return false;
+      BImg map;
+      map.w = nw * tileW;
+      map.h = nh * tileH;
+      map.palette = set->palette;
+      if ( set->indexed() ) map.indices.assign( static_cast<size_t>( map.w ) * map.h, 0 );
+      else map.rgba.assign( static_cast<size_t>( map.w ) * map.h, 0 );
+      const int nTiles = set->w / tileW;
+      for ( int ty = 0; ty < nh; ++ty ) {
+        for ( int tx = 0; tx < nw; ++tx ) {
+          const int t = tiles[ty * nw + tx];
+          if ( t <= 0 || t >= nTiles ) continue;  // tile 0 is Aseprite's empty tile
+          for ( int py = 0; py < std::min( tileH, set->h ); ++py ) {
+            for ( int px = 0; px < tileW; ++px ) {
+              const size_t src = static_cast<size_t>( py ) * set->w + t * tileW + px;
+              const size_t dst = static_cast<size_t>( ty * tileH + py ) * map.w + tx * tileW + px;
+              if ( set->indexed() ) map.indices[dst] = set->indices[src];
+              else map.rgba[dst] = set->rgba[src];
+            }
+          }
+        }
+      }
+      auto scene = dynamic_pointer_cast<Scene>( WindowManager::getInstance().back() );
+      if ( !scene ) return false;
+      Position vel{};
+      vel.x = vx;
+      vel.y = vy;
+      scene->getGrid().addLayer( Layer( pixelImage( std::make_shared<const BImg>( std::move( map ) ) ),
+                                        static_cast<LayerType>( type ), parallaxPct, parallaxPctY, vel, Position( x, y ) ) );
+      return true;
     }
 
     void setPos( Entity entity, Position pos ) {

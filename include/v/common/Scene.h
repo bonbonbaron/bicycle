@@ -51,6 +51,7 @@ struct Layer {
   Layer();
   Layer( const std::string bgStr = "", const std::string& bgCollStr = "", LayerType type = LayerType::FIXED );
   Layer( const std::string& bgStr, LayerType type, int parallaxPct, int parallaxPctY, Position vel, Position offset );
+  Layer( const Image& img, LayerType type, int parallaxPct, int parallaxPctY, Position vel, Position offset );  // pixels
 
   Entity id{};
   Image bgImg;

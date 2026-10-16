@@ -27,6 +27,8 @@ message( STATUS "bicycle: render mode ${BICYCLE_RENDER}" )
 include( cmake/BicycleDeps.cmake )
 if ( BICYCLE_RENDER STREQUAL "ASCII" )
   bicycle_curses()
+else()
+  bicycle_sdl3()
 endif()
 bicycle_luajit()
 bicycle_fluidsynth()
@@ -87,6 +89,8 @@ set( BICYCLE_SOURCES
 # Not built (unfinished or replaced): src/c/Input.cpp (Linux evdev keyboard), src/c/RenderSystem.cpp, src/v/common/Graph.cpp
 if ( BICYCLE_RENDER STREQUAL "ASCII" )
   list( APPEND BICYCLE_SOURCES src/v/ascii/AsciiRenderer.cpp src/c/SshInputListener.cpp )
+elseif ( BICYCLE_RENDER STREQUAL "2D" )
+  list( APPEND BICYCLE_SOURCES src/v/sdl/PixelRenderer.cpp src/v/2d/Renderer2D.cpp )
 endif()
 
 add_executable( o ${BICYCLE_SOURCES} )
@@ -95,8 +99,16 @@ target_link_libraries( o PRIVATE bicycle_data bicycle_luajit bicycle_fluidsynth 
 target_compile_definitions( o PRIVATE BICYCLE_RENDER_${BICYCLE_RENDER} )
 if ( BICYCLE_RENDER STREQUAL "ASCII" )
   target_link_libraries( o PRIVATE bicycle_curses )
+else()
+  target_link_libraries( o PRIVATE bicycle_sdl3 )
+endif()
+# The executable is o (ASCII), o-2d or o-3d, so builds of different modes can sit side by side in the repo root.
+set( BICYCLE_EXE_NAME o )
+if ( NOT BICYCLE_RENDER STREQUAL "ASCII" )
+  string( TOLOWER "o-${BICYCLE_RENDER}" BICYCLE_EXE_NAME )
 endif()
 set_target_properties( o PROPERTIES
+  OUTPUT_NAME ${BICYCLE_EXE_NAME}
   RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}
   RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_SOURCE_DIR}
   RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_SOURCE_DIR}

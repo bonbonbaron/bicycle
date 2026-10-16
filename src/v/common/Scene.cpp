@@ -30,6 +30,17 @@ Layer::Layer( const std::string& bgStr, LayerType type, int parallaxPct, int par
   World::set<Box>( id, { offset, bgImg.size } );
 }
 
+Layer::Layer( const Image& img, LayerType type, int parallaxPct, int parallaxPctY, Position vel, Position offset )
+  : id( newEntityId() ),
+    type( type ),
+    parallaxPct( parallaxPct ),
+    parallaxPctY( parallaxPctY ),
+    vel( vel )
+{
+  World::set<Image>( id, img );
+  World::set<Box>( id, { offset, img.size } );
+}
+
 void Grid::addLayer( const Layer& layer ) {
   _layers.push_back( layer );
 }

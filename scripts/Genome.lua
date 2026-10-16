@@ -69,6 +69,22 @@ function Sprite.getAsset( name )
   return result
 end
 
+-- Path of a pixel export's .bimg (see scripts/aseprite/sprite.lua).
+function Sprite.pixelPath( name )
+  return "./"..gameName.."/genome/"..Sprite.assetName( name )..".bimg"
+end
+
+-- Render mode of this build: "ascii", "2d" or "3d" ("ascii" outside the engine, e.g. headless tests).
+-- Pixel modes use a sprite's pixel export (.bimg) when it has one and fall back to its ASCII art otherwise.
+Sprite.MODES = { [0] = "ascii", [1] = "2d", [2] = "3d" }
+function Sprite.renderMode()
+  local ok, mode = pcall( function() return ffi.C.renderMode() end )
+  return ok and Sprite.MODES[mode] or "ascii"
+end
+function Sprite.usePixels( hasPixels )
+  return hasPixels and Sprite.renderMode() ~= "ascii"
+end
+
 function Sprite.exists( name )
   return Asset.exists( "./"..gameName.."/genome/"..Sprite.assetName( name )..".lua" )
 end
@@ -97,6 +113,9 @@ end
 
 -- An image layer: slice its ASCII strip into one string per frame and build animation strips.
 function Sprite.loadCharacterLayer( layer, globAnim )
+  if Sprite.usePixels( layer.pixels ) or not layer.colormap then
+    return Sprite.loadPixelLayer( layer, globAnim )
+  end
   local img = Sprite.getAsset( layer.colormap ).img
   checkType( img, "string" )
   local srcRects = layer.animSrcRects and Sprite.getAsset( layer.animSrcRects ).strips or {}
@@ -148,6 +167,45 @@ function Sprite.loadCharacterLayer( layer, globAnim )
   return { kind = Sprite.CHARACTER, frames = frames, strips = strips, w = frameW, h = #lines }
 end
 
+-- Strips from a layer's src rects: frame indices (by each rect's x) plus timing and direction from the global anim.
+local function loadStrips( srcRects, globAnim, xToFrameIdx )
+  local strips = {}
+  for stripName, rects in pairs( srcRects ) do
+    local glob = globAnim and globAnim.strips[stripName] or {}
+    local stripFrames = {}
+    for i, rect in ipairs( rects ) do
+      local globFrame = glob.frames and glob.frames[i]
+      local durationMs = globFrame and math.floor( globFrame.duration * 1000 + 0.5 ) or Sprite.DEFAULT_DURATION_MS
+      stripFrames[i] = { frameIdx = xToFrameIdx[rect.x], durationMs = durationMs }
+    end
+    strips[stripName] = {
+      frames = stripFrames,
+      sequence = getSequence( #stripFrames, glob.direction or Sprite.FORWARD ),
+      numReps = glob.numReps or 0,
+    }
+  end
+  return strips
+end
+
+-- An image layer's pixel export: a .bimg frame strip (frame f at x = (f - 1) * canvas width, in pixels).
+-- Sizes are in cells like everything else: a pixel is 2 cells wide and 1 tall, as in the ASCII export.
+function Sprite.loadPixelLayer( layer, globAnim )
+  if not layer.pixels then error( "Layer '"..tostring( layer.colormap ).."' has no pixel export; re-export it with BICYCLE_EXPORT=pixels or both." ) end
+  local srcRects = layer.animSrcRects and Sprite.getAsset( layer.animSrcRects ).strips or {}
+  local xToFrameIdx, canvasW, canvasH = {}, nil, nil
+  for _, rects in pairs( srcRects ) do
+    for _, rect in ipairs( rects ) do
+      xToFrameIdx[rect.x] = math.floor( rect.x / rect.w ) + 1
+      canvasW, canvasH = rect.w, rect.h
+    end
+  end
+  canvasW = canvasW or layer.pixelW
+  canvasH = canvasH or layer.pixelH
+  local nFrames = math.max( math.floor( ( layer.pixelW or canvasW ) / canvasW ), 1 )
+  return { kind = Sprite.CHARACTER, pixels = { layer.pixels }, nFrames = nFrames,
+           strips = loadStrips( srcRects, globAnim, xToFrameIdx ), w = 2 * canvasW, h = canvasH }
+end
+
 -- A tilemap layer: tile indices laid out row-major plus its tileset's animation and collision data.
 function Sprite.loadTilemapLayer( layer )
   local map = Sprite.getAsset( layer.tilemap )
@@ -195,6 +253,18 @@ end
 function Sprite.addBgLayer( tm )
   local bg = tm.bg
   local FIXEDPT = 256  -- 1 << FIXEDPT_DEC_BITS
+  if Sprite.usePixels( tm.tileset and tm.tileset.pixels ) then
+    local n = tm.numTilesWide * tm.numTilesHigh
+    local tiles = ffi.new( "int[?]", n )
+    for i = 1, n do tiles[i - 1] = tm.tiles[i] end
+    local ok = ffi.C.addBgLayerPixels( Sprite.pixelPath( tm.tileset.pixels ), tiles, tm.numTilesWide, tm.numTilesHigh,
+      tm.tileW, tm.tileH, Sprite.BG_MODES[bg.mode], bg.parallax, bg.parallaxy,
+      math.floor( bg.vx * FIXEDPT / Sprite.FRAMES_PER_SECOND + 0.5 ),
+      math.floor( bg.vy * FIXEDPT / Sprite.FRAMES_PER_SECOND + 0.5 ),
+      bg.x, bg.y )
+    if not ok then error( "Couldn't load tileset pixels '"..tm.tileset.pixels.."'." ) end
+    return
+  end
   ffi.C.addBgLayerEx( Sprite.tilemapToAscii( tm ), Sprite.BG_MODES[bg.mode], bg.parallax, bg.parallaxy,
     math.floor( bg.vx * FIXEDPT / Sprite.FRAMES_PER_SECOND + 0.5 ),  -- cells/second -> fixed-point cells/frame
     math.floor( bg.vy * FIXEDPT / Sprite.FRAMES_PER_SECOND + 0.5 ),
@@ -206,6 +276,14 @@ end
 function Sprite.composite( characters )
   local base = characters[1]
   if #characters == 1 then return base end
+  if base.pixels then  -- pixel layers composite in C++ (newPixelImage): just list them, bottom first
+    local pixels = {}
+    for _, c in ipairs( characters ) do
+      if not c.pixels then error( "Can't composite pixel and ASCII layers of one sprite." ) end
+      table.insert( pixels, c.pixels[1] )
+    end
+    return { kind = Sprite.CHARACTER, pixels = pixels, nFrames = base.nFrames, strips = base.strips, w = base.w, h = base.h }
+  end
   local frames = {}
   for f = 1, #base.frames do
     local rows = splitLines( base.frames[f] )
@@ -366,8 +444,22 @@ Gene["GeneLoader"] = {
     tbl.spriteData = spr
     if spr.kind == Sprite.CHARACTER then
       local character = spr.character  -- all image layers composited
-      local img, rects = Sprite.toStrip( character )
-      ffi.C.newImage( entity, img )
+      local rects
+      if character.pixels then
+        local paths = {}
+        for i, name in ipairs( character.pixels ) do paths[i] = Sprite.pixelPath( name ) end
+        if not ffi.C.newPixelImage( entity, table.concat( paths, "\n" ) ) then
+          error( "Couldn't load sprite pixels for '"..gene.val.."'." )
+        end
+        rects = {}  -- frames side by side, no gap, each the canvas size (in cells)
+        for f = 1, character.nFrames do
+          rects[f] = { x = ( f - 1 ) * character.w, y = 0, w = character.w, h = character.h }
+        end
+      else
+        local img
+        img, rects = Sprite.toStrip( character )
+        ffi.C.newImage( entity, img )
+      end
       tbl.anim = Animation.new( entity, character, rects )
       -- Play the untagged strip, else whichever tag the genome asked for, else any.
       if not tbl.anim:set( tbl.initAnim or "DEFAULT" ) then
@@ -390,6 +482,7 @@ Gene["GeneLoader"] = {
     ffi.C.addCollider( entity, c.layer or 0, collType, box[1], box[2], box[3], box[4] )
   end,
   initAnim = 0,  -- do nothing; read by the sprite loader
+  sprite2d = 0,  -- read by Genome.new: the sprite pixel modes use instead of img/sprite (ASCII keeps its own art)
   onSpawn = 0,  -- do nothing; called by Scene once the entity is placed
   onUncollision = 0,  -- do nothing, just allow it to exist
   spriteData = 0,  -- do nothing; set by the sprite loader
@@ -446,6 +539,11 @@ Genome.__index = Genome
 -- allow __newindex for blackboard functionality
 Genome.new = function( name )
   local tbl = Genome.get( name ) -- tbl is the table of type-value pairs of genes (e.g. { img = "shopkeeper", ... })
+  -- sprite2d = "<aseprite sprite>": pixel modes draw this instead of the img/sprite gene, so a genome can keep
+  -- hand-made ASCII art for the ASCII mode and still have pixel art in 2D/3D.
+  if tbl.sprite2d and Sprite.renderMode() ~= "ascii" then
+    tbl.sprite, tbl.img = tbl.sprite2d, nil
+  end
   local instance = { id=ffi.C.newEntity(), tbl=tbl, genes={} }
   -- Collect genes first; loaders may add fields (e.g. anim) to the genome table.
   local genes = {}

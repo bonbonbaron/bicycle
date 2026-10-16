@@ -8,3 +8,8 @@ o.exe
 *.pdb
 sf2/
 assets.bpak
+o-2d
+o-3d
+o-2d.exe
+o-3d.exe
+build-*/
