@@ -3,6 +3,7 @@
 #include "bicycle.h"
 #include "Constants.h"
 #include "c/Trigger.h"
+#include "c/StartupStats.h"
 #include "c/CollisionDetector.h"
 #include "c/Physics3D.h"
 #include "v/common/Dialogue.h"
@@ -50,9 +51,12 @@ namespace bicycle {
 #elif defined( BICYCLE_RELEASE_ASSETS )
     assets::mount( gameName );
 #endif
+    startup::mark( "asset pack" );
     gfx::renderer().init( gameName );
+    startup::mark( "renderer init (window, GL, fonts)" );
     auto& trig = Trigger::getInstance();
     trig.init( gameName );
+    startup::mark( "game main.lua (scene, models, audio)" );
   }
 
   // Pixel images: one pixel is 2x1 cells (see Renderer.h).
@@ -753,6 +757,7 @@ namespace bicycle {
       const auto t2 = clk::now();
       // Outputs
       wm.render();   // TODO make this internally only change dirty windows
+      if ( frames == 1 ) startup::mark( "first frame" );
       const auto t3 = clk::now();
       // BICYCLE_FRAME_STATS=1: where a frame's time goes (ms, averaged over 90 frames): motion + physics, Lua
       // (events + onFrame), rendering (including the GL work and the swap).

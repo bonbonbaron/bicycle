@@ -1,3 +1,4 @@
+#include "c/StartupStats.h"
 // 3D mode: OpenGL 3.3 core through SDL3. The scene's camera box picks what the 3D camera follows; entities with a
 // model (setModel, the Lua "model" gene) are drawn as meshes (.bmesh, Edgebreaker-compressed, from Blender via
 // scripts/blender/export.py), other entities as camera-facing billboards of their current sprite frame, and static
@@ -482,11 +483,13 @@ class Renderer3D final : public PixelRenderer {
         std::exit( 1 );
       }
       SDL_GL_SetSwapInterval( 0 );
+      startup::mark( "  window + GL context" );
       if ( std::getenv( "BICYCLE_GL_INFO" ) ) {
         std::fprintf( stderr, "GL %s on %s\n", gl.GetString( GL_VERSION ), gl.GetString( GL_RENDERER ) );
       }
       _prog = program( VS, FS );
       _depthProg = program( VS, DEPTH_FS );
+      startup::mark( "  shaders (compile + link)" );
       // The color texture is on unit 0 and the shadow map on unit 1, always (two sampler types may not share a unit).
       gl.UseProgram( _prog );
       gl.Uniform1i( gl.GetUniformLocation( _prog, "tex" ), 0 );

@@ -1,3 +1,4 @@
+#include "c/StartupStats.h"
 // Shared by the 2D and 3D renderers: SDL3 window and keyboard, and a software framebuffer drawn in cells.
 #include "v/sdl/PixelRenderer.h"
 #include "v/common/Capture.h"
@@ -67,6 +68,7 @@ void PixelRenderer::init( const std::string& gameName ) {
   if ( const char* s = std::getenv( "BICYCLE_WINDOW_SIZE" ) ) {
     std::sscanf( s, "%dx%d", &w, &h );
   }
+  startup::mark( "  SDL_Init (video)" );
   _gameName = gameName;
   // UI text: fonts/ui.ttf (a game can ship its own as <game>/fonts/ui.ttf).
   for ( const std::string dir : { "./" + gameName + "/fonts/", std::string( "./fonts/" ) } ) {
@@ -76,6 +78,7 @@ void PixelRenderer::init( const std::string& gameName ) {
     }
   }
   if ( !_font.loaded() ) std::fprintf( stderr, "bicycle: no fonts/ui.ttf; UI text falls back to the bitmap font\n" );
+  startup::mark( "  UI fonts" );
   beforeWindowCreated();
   _window = SDL_CreateWindow( ( "bicycle - " + gameName ).c_str(), w, h, windowFlags() );
   if ( !_window ) {

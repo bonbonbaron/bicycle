@@ -1,10 +1,14 @@
 #pragma once
 #include <string>
+#include <utility>
+#include <vector>
 #include <fluidsynth.h>
 
 // Music (a looping MIDI file) and sound effects (notes on a reserved channel), both synthesized by fluidsynth
-// from SoundFonts. A General MIDI SoundFont is loaded first as a fallback for any program the game's own
-// SoundFonts don't define.
+// from SoundFonts. A General MIDI SoundFont is the fallback for any program the game's own SoundFonts don't define;
+// it's loaded only when one is needed (a song or the SFX channel uses a bank/program none of the game's SoundFonts
+// has), and then goes under them in the stack. Most games never touch it, so start-up skips reading ~30 MB.
+// BICYCLE_EAGER_GM=1 loads it at start-up as before.
 //
 // Environment:
 //   BICYCLE_AUDIO_DRIVER  fluidsynth audio driver (pulseaudio, alsa, jack, sdl2, ...); default: fluidsynth's choice
@@ -51,4 +55,16 @@ class MidiPlayer {
     fluid_audio_driver_t* _aDriverP{};
     fluid_player_t* _playerP{};
     std::string _rawFile{};  // BICYCLE_AUDIO_FILE when fluidsynth can only write raw samples
+    // Lazy General MIDI fallback (see above).
+    struct GameFont { std::string name; int id; };  // a game SoundFont, by its in-memory name and current id
+    std::vector<GameFont> _gameFonts{};             // load order; ids change when GM is slid under them
+    std::vector<std::pair<int, int>> _idMap{};      // first id handed to Lua -> current id
+    struct ChanSel { int sfont{ -1 }, bank{}, program{}; };
+    ChanSel _sel[16]{};                             // explicit selectProgram per channel (re-applied after a restack)
+    bool _gmTried{};
+    bool _sfxSelected{};
+    auto hasPreset( int bank, int program ) const -> bool;  // in one of the game's SoundFonts
+    void ensureGm( const char* why );                       // load GM under the game's SoundFonts, once
+    auto currentId( int luaId ) const -> int;
+    std::string _unused{};  // BICYCLE_AUDIO_FILE when fluidsynth can only write raw samples
 };
