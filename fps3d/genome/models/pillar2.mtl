@@ -1,0 +1,4 @@
+newmtl brick
+Kd 1.0000 1.0000 1.0000
+d 1.0000
+map_Kd brick3d.png

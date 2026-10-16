@@ -1,0 +1,4 @@
+newmtl concrete
+Kd 1.0000 1.0000 1.0000
+d 1.0000
+map_Kd concrete3d.png
