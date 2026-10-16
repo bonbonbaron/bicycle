@@ -20,6 +20,26 @@
       }
     },
     {
+      "name": "windows-clang64",
+      "displayName": "Windows, MSYS2 CLANG64 shell (clang, Ninja); dependencies fetched and built; RelWithDebInfo",
+      "inherits": "default",
+      "binaryDir": "${sourceDir}/build/clang64",
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++"
+      }
+    },
+    {
+      "name": "windows-ucrt64",
+      "displayName": "Windows, MSYS2 UCRT64 shell (gcc, Ninja); dependencies fetched and built; RelWithDebInfo",
+      "inherits": "default",
+      "binaryDir": "${sourceDir}/build/ucrt64",
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "gcc",
+        "CMAKE_CXX_COMPILER": "g++"
+      }
+    },
+    {
       "name": "msvc",
       "displayName": "Visual Studio 2022 x64 (run from a Developer Command Prompt)",
       "generator": "Visual Studio 17 2022",
@@ -35,6 +55,14 @@
     {
       "name": "system",
       "configurePreset": "system"
+    },
+    {
+      "name": "windows-clang64",
+      "configurePreset": "windows-clang64"
+    },
+    {
+      "name": "windows-ucrt64",
+      "configurePreset": "windows-ucrt64"
     },
     {
       "name": "msvc",

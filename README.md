@@ -56,11 +56,15 @@ In an MSYS2 CLANG64 shell, install just the toolchain, then build:
 
 ```sh
 pacman -S --needed make mingw-w64-clang-x86_64-{clang,cmake,ninja}
-cmake -B build && cmake --build build
+cmake --preset windows-clang64 && cmake --build --preset windows-clang64
 ./o.exe test
 ```
 
-(UCRT64 with `mingw-w64-ucrt-x86_64-{gcc,cmake,ninja}` works the same way.) `o.exe` doesn't depend on MSYS2's
+The preset builds RelWithDebInfo into `build/clang64` with clang and Ninja (debug info split into `o.exe.debug`);
+add `-DCMAKE_BUILD_TYPE=Debug` for -O0 stepping or `-DBICYCLE_RELEASE=ON` for a release. `make` is needed only for
+LuaJIT's own Makefile on the first configure.
+
+(UCRT64 with `mingw-w64-ucrt-x86_64-{gcc,cmake,ninja}` works the same way, with `--preset windows-ucrt64`.) `o.exe` doesn't depend on MSYS2's
 DLLs, so it also runs from `cmd` or PowerShell (`o test`, `o.bat test`, `.\o.ps1 test`).
 
 ### Windows, Visual Studio
