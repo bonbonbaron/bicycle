@@ -3,71 +3,64 @@
 A terminal game engine: ncurses (PDCurses on Windows) graphics, LuaJIT game scripts, fluidsynth music and
 sound effects. The engine is one executable, `o`, that runs a game folder: `./o test` runs `test/main.lua`.
 
-## Building on Linux
+## Building
 
-Packages (Debian/Ubuntu): `cmake g++ pkg-config libncurses-dev libluajit-5.1-dev libfluidsynth-dev`, plus a
-General MIDI SoundFont for the music fallback: `fluid-soundfont-gm` (or `timgm6mb-soundfont`).
+Everything the engine needs (LuaJIT, fluidsynth, PDCurses on Windows, and a General MIDI SoundFont) is
+downloaded from pinned URLs (checked against SHA-256 hashes) and built from source the first time you configure.
+You only need CMake (3.21+), a C/C++ compiler and an internet connection; git isn't needed for the dependencies.
 
 ```sh
-cmake --preset linux && cmake --build --preset linux    # or just: make
-./o test
+cmake -B build && cmake --build build
+./o test            # o.exe test on Windows
 ```
 
-`make` is a thin wrapper around the same CMake build (`make clean`, `make install` too). The executable lands in
-the repository root because games and `scripts/` are found relative to the current folder.
+The first configure takes a minute or two (it builds the dependencies into `build/_deps`); later builds don't
+repeat it. The executable lands in the repository root because games and `scripts/` are found relative to the
+current folder. Everything is linked statically, so `o`/`o.exe` needs no extra DLLs (any that are used are copied
+next to `o.exe` after the build).
 
-## Building on Windows
+`make` is a thin wrapper around the same build (`make clean`, `make install` too). Presets: `cmake --preset default`
+(Ninja), `cmake --preset system` (installed packages only), `cmake --preset msvc` (Visual Studio 2022).
 
-### Visual Studio (MSVC) + vcpkg
+### Linux
 
-1. Install Visual Studio 2022 with "Desktop development with C++" (it includes CMake), and
-   [vcpkg](https://github.com/microsoft/vcpkg):
-   ```bat
-   git clone https://github.com/microsoft/vcpkg C:\vcpkg
-   C:\vcpkg\bootstrap-vcpkg.bat
-   setx VCPKG_ROOT C:\vcpkg
-   ```
-2. In a new "x64 Native Tools Command Prompt for VS 2022", from the repository root:
-   ```bat
-   cmake --preset windows-msvc
-   cmake --build --preset windows-msvc
-   ```
-   vcpkg reads `vcpkg.json` and builds PDCurses, LuaJIT and fluidsynth (and their dependencies, e.g. glib) the
-   first time, which takes a while. It copies their DLLs next to `o.exe`.
-3. Run a game from the repository root: `o test` (or `o.bat test`, or `.\o.ps1 test` in PowerShell).
+Needs `cmake`, `g++` (or clang), `make`, and for sound `libasound2-dev` and/or `libpulse-dev`. The system ncurses
+is used (`libncurses-dev`); with `-DBICYCLE_FETCH_NCURSES=ON` ncurses is built from source too.
 
-Opening the folder in Visual Studio ("Open a local folder") also works: pick the `windows-msvc` preset.
+### Windows, MSYS2 CLANG64
 
-### MSYS2 / MinGW-w64
-
-In an MSYS2 UCRT64 shell:
+In an MSYS2 CLANG64 shell, install just the toolchain, then build:
 
 ```sh
-pacman -S --needed mingw-w64-ucrt-x86_64-{gcc,cmake,ninja,pkgconf,pdcurses,luajit,fluidsynth}
-cmake --preset windows-mingw && cmake --build --preset windows-mingw
+pacman -S --needed make mingw-w64-clang-x86_64-{clang,cmake,ninja}
+cmake -B build && cmake --build build
 ./o.exe test
 ```
 
-Run it from the UCRT64 shell (or put `C:\msys64\ucrt64\bin` on `PATH`) so it finds the DLLs.
+(UCRT64 with `mingw-w64-ucrt-x86_64-{gcc,cmake,ninja}` works the same way.) `o.exe` doesn't depend on MSYS2's
+DLLs, so it also runs from `cmd` or PowerShell (`o test`, `o.bat test`, `.\o.ps1 test`).
 
-### MSYS2 CLANG64
+### Windows, Visual Studio
 
-In an MSYS2 CLANG64 shell:
+Install Visual Studio 2022 (or the Build Tools) with "Desktop development with C++", which includes CMake. In an
+"x64 Native Tools Command Prompt for VS 2022" (LuaJIT's `msvcbuild.bat` needs it), from the repository root:
 
-```sh
-pacman -S --needed mingw-w64-clang-x86_64-{clang,cmake,ninja,pkgconf,pdcurses,luajit,fluidsynth}
-cmake --preset windows-clang64 && cmake --build --preset windows-clang64
-./o.exe test
+```bat
+cmake --preset msvc && cmake --build --preset msvc
+o test
 ```
 
-Run it from the CLANG64 shell (or put `C:\msys64\clang64\bin` on `PATH`) so it finds the DLLs.
-Don't use `windows-msvc` from an MSYS2 shell: it needs Visual Studio 2022 and `VCPKG_ROOT`.
+### Options
 
-### Music on Windows
+* `BICYCLE_USE_SYSTEM_DEPS` (OFF): use installed packages (pkg-config / CMake config) and download nothing.
+* `BICYCLE_FETCH_NCURSES` (OFF): on Linux/macOS, build ncurses instead of using the system one.
+* `BICYCLE_DOWNLOAD_GM_SF2` (ON): download GeneralUser GS (32 MB) to `sf2/default-GM.sf2`, the music fallback.
+* `BICYCLE_DEPS_DIR` (`build/_deps`): where downloads and dependency builds go.
 
-The General MIDI fallback SoundFont is looked up at `BICYCLE_GM_SF2`, then `./sf2/default-GM.sf2` (the
-Linux system paths don't exist on Windows). Put any GM SoundFont there, e.g. FluidR3_GM.sf2 or TimGM6mb.sf2.
-Without one, games still play with their own SoundFonts. See `tools/audio/README.md`.
+### Music
+
+The General MIDI fallback SoundFont is looked up at `BICYCLE_GM_SF2`, then `./sf2/default-GM.sf2` (downloaded by
+the build), then the usual Linux system paths. See `tools/audio/README.md`.
 
 ### How Windows differs
 
@@ -81,16 +74,16 @@ Without one, games still play with their own SoundFonts. See `tools/audio/README
 
 ### Cross-compiling o.exe from Linux (a check, not a release build)
 
-`cmake/mingw-w64.cmake` is a MinGW-w64 toolchain file. With Windows builds of PDCurses, LuaJIT (both build
-easily with MinGW) and fluidsynth (its release zip) under `~/win64`:
+`cmake/mingw-w64.cmake` is a MinGW-w64 toolchain file; the dependencies are fetched and cross-built as above.
 
 ```sh
-cmake -S . -B build/mingw-cross -DCMAKE_TOOLCHAIN_FILE=cmake/mingw-w64.cmake -DCMAKE_PREFIX_PATH=$HOME/win64 \
-      -DFLUIDSYNTH_LIBRARY=$HOME/win64/bin/libfluidsynth-3.dll -DFLUIDSYNTH_INCLUDE_DIR=$HOME/win64/include
-cmake --build build/mingw-cross
+cmake -B build/mingw -G Ninja -DCMAKE_TOOLCHAIN_FILE=cmake/mingw-w64.cmake && cmake --build build/mingw
+# llvm-mingw (clang) instead of gcc:
+cmake -B build/clang64 -G Ninja -DCMAKE_TOOLCHAIN_FILE=cmake/mingw-w64.cmake \
+      -DMINGW_CC=x86_64-w64-mingw32-clang -DMINGW_CXX=x86_64-w64-mingw32-clang++ && cmake --build build/clang64
 ```
 
-The resulting `o.exe` runs under Wine with those DLLs (plus fluidsynth's SDL3.dll) next to it.
+The resulting `o.exe` runs under Wine.
 
 ## Environment variables
 

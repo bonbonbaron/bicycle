@@ -1,6 +1,6 @@
 # Convenience wrapper around CMake (CMakeLists.txt is the build). `make` builds ./o, `make clean` cleans,
 # `make install` puts the headers in /usr/local/include/bicycle and o in /usr/local/bin.
-BUILD := build/cmake
+BUILD := build
 
 all:
 	cmake -S . -B $(BUILD)

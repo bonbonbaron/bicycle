@@ -1,15 +1,26 @@
 # bicycle: builds the engine executable `o` (o.exe on Windows) into the repository root, next to the games it
-# runs (`./o test` runs test/main.lua). Linux uses pkg-config (ncurses, luajit, fluidsynth); Windows uses vcpkg
-# (pdcurses, luajit, fluidsynth; see vcpkg.json and README.md).
-cmake_minimum_required( VERSION 3.20 )
-project( bicycle CXX )
+# runs (`./o test` runs test/main.lua). Needs only a C/C++ compiler, CMake and Ninja or Make:
+#   cmake -B build && cmake --build build
+# The first configure downloads and builds LuaJIT, fluidsynth and (on Windows) PDCurses, plus a General MIDI
+# SoundFont; see cmake/BicycleDeps.cmake. -DBICYCLE_USE_SYSTEM_DEPS=ON uses installed packages instead.
+cmake_minimum_required( VERSION 3.21 )
+cmake_policy( SET CMP0091 NEW )  # MSVC runtime chosen by CMAKE_MSVC_RUNTIME_LIBRARY
+set( CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL" )  # same runtime as the fetched static libraries
+project( bicycle C CXX )
 
 set( CMAKE_CXX_STANDARD 20 )
 set( CMAKE_CXX_STANDARD_REQUIRED ON )
 set( CMAKE_EXPORT_COMPILE_COMMANDS ON )
 if ( NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES )
-  set( CMAKE_BUILD_TYPE Debug )  # same as the Makefile's -g
+  set( CMAKE_BUILD_TYPE Debug )  # same as the old Makefile's -g
 endif()
+
+include( cmake/BicycleDeps.cmake )
+bicycle_curses()
+bicycle_luajit()
+bicycle_fluidsynth()
+bicycle_gm_soundfont()
+find_package( Threads REQUIRED )
 
 set( BICYCLE_SOURCES
   src/main.cpp src/bicycle.cpp src/trigLUT.cpp
@@ -22,11 +33,13 @@ set( BICYCLE_SOURCES
 
 add_executable( o ${BICYCLE_SOURCES} )
 target_include_directories( o PRIVATE include )
+target_link_libraries( o PRIVATE bicycle_curses bicycle_luajit bicycle_fluidsynth Threads::Threads )
 set_target_properties( o PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}
   RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_SOURCE_DIR}
   RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_SOURCE_DIR}
   RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO ${CMAKE_SOURCE_DIR}
+  RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL ${CMAKE_SOURCE_DIR}
   # Lua finds the engine's extern "C" functions through LuaJIT's FFI (ffi.C.*), which looks them up among the
   # executable's exported symbols: -rdynamic on Linux, an export table on Windows.
   ENABLE_EXPORTS ON
@@ -38,49 +51,15 @@ else()
   target_compile_options( o PRIVATE -Wall -Wno-switch )
 endif()
 if ( MINGW )
-  target_link_options( o PRIVATE -Wl,--export-all-symbols )
+  # Export the engine functions for the FFI, and link the compiler's runtime (libstdc++/libc++, winpthread)
+  # statically so o.exe runs without MinGW's DLLs on PATH.
+  target_link_options( o PRIVATE -Wl,--export-all-symbols -static )
 endif()
-
-find_package( Threads REQUIRED )
-target_link_libraries( o PRIVATE Threads::Threads )
-
-# Finds a library through pkg-config if there is one, else by header and library name (vcpkg, MSYS2, by hand).
-find_package( PkgConfig QUIET )
-function( bicycle_find_lib target pcName header libNames headerSuffixes )
-  if ( PKG_CONFIG_FOUND )
-    pkg_check_modules( ${target}_PC QUIET IMPORTED_TARGET ${pcName} )
-    if ( ${target}_PC_FOUND )
-      target_link_libraries( o PRIVATE PkgConfig::${target}_PC )
-      message( STATUS "bicycle: ${pcName} from pkg-config" )
-      return()
-    endif()
-  endif()
-  find_path( ${target}_INCLUDE_DIR ${header} PATH_SUFFIXES ${headerSuffixes} )
-  find_library( ${target}_LIBRARY NAMES ${libNames} )
-  if ( NOT ${target}_INCLUDE_DIR OR NOT ${target}_LIBRARY )
-    message( FATAL_ERROR "bicycle: couldn't find ${pcName} (${header}, ${libNames}). On Windows, use the vcpkg toolchain; see README.md." )
-  endif()
-  target_include_directories( o PRIVATE ${${target}_INCLUDE_DIR} )
-  target_link_libraries( o PRIVATE ${${target}_LIBRARY} )
-  message( STATUS "bicycle: ${pcName}: ${${target}_LIBRARY}" )
-endfunction()
 
 if ( WIN32 )
-  # PDCurses (Windows console port); vcpkg's is "pdcurses". MSYS2's mingw-w64 pdcurses package works too.
-  bicycle_find_lib( CURSES pdcurses curses.h "pdcurses;libpdcurses;pdcursesstatic" "pdcurses" )
-else()
-  bicycle_find_lib( CURSES ncurses curses.h "ncurses" "" )
+  # Fetched dependencies are static. Installed ones (BICYCLE_USE_SYSTEM_DEPS) may be DLLs: copy them next to o.exe.
+  add_custom_command( TARGET o POST_BUILD
+    COMMAND ${CMAKE_COMMAND} "-DDLLS=$<TARGET_RUNTIME_DLLS:o>" "-DDEST=$<TARGET_FILE_DIR:o>"
+            -P ${CMAKE_SOURCE_DIR}/cmake/CopyDlls.cmake
+    VERBATIM )
 endif()
-
-bicycle_find_lib( LUAJIT luajit lua.hpp "luajit-5.1;lua51;luajit" "luajit;luajit-2.1;luajit-2.0" )
-
-find_package( FluidSynth CONFIG QUIET )  # fluidsynth >= 2.4 (vcpkg) installs a CMake package
-if ( TARGET FluidSynth::libfluidsynth )
-  target_link_libraries( o PRIVATE FluidSynth::libfluidsynth )
-  message( STATUS "bicycle: fluidsynth from its CMake package" )
-else()
-  bicycle_find_lib( FLUIDSYNTH fluidsynth fluidsynth.h "fluidsynth;libfluidsynth;libfluidsynth-3" "" )
-endif()
-
-# On Windows, vcpkg's toolchain copies the dependency DLLs (lua51.dll, libfluidsynth-3.dll, pdcurses.dll...) next
-# to o.exe after each build (VCPKG_APPLOCAL_DEPS, on by default).
