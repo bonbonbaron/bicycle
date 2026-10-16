@@ -24,6 +24,10 @@ if ( NOT BICYCLE_RENDER MATCHES "^(ASCII|2D|3D)$" )
 endif()
 message( STATUS "bicycle: render mode ${BICYCLE_RENDER}" )
 
+# Release: zero file I/O at run time (see "Release builds" below and README).
+option( BICYCLE_RELEASE "Embed all assets and scripts in the executable; no file I/O at run time" OFF )
+option( BICYCLE_EMBED_GM_SF2 "Release: embed sf2/default-GM.sf2 (the GM fallback, ~30 MB) in the executable" OFF )
+
 include( cmake/BicycleDeps.cmake )
 if ( BICYCLE_RENDER STREQUAL "ASCII" )
   bicycle_curses()
@@ -90,6 +94,46 @@ foreach( game ${BICYCLE_GAMES} )
     COMMENT "Packing ${game}'s assets" VERBATIM )
   list( APPEND packs "${CMAKE_SOURCE_DIR}/${game}/assets.bpak" )
 endforeach()
+# Release (-DBICYCLE_RELEASE=ON): zero file I/O at run time. The first game in BICYCLE_GAMES is packed together
+# with the engine's Lua scripts (scripts/*.lua), UI fonts and, with BICYCLE_EMBED_GM_SF2, the General MIDI
+# SoundFont, and that pack is linked into the executable (src/data/EmbeddedPack.c). The engine's file readers,
+# Lua's file searchers/io.open/dofile and fluidsynth's file loader are compiled out or disabled; see README.
+if ( BICYCLE_RELEASE )
+  set( BICYCLE_RELEASE_ASSETS ON CACHE BOOL "" FORCE )
+  if ( MSVC )
+    message( FATAL_ERROR "BICYCLE_RELEASE embeds the pack with .incbin: build with GCC/clang/MinGW/llvm-mingw." )
+  endif()
+  list( GET BICYCLE_GAMES 0 BICYCLE_RELEASE_GAME )
+  set( game "${BICYCLE_RELEASE_GAME}" )
+  file( GLOB_RECURSE gameFiles CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/${game}/main.lua" "${CMAKE_SOURCE_DIR}/${game}/genome/*" )
+  file( GLOB engineScripts CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/scripts/*.lua" )
+  # A game's own fonts/ replace the engine's (PixelRenderer looks in <game>/fonts first).
+  file( GLOB fontFiles CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/${game}/fonts/*.ttf" )
+  if ( NOT fontFiles )
+    file( GLOB fontFiles CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/fonts/*.ttf" )
+  endif()
+  set( addArgs )
+  foreach( f ${engineScripts} ${fontFiles} )
+    get_filename_component( dir "${f}" DIRECTORY )
+    get_filename_component( dir "${dir}" NAME )
+    get_filename_component( name "${f}" NAME )
+    list( APPEND addArgs --add "${f}" "${dir}/${name}" )
+  endforeach()
+  set( extraFiles ${engineScripts} ${fontFiles} )
+  if ( BICYCLE_EMBED_GM_SF2 )
+    if ( NOT EXISTS "${CMAKE_SOURCE_DIR}/sf2/default-GM.sf2" )
+      message( FATAL_ERROR "BICYCLE_EMBED_GM_SF2: no sf2/default-GM.sf2" )
+    endif()
+    list( APPEND addArgs --add "${CMAKE_SOURCE_DIR}/sf2/default-GM.sf2" "sf2/default-GM.sf2" )
+    list( APPEND extraFiles "${CMAKE_SOURCE_DIR}/sf2/default-GM.sf2" )
+  endif()
+  set( BICYCLE_EMBEDDED_PACK "${CMAKE_BINARY_DIR}/embedded-${game}.bpak" )
+  add_custom_command( OUTPUT "${BICYCLE_EMBEDDED_PACK}"
+    COMMAND "${BICYCLE_PACKER}" "${CMAKE_SOURCE_DIR}/${game}" "${BICYCLE_EMBEDDED_PACK}" ${addArgs}
+    DEPENDS ${gameFiles} ${extraFiles} ${BICYCLE_PACKER_TARGET}
+    COMMENT "Packing ${game}, the engine scripts and fonts for embedding" VERBATIM )
+  add_custom_target( embedded-pack DEPENDS "${BICYCLE_EMBEDDED_PACK}" )
+endif()
 if ( BICYCLE_RELEASE_ASSETS )
   add_custom_target( assets ALL DEPENDS ${packs} )
 else()
@@ -125,12 +169,23 @@ elseif ( BICYCLE_RENDER STREQUAL "3D" )
   list( APPEND BICYCLE_SOURCES src/v/sdl/PixelRenderer.cpp src/v/sdl/UiFont.cpp src/v/sdl/SpriteAtlas.cpp src/v/3d/Renderer3D.cpp )
 endif()
 
+if ( BICYCLE_RELEASE )
+  list( APPEND BICYCLE_SOURCES src/data/EmbeddedPack.c )
+  set_source_files_properties( src/data/EmbeddedPack.c PROPERTIES
+    COMPILE_DEFINITIONS "BICYCLE_EMBEDDED_PACK=\"${BICYCLE_EMBEDDED_PACK}\""
+    OBJECT_DEPENDS "${BICYCLE_EMBEDDED_PACK}" )
+endif()
 add_executable( o ${BICYCLE_SOURCES} )
 target_include_directories( o PRIVATE include )
 target_link_libraries( o PRIVATE bicycle_data bicycle_luajit bicycle_fluidsynth Threads::Threads )
 target_compile_definitions( o PRIVATE BICYCLE_RENDER_${BICYCLE_RENDER} )
 if ( BICYCLE_RELEASE_ASSETS )
   target_compile_definitions( o PRIVATE BICYCLE_RELEASE_ASSETS )
+endif()
+if ( BICYCLE_RELEASE )
+  target_compile_definitions( o PRIVATE BICYCLE_RELEASE "BICYCLE_RELEASE_GAME=\"${BICYCLE_RELEASE_GAME}\"" )
+  target_compile_definitions( bicycle_data PRIVATE BICYCLE_RELEASE )
+  add_dependencies( o embedded-pack )
 endif()
 if ( BICYCLE_RENDER STREQUAL "ASCII" )
   target_link_libraries( o PRIVATE bicycle_curses )
@@ -171,4 +226,12 @@ if ( WIN32 )
     COMMAND ${CMAKE_COMMAND} "-DDLLS=$<TARGET_RUNTIME_DLLS:o>" "-DDEST=$<TARGET_FILE_DIR:o>"
             -P ${CMAKE_SOURCE_DIR}/cmake/CopyDlls.cmake
     VERBATIM )
+endif()
+
+# Release builds: run the game headless for 120 frames under strace and fail if it opens anything but OS files
+# (tests/release_io_test.sh lists what's allowed and why). Needs strace; 2D/3D also xvfb-run (or a DISPLAY).
+if ( BICYCLE_RELEASE AND NOT CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_NAME STREQUAL "Linux" )
+  string( TOLOWER "${BICYCLE_RENDER}" modeLower )
+  add_test( NAME release-zero-io COMMAND sh "${CMAKE_SOURCE_DIR}/tests/release_io_test.sh" "$<TARGET_FILE:o>" ${modeLower} 120 )
+  set_tests_properties( release-zero-io PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 300 )
 endif()

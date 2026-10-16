@@ -1,5 +1,7 @@
 // bicycle-pack: compresses a game's assets into <game>/assets.bpak (see include/data/Pack.h).
-//   bicycle-pack <game folder> [<output>]      default output: <game folder>/assets.bpak
+//   bicycle-pack <game folder> [<output>] [--add <file> <name>]...   default output: <game folder>/assets.bpak
+// --add packs an extra file under the given entry name (release builds add the engine's scripts/*.lua as
+// "scripts/<x>.lua", fonts/*.ttf as "fonts/<x>.ttf" and optionally the GM SoundFont as "sf2/default-GM.sf2").
 // Packs <game>/main.lua and everything under <game>/genome:
 //   .bimg          indexed: strip-coded (jollybean's strips) or deflated, whichever is smaller; true color: deflated
 //   models/*.obj   Edgebreaker-coded into models/<name>.bmesh (with its .mtl); the .obj/.mtl aren't packed
@@ -76,7 +78,21 @@ int main( int argc, char** argv ) {
     return 2;
   }
   const fs::path game = argv[1];
-  const fs::path out = argc > 2 ? fs::path( argv[2] ) : game / "assets.bpak";
+  fs::path out = game / "assets.bpak";
+  std::vector<std::pair<fs::path, std::string>> extras;
+  for ( int i = 2; i < argc; ++i ) {
+    if ( std::string( argv[i] ) == "--add" ) {
+      if ( i + 2 >= argc ) {
+        std::fprintf( stderr, "bicycle-pack: --add needs <file> <name>\n" );
+        return 2;
+      }
+      extras.emplace_back( argv[i + 1], argv[i + 2] );
+      i += 2;
+    }
+    else {
+      out = argv[i];
+    }
+  }
   std::vector<fs::path> files;
   if ( fs::exists( game / "main.lua" ) ) files.push_back( game / "main.lua" );
   if ( fs::exists( game / "genome" ) ) {
@@ -139,6 +155,13 @@ int main( int argc, char** argv ) {
     }
     const std::string raw = readFile( f );
     packed.push_back( ext == ".bimg" ? packImage( rel, raw ) : packGeneric( rel, raw ) );
+  }
+  for ( auto& [f, name] : extras ) {
+    if ( !fs::exists( f ) ) {
+      std::fprintf( stderr, "bicycle-pack: no %s\n", f.string().c_str() );
+      return 1;
+    }
+    packed.push_back( packGeneric( name, readFile( f ) ) );
   }
   // Write the pack.
   std::string header = "BPAK";

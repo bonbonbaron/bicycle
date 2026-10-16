@@ -25,7 +25,7 @@ UiFont::UiFont() : _impl( std::make_unique<Impl>() ) {}
 UiFont::~UiFont() = default;
 
 auto UiFont::load( const std::string& path ) -> bool {
-  auto bytes = assets::readFile( path, mem::GRAPHIC );
+  auto bytes = assets::read( path, mem::GRAPHIC );  // the embedded pack in release, the file in dev
   if ( !bytes ) return false;
   _bytes = std::move( *bytes );
   const auto* data = reinterpret_cast<const unsigned char*>( _bytes.data() );

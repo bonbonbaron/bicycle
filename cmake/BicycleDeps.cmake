@@ -112,6 +112,45 @@ function( bicycle_build_cmake_dep name src )
   file( TOUCH "${stamp}" )
 endfunction()
 
+# ncurses with terminfo compiled in and no database (release builds; see bicycle_curses).
+set( BICYCLE_TERMINFO_FALLBACKS "xterm-256color;xterm;screen-256color;screen;tmux-256color;tmux;linux;vt100;rxvt-unicode-256color;st-256color;alacritty;xterm-kitty;foot;wezterm"
+  CACHE STRING "Release: terminals whose terminfo is compiled into ncurses (those missing on the build machine are skipped)" )
+function( bicycle_ncurses_embedded_terminfo )
+  set( prefix "${BICYCLE_DEPS_DIR}/prefix-ncurses-embedded" )
+  find_program( BICYCLE_INFOCMP infocmp REQUIRED )
+  find_program( BICYCLE_TIC tic REQUIRED )  # ncurses' build compiles the fallbacks with the host's tic/infocmp
+  set( terms )
+  foreach( t ${BICYCLE_TERMINFO_FALLBACKS} )
+    execute_process( COMMAND "${BICYCLE_INFOCMP}" "${t}" RESULT_VARIABLE rc OUTPUT_QUIET ERROR_QUIET )
+    if ( rc EQUAL 0 )
+      list( APPEND terms "${t}" )
+    endif()
+  endforeach()
+  list( JOIN terms "," fallbacks )
+  set( stamp "${prefix}/.installed-${fallbacks}" )
+  if ( NOT EXISTS "${stamp}" )
+    bicycle_fetch( ncurses "${BICYCLE_NCURSES_URL}" ${BICYCLE_NCURSES_SHA256} src )
+    find_program( BICYCLE_MAKE NAMES gmake make REQUIRED )
+    set( bin "${BICYCLE_DEPS_DIR}/build/ncurses-embedded" )
+    file( REMOVE_RECURSE "${bin}" "${prefix}" )
+    file( MAKE_DIRECTORY "${bin}" )
+    message( STATUS "bicycle: building ncurses 6.5 with built-in terminfo for ${fallbacks}" )
+    bicycle_run( "configuring ncurses" "${CMAKE_COMMAND}" -E env "CC=${CMAKE_C_COMPILER}"
+      sh "${src}/configure" "--prefix=${prefix}" --without-shared --without-debug --without-cxx
+      --without-cxx-binding --without-ada --without-progs --without-tests --without-manpages --enable-overwrite
+      --disable-database --disable-home-terminfo --disable-termcap "--with-fallbacks=${fallbacks}"
+      "--with-tic-path=${BICYCLE_TIC}" "--with-infocmp-path=${BICYCLE_INFOCMP}"
+      WORKING_DIRECTORY "${bin}" )
+    bicycle_run( "building ncurses" "${BICYCLE_MAKE}" -C "${bin}" -j${BICYCLE_JOBS} libs )
+    bicycle_run( "installing ncurses" "${BICYCLE_MAKE}" -C "${bin}" install.libs install.includes )
+    file( TOUCH "${stamp}" )
+  endif()
+  add_library( bicycle_curses INTERFACE )
+  target_include_directories( bicycle_curses INTERFACE "${prefix}/include" )
+  target_link_libraries( bicycle_curses INTERFACE "${prefix}/lib/libncursesw.a" )
+  message( STATUS "bicycle: ncurses 6.5 with built-in terminfo (${fallbacks}); no terminfo files are read" )
+endfunction()
+
 # --- curses ------------------------------------------------------------------------------------------------------
 function( bicycle_curses )
   if ( WIN32 )
@@ -141,6 +180,12 @@ function( bicycle_curses )
     endif()
     target_link_libraries( bicycle_curses PUBLIC user32 advapi32 )
     message( STATUS "bicycle: PDCurses 3.9 (fetched, built in)" )
+    return()
+  endif()
+  # Release builds read no files, not even terminfo: ncurses is built from source without a terminfo database,
+  # with the common terminals' descriptions compiled in (--with-fallbacks, made from this machine's terminfo).
+  if ( BICYCLE_RELEASE )
+    bicycle_ncurses_embedded_terminfo()
     return()
   endif()
   # Elsewhere ncurses is practically always installed (and its terminfo database with it); use it.

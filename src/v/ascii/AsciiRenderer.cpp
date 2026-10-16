@@ -31,7 +31,11 @@ static auto W( WinHandle win ) -> WINDOW* {
 }
 
 void AsciiRenderer::init( const std::string& ) {
+#ifdef BICYCLE_RELEASE
+  setlocale( LC_CTYPE, "" );  // only the character set (UTF-8 for the box drawing): one locale file, not twelve
+#else
   setlocale( LC_ALL, "" );
+#endif
   initscr();
   start_color();
   cbreak();  // reads each character as they're typed instead of waiting for newline

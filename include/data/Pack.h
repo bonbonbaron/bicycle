@@ -7,6 +7,8 @@
 //   STORE    already-compressed data, e.g. meshes (.bmesh, Edgebreaker; src/data/Edgebreaker.cpp)
 // The engine reads assets through assets::read(), which looks in the pack first and falls back to loose files
 // (set BICYCLE_LOOSE_ASSETS=1 to ignore the pack).
+// BICYCLE_RELEASE builds instead mount a pack linked into the executable (src/data/EmbeddedPack.c) that also holds
+// the engine's scripts/*.lua and fonts/*.ttf, and never fall back to the disk: readFile() returns nullopt.
 //
 // .bpak layout (little endian):
 //   "BPAK" u32 version(1) u32 count

@@ -4,17 +4,26 @@
 #include "Bytes.h"
 #include <algorithm>
 #include <cstdlib>
+#ifndef BICYCLE_RELEASE
 #include <fstream>
+#endif
 #include <mutex>
 #include <sstream>
 #include <unordered_map>
+
+#ifdef BICYCLE_RELEASE
+// The pack linked into the executable (src/data/EmbeddedPack.c, .incbin): release builds never touch the disk.
+extern "C" const char bicycle_embedded_pack[];
+extern "C" const char bicycle_embedded_pack_end[];
+#endif
 
 namespace assets {
 
 namespace {
   struct Mount {
     std::string game;
-    mem::Blob bytes{ mem::Allocator<char>( mem::PERMANENT ) };  // the whole pack (packs are small; the GM SoundFont isn't in it)
+    mem::Blob bytes{ mem::Allocator<char>( mem::PERMANENT ) };  // dev: the whole pack, read from <game>/assets.bpak
+    std::string_view view;  // the mounted pack's bytes: `bytes`, or the executable's own copy in release
     std::unordered_map<std::string, Entry> entries;
     bool on{};
   };
@@ -26,14 +35,18 @@ namespace {
 
 
   // "./test/genome/x.lua" -> "genome/x.lua" if it's under the mounted game's folder.
+  // Release packs also hold engine files outside the game folder ("./scripts/Genome.lua" -> "scripts/Genome.lua",
+  // "./fonts/ui.ttf" -> "fonts/ui.ttf").
   auto packName( const std::string& path ) -> std::optional<std::string> {
     std::string p = path;
     for ( auto& c : p ) if ( c == '\\' ) c = '/';
     while ( p.rfind( "./", 0 ) == 0 ) p = p.substr( 2 );
     const auto& m = theMount();
     const std::string prefix = m.game + "/";
-    if ( p.rfind( prefix, 0 ) != 0 ) return std::nullopt;
-    p = p.substr( prefix.size() );
+    if ( p.rfind( prefix, 0 ) == 0 ) p = p.substr( prefix.size() );
+#ifndef BICYCLE_RELEASE
+    else return std::nullopt;
+#endif
     // Collapse "a/./b" and "a//b".
     std::string out;
     std::stringstream ss( p );
@@ -47,6 +60,10 @@ namespace {
 }
 
 auto readFile( const std::string& path, mem::PoolId pool ) -> std::optional<mem::Blob> {
+#ifdef BICYCLE_RELEASE
+  (void)path, (void)pool;
+  return std::nullopt;  // release engines never read files: everything is in the embedded pack
+#else
   std::ifstream f( path, std::ios::binary | std::ios::ate );
   if ( !f ) return std::nullopt;
   const auto size = static_cast<size_t>( f.tellg() );
@@ -54,6 +71,7 @@ auto readFile( const std::string& path, mem::PoolId pool ) -> std::optional<mem:
   mem::Blob out( size, '\0', mem::Allocator<char>( pool ) );
   if ( size && !f.read( out.data(), static_cast<std::streamsize>( size ) ) ) return std::nullopt;
   return out;
+#endif
 }
 
 auto inflateZlib( const uint8_t* src, size_t srcLen, size_t rawLen, mem::PoolId pool ) -> std::optional<mem::Blob> {
@@ -101,12 +119,24 @@ auto mount( const std::string& gameName ) -> bool {
   auto& m = theMount();
   m = Mount{};
   m.game = gameName;
+#ifdef BICYCLE_RELEASE
+  {
+    const std::string_view embedded( bicycle_embedded_pack, static_cast<size_t>( bicycle_embedded_pack_end - bicycle_embedded_pack ) );
+    std::vector<Entry> entries;
+    if ( !parsePack( embedded, entries ) ) return false;
+    m.view = embedded;
+    for ( auto& e : entries ) m.entries[e.name] = e;
+    m.on = true;
+    return true;
+  }
+#endif
   if ( const char* loose = std::getenv( "BICYCLE_LOOSE_ASSETS" ); loose && *loose && *loose != '0' ) return false;
   auto bytes = readFile( gameName + "/assets.bpak", mem::PERMANENT );
   if ( !bytes ) return false;
   std::vector<Entry> entries;
   if ( !parsePack( *bytes, entries ) ) return false;
   m.bytes = std::move( *bytes );
+  m.view = m.bytes;
   for ( auto& e : entries ) m.entries[e.name] = e;
   m.on = true;
   return true;
@@ -123,12 +153,16 @@ auto read( const std::string& path, mem::PoolId pool ) -> std::optional<mem::Blo
     if ( m.on ) {
       if ( auto name = packName( path ) ) {
         if ( auto it = m.entries.find( *name ); it != m.entries.end() ) {
-          return unpackEntry( m.bytes, it->second, pool );
+          return unpackEntry( m.view, it->second, pool );
         }
       }
     }
   }
+#ifdef BICYCLE_RELEASE
+  return std::nullopt;  // not in the embedded pack: there is no disk to fall back to
+#else
   return readFile( path, pool );
+#endif
 }
 
 auto list( const std::string& dir ) -> std::vector<std::string> {
@@ -158,8 +192,12 @@ auto exists( const std::string& path ) -> bool {
       if ( auto name = packName( path ); name && m.entries.count( *name ) ) return true;
     }
   }
+#ifdef BICYCLE_RELEASE
+  return false;
+#else
   std::ifstream f( path, std::ios::binary );
   return static_cast<bool>( f );
+#endif
 }
 
 }  // namespace assets

@@ -66,6 +66,13 @@ static int packSearcher( lua_State* L ) {
   }
   path += ".lua";
   auto code = assets::read( path, mem::TEXT );  // the pack (release) or the loose file (dev), into TEXT
+#ifdef BICYCLE_RELEASE
+  // Engine modules (require("Genome")) are packed as scripts/Genome.lua; dev finds them via package.path.
+  if ( !code ) {
+    path = "scripts/" + path;
+    code = assets::read( path, mem::TEXT );
+  }
+#endif
   if ( !code ) {
     lua_pushstring( L, ( "\n\tno '" + path + "' in the asset pack or folder" ).c_str() );
     return 1;
@@ -75,6 +82,53 @@ static int packSearcher( lua_State* L ) {
   }
   return 1;
 }
+
+#ifdef BICYCLE_RELEASE
+// Release: Lua can't touch files either. io.open/io.lines/io.popen/io.input/io.output with a file name, dofile,
+// loadfile, os.remove/rename/tmpname/execute and package.loadlib answer nil + an error message (so optional
+// things like BICYCLE_DEBUG_LOG quietly switch off), and require only knows preloaded and embedded modules.
+static int noFileIo( lua_State* L ) {
+  lua_pushnil( L );
+  lua_pushstring( L, "bicycle release build: no file I/O (everything is embedded)" );
+  return 2;
+}
+static int noFileIoError( lua_State* L ) {
+  return luaL_error( L, "bicycle release build: no file I/O (everything is embedded)" );
+}
+static void sandboxFileIo( lua_State* L ) {
+  struct Stub { const char* lib; const char* fn; lua_CFunction f; };
+  for ( const Stub& s : { Stub{ "io", "open", noFileIo }, Stub{ "io", "popen", noFileIo }, Stub{ "io", "lines", noFileIoError },
+                          Stub{ "io", "input", noFileIoError }, Stub{ "io", "output", noFileIoError },
+                          Stub{ "os", "remove", noFileIo }, Stub{ "os", "rename", noFileIo }, Stub{ "os", "tmpname", noFileIoError },
+                          Stub{ "os", "execute", noFileIo }, Stub{ "package", "loadlib", noFileIo },
+                          Stub{ nullptr, "dofile", noFileIoError }, Stub{ nullptr, "loadfile", noFileIo } } ) {
+    if ( s.lib ) {
+      lua_getglobal( L, s.lib );
+      lua_pushcfunction( L, s.f );
+      lua_setfield( L, -2, s.fn );
+      lua_pop( L, 1 );
+    }
+    else {
+      lua_pushcfunction( L, s.f );
+      lua_setglobal( L, s.fn );
+    }
+  }
+  // require: preload, then the embedded pack; Lua's and C's file searchers are dropped.
+  lua_getglobal( L, "package" );
+  lua_getfield( L, -1, "loaders" );
+  const int n = static_cast<int>( lua_objlen( L, -1 ) );
+  for ( int i = n; i >= 3; --i ) {
+    lua_pushnil( L );
+    lua_rawseti( L, -2, i );
+  }
+  lua_pop( L, 1 );
+  lua_pushstring( L, "" );
+  lua_setfield( L, -2, "path" );
+  lua_pushstring( L, "" );
+  lua_setfield( L, -2, "cpath" );
+  lua_pop( L, 1 );
+}
+#endif
 
 // The Lua heap lives in the TEXT pool. LuaJIT accepts a custom allocator only in GC64 builds (the default on
 // x64/arm64 since 2.1); a non-GC64 64-bit LuaJIT returns NULL from lua_newstate, so we fall back to its own
@@ -94,10 +148,7 @@ void Trigger::init( const std::string& gameName ) {
     L = luaL_newstate();
   }
   luaL_openlibs(L);
-  // Release builds read <game>/assets.bpak (see include/data/Pack.h); dev builds read loose files only.
-#ifdef BICYCLE_RELEASE_ASSETS
-  assets::mount( gameName );
-#endif
+  // The asset pack is mounted in bicycle::init, before the renderer (which loads fonts from it).
   lua_getglobal( L, "package" );
   lua_getfield( L, -1, "loaders" );  // LuaJIT (Lua 5.1) calls them loaders
   if ( lua_istable( L, -1 ) ) {
@@ -111,6 +162,9 @@ void Trigger::init( const std::string& gameName ) {
     lua_rawseti( L, -2, 2 );
   }
   lua_pop( L, 2 );
+#ifdef BICYCLE_RELEASE
+  sandboxFileIo( L );
+#endif
   _timer = &Timer::getInstance();
   _motion = &Kinematics::getInstance();
 
