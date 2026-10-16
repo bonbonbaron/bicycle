@@ -5,11 +5,11 @@ local beetle_sprite = {
   layers = {
     {
       colorpal = "beetle_sprite_body_palette",
-      pixelW = 12,
       animSrcRects = "beetle_sprite_body_anim_src_rects",
-      pixels = "beetle_sprite_body_pixels",
+      pixelH = 4,
       colormap = "beetle_sprite_body_colormap",
-      pixelH = 4
+      pixelW = 12,
+      pixels = "beetle_sprite_body_pixels"
     }
   }
 }

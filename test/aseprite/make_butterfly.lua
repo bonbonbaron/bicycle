@@ -1,7 +1,6 @@
 -- Authors test/aseprite/butterfly_sprite.aseprite: a 5x4 px butterfly with a 2-frame "flap" tag (the motion demos'
 -- orbiting and orbit-while-travelling critters). Run in batch mode:
 --   aseprite -b --script test/aseprite/make_butterfly.lua
--- Without Aseprite: lua5.4 tools/aseprite/headless.lua test/aseprite/make_butterfly.lua
 local here = debug.getinfo(1, "S").source:match("^@?(.*[/\\])") or "./"
 local PALETTE = {
   ["."] = Color{ r = 255, g = 255, b = 255, a = 0 },

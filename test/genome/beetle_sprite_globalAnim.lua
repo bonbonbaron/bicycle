@@ -1,7 +1,6 @@
 --auto-generated table by generate_table.lua
 
 local beetle_sprite_globalAnim = {
-  name = "beetle_sprite",
   strips = {
     crawl = {
       direction = 0,
@@ -13,10 +12,11 @@ local beetle_sprite_globalAnim = {
           duration = 0.2
         }
       },
-      numReps = 0,
-      numFrames = 2
+      numFrames = 2,
+      numReps = 0
     }
-  }
+  },
+  name = "beetle_sprite"
 }
 
 return beetle_sprite_globalAnim

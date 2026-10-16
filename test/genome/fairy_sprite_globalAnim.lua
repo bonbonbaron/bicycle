@@ -1,12 +1,9 @@
 --auto-generated table by generate_table.lua
 
 local fairy_sprite_globalAnim = {
-  name = "fairy_sprite",
   strips = {
     flutter = {
       direction = 0,
-      numFrames = 4,
-      numReps = 0,
       frames = {
         {
           duration = 0.09
@@ -20,9 +17,12 @@ local fairy_sprite_globalAnim = {
         {
           duration = 0.09
         }
-      }
+      },
+      numFrames = 4,
+      numReps = 0
     }
-  }
+  },
+  name = "fairy_sprite"
 }
 
 return fairy_sprite_globalAnim

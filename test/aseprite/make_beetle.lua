@@ -1,6 +1,5 @@
 -- Authors test/aseprite/beetle_sprite.aseprite: a 6x4 px beetle with a 2-frame "crawl" tag (the linear patrol demo).
 -- Run in batch mode:  aseprite -b --script test/aseprite/make_beetle.lua
--- Without Aseprite: lua5.4 tools/aseprite/headless.lua test/aseprite/make_beetle.lua
 local here = debug.getinfo(1, "S").source:match("^@?(.*[/\\])") or "./"
 local PALETTE = {
   ["."] = Color{ r = 255, g = 255, b = 255, a = 0 },

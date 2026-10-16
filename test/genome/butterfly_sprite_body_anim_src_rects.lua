@@ -1,6 +1,7 @@
 --auto-generated table by generate_table.lua
 
 local butterfly_sprite_body_anim_src_rects = {
+  refGlobalAnim = "butterfly_sprite",
   strips = {
     flap = {
       {
@@ -16,8 +17,7 @@ local butterfly_sprite_body_anim_src_rects = {
         w = 5
       }
     }
-  },
-  refGlobalAnim = "butterfly_sprite"
+  }
 }
 
 return butterfly_sprite_body_anim_src_rects

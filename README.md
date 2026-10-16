@@ -229,9 +229,6 @@ width, index 0 transparent) and `<layer>_tileset_pixels.bimg`, and records each 
 The pixel modes use the `.bimg` files when a sprite has them, and a genome can name different art for them with
 `sprite2d` (e.g. the horse keeps its hand-drawn ASCII `img` and uses `horse_sprite` in 2D/3D).
 
-Without Aseprite, `lua5.4 tools/aseprite/headless.lua test/aseprite/make_fairy.lua` runs a make script and the
-exporter against a headless shim of the Aseprite API. It writes the exports but not the `.aseprite` file.
-
 ### 3D art: Blender
 
 See `scripts/blender/README.md`: `make_scene.py` authors the test scene headless, `export.py` exports it

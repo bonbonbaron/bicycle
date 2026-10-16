@@ -2,7 +2,6 @@
 -- down, a sparkle twinkles around her). Run in batch mode:
 --   aseprite -b --script test/aseprite/make_fairy.lua
 --   aseprite -b test/aseprite/fairy_sprite.aseprite --script scripts/aseprite/sprite.lua
--- Without Aseprite: lua5.4 tools/aseprite/headless.lua test/aseprite/make_fairy.lua (writes the same genome files).
 local here = debug.getinfo(1, "S").source:match("^@?(.*[/\\])") or "./"
 
 local PALETTE = {
