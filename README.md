@@ -229,11 +229,55 @@ width, index 0 transparent) and `<layer>_tileset_pixels.bimg`, and records each 
 The pixel modes use the `.bimg` files when a sprite has them, and a genome can name different art for them with
 `sprite2d` (e.g. the horse keeps its hand-drawn ASCII `img` and uses `horse_sprite` in 2D/3D).
 
+Without Aseprite, `lua5.4 tools/aseprite/headless.lua test/aseprite/make_fairy.lua` runs a make script and the
+exporter against a headless shim of the Aseprite API. It writes the exports but not the `.aseprite` file.
+
 ### 3D art: Blender
 
 See `scripts/blender/README.md`: `make_scene.py` authors the test scene headless, `export.py` exports it
 (`blender -b scene.blend --python scripts/blender/export.py -- test/genome/models`), and the pack turns the OBJs
 into `.bmesh`. Genomes pick a mesh with `model = "<object>"`.
+
+## Motion and tracking (Kinematics)
+
+Kinematics drives four motion types (`include/m/Motion.h`; the math is in `include/c/MotionMath.h` and is
+unit-tested by `tests/motion_test.cpp`). Units are cells (a sprite pixel is 2x1 cells) and timing is framerate
+independent.
+
+* `linear`: walk waypoints at `speed` cells/s, looping or ping-ponging.
+* `orbital`: circle or ellipse around a point or an entity (`radius` in rows, so rx = 2*radius; `rx`/`ry` to override;
+  `speed` in deg/s; `phase`).
+* `combo`: an orbit whose center travels a waypoint path (`travel` cells/s).
+* `follow`: `pos += (target+offset-pos)*(1-exp(-rate*dt))`, with an optional dead zone, offset mirroring and idle
+  bob. `mode="hard"` (rate 0) snaps every frame.
+
+A genome declares one with the `motion` gene; motions start once every entity in the scene has spawned:
+
+```lua
+motion = { type = "follow", target = "hero", mode = "lerp", rate = 3.5, offset = {9, -5}, bob = 0.6, bobHz = 1.1 }
+motion = { type = "orbital", around = "villager", radius = 5, speed = 100 }
+motion = { type = "combo", radius = 3, speed = 200, travel = 5, path = {{0,0},{50,0}}, pingpong = true }
+motion = { type = "linear", speed = 6, path = {{0,0},{36,0},{36,3},{0,3}} }
+```
+
+At runtime, `track(follower, target, opts)` makes any entity a follower, with
+`opts = {mode="lerp"|"hard", rate=8, offset={x,y}, deadzone={x,y}, mirror, bob, bobHz}`. Calling it again switches
+mode and keeps the current position.
+
+### The camera is a kinematic body
+
+The camera has no follow logic of its own. It is an entity that Kinematics moves with the same follow motion, clamped
+to the world bounds. Its position is sub-cell (fixed point). `Camera.track` takes the same options as `track`:
+
+```lua
+Camera.track(hero.id, { mode = "lerp", rate = 5, deadzone = {10, 3} })  -- smooth
+Camera.track(hero.id, { mode = "hard" })                                -- snap to the hero each frame
+```
+
+The 2D renderer offsets each layer and sprite by the camera's fractional cell in screen pixels, so scrolling moves
+in 1-px steps even when a logical pixel is 16 px wide. The framebuffer is drawn on the CPU, so there are no seams,
+and the UI stays fixed. 3D reads the float position. ASCII snaps to whole cells. In the test game,
+`BICYCLE_CAMERA=hard` picks hard tracking.
 
 ## UI per render mode
 
@@ -279,8 +323,11 @@ still uses malloc. fluidsynth's cpp11 thread code is patched at fetch time (new 
 
 `BICYCLE_MAX_FRAMES=<n>`: quit after n frames (headless tests).
 
-`BICYCLE_LOOSE_ASSETS`, `BICYCLE_WINDOW_SIZE`, `BICYCLE_SCREENSHOT=<file.bmp>` (+ `BICYCLE_SCREENSHOT_FRAME`,
-default 90, and `BICYCLE_EXIT_AFTER_SCREENSHOT=1`) and `BICYCLE_GL_INFO` for the pixel modes;
+`BICYCLE_SCRIPTED_INPUT="w@20-34/2,d@36-170/2"`: press a key on frames 20..34, every 2nd frame (dev only).
+
+`BICYCLE_LOOSE_ASSETS`, `BICYCLE_WINDOW_SIZE`, `BICYCLE_SCREENSHOT=<file.bmp>` (`%d` = frame number; in
+ASCII the file is a text dump of the screen) (+ `BICYCLE_SCREENSHOT_FRAME`, default 90, or a list in
+`BICYCLE_SCREENSHOT_FRAMES=40,41,42`, and `BICYCLE_EXIT_AFTER_SCREENSHOT=1`) and `BICYCLE_GL_INFO` for the pixel modes;
 
 and `BICYCLE_AUDIO_DRIVER`, `BICYCLE_AUDIO_FILE`, `BICYCLE_GM_SF2`, `BICYCLE_MUTE_MUSIC`, `BICYCLE_PROFILE` (audio
 start-up timings) and `BICYCLE_DEBUG_LOG` (Lua `dbglog`): see `include/c/MidiPlayer.h` and `tools/audio/README.md`.
