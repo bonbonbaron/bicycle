@@ -351,7 +351,7 @@ function Animation:frameIdx()
 end
 
 -- Collision types games can refer to by name in coll genes; onCollision( other, type ) receives the number.
-local COLL = { hero = 1, solid = 2, coin = 3 }
+local COLL = { hero = 1, solid = 2, coin = 3, enemy = 4, npc = 5 }
 
 Gene["GeneLoader"] = {
   scene = function(entity, gene)
@@ -405,6 +405,7 @@ Gene["GeneLoader"] = {
     --TODO insert into world vel array
   end,
   name = 0,  -- do nothing, just allow it to exist
+  lines = 0,  -- what an NPC says when talked to (see TextBox.lua); read by its genome
   onInput = function(entity, gene) end,  -- do nothing, just allow it to exist
   onCollision = function(entity, gene) end,  -- do nothing, just allow it to exist
   onTimer = function(entity, gene) end,  -- do nothing, just allow it to exist

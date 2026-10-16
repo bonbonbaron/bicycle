@@ -66,9 +66,9 @@ ffi.cdef([[
       COUNT     // ← use this to know how many we defined (not a real key)
   } LogicalKey;
 
-  typedef struct { 
-    unsigned h;
+  typedef struct {  // same field order as include/m/Size.h
     unsigned w;
+    unsigned h;
     unsigned d;
   } Size;
 
@@ -245,6 +245,11 @@ ffi.cdef([[
   int loadSoundfont( const char* sfFilepath );
   bool selectProgram( const int chan, const int sfontId, const int bank, const int program );
   int getSfxChannel();
+  int addHudBar( const char* label, int max, int len, int x, int y );
+  void setHudBar( int id, int val );
+  void setTextBox( const char* text );
+  int getTextBoxWidth();
+  void setHidden( Entity entity, bool hidden );
 
   Entity pop() {
     auto& wm = WindowManager::getInstance();
