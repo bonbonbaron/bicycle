@@ -97,6 +97,7 @@ class Scene : public Window {
     void render() override;
     void onInput( Input& input ) override;
     void onTermResize() override;
+    auto panelKind() const -> gfx::Panel override { return gfx::Panel::Scene; }
     void setFocus( Entity entity );
 
     auto getBackLayer() -> std::optional<Layer>;

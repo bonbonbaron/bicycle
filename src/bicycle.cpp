@@ -305,6 +305,22 @@ namespace bicycle {
       }
     }
 
+    // Pixel modes: draw HUD bar id from images (asset paths of .bimg files; either may be null or "").
+    // The frame is drawn as is over the fill, which is cropped to the bar's fraction. ASCII ignores this.
+    bool setHudBarSprites( int id, const char* framePath, const char* fillPath ) {
+      auto scene = currScene();
+      Bar* bar = scene ? scene->getHudBar( id ) : nullptr;
+      if ( !bar ) return false;
+      auto load = []( const char* p ) -> std::shared_ptr<const BImg> {
+        if ( !p || !*p ) return nullptr;
+        auto img = loadBImg( p );
+        return img ? std::make_shared<const BImg>( std::move( *img ) ) : nullptr;
+      };
+      auto frame = load( framePath ), fill = load( fillPath );
+      bar->setSprites( frame, fill );
+      return ( !framePath || !*framePath || frame ) && ( !fillPath || !*fillPath || fill );
+    }
+
     void setHidden( Entity entity, bool hidden ) {
       auto scene = currScene();
       if ( scene ) {

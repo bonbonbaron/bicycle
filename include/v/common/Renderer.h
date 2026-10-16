@@ -8,11 +8,13 @@
 // Everything is laid out in character cells, the engine's world unit, in every mode: an image pixel is 2 cells
 // wide and 1 cell tall (the ASCII exporter's 2-chars-per-pixel scheme), so game logic, positions, collision and
 // camera are the same in all modes. Pixel modes just draw a cell as CELL_W x CELL_H screen pixels.
+#include <memory>
 #include <string>
 #include "m/Entity.h"
 
 struct Image;
 struct Box;
+struct BImg;
 
 namespace gfx {
 
@@ -24,6 +26,19 @@ enum Attr : int {
 };
 
 using WinHandle = void*;  // a curses WINDOW* in ASCII, a rectangle of cells elsewhere
+
+// What a window is, so each mode can decorate it its own way: ASCII draws a box of line characters around every
+// kind; the pixel modes draw dialogue and menu windows as graphical panels and leave a scene's view undecorated.
+enum class Panel { Scene, Dialogue, Menu };
+
+// A meter (health, stamina, progress). ASCII draws "HP [#######---] 7/10"; the pixel modes draw a graphical bar
+// (frame + fill colored by fraction), or the given sprites: frame drawn as is, fill cropped to the fraction.
+struct BarSpec {
+  std::string label;
+  int curr{}, max{1};
+  int len{};  // in cells (ASCII: segments)
+  std::shared_ptr<const BImg> frameSprite, fillSprite;
+};
 
 class Renderer {
   public:
@@ -51,7 +66,12 @@ class Renderer {
     virtual auto windowX( WinHandle win ) const -> int = 0;
     virtual auto windowY( WinHandle win ) const -> int = 0;
     virtual void clearWindow( WinHandle win ) = 0;
-    virtual void drawBorder( WinHandle win ) = 0;
+    virtual void drawBorder( WinHandle win ) = 0;  // the window's frame (see Panel)
+    virtual void setPanel( WinHandle win, Panel kind ) {}  // set before the window clears (Window::clear)
+    // UI widgets, each mode its own way (cells are the window's).
+    virtual void drawBar( WinHandle win, int y, int x, const BarSpec& bar ) = 0;
+    // A menu's selection marker in front of row y; ASCII prints the menu's cursor string.
+    virtual void drawMenuCursor( WinHandle win, int y, int x, const std::string& asciiCursor ) = 0;
     virtual void text( WinHandle win, int y, int x, const std::string& s ) = 0;
     virtual void setAttr( WinHandle win, int attr, bool on ) = 0;
     virtual void presentWindow( WinHandle win ) = 0;  // the window is done for this frame

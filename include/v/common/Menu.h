@@ -19,6 +19,7 @@ class Menu : public Window {
     void setOnCursorMovement( int cbRef );
     void addItem( const char* text );  // call after menu creation
     const unsigned getSelection() const;
+    auto panelKind() const -> gfx::Panel override { return gfx::Panel::Menu; }
 
     Menu( 
       const int x,

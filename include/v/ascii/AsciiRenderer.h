@@ -21,6 +21,8 @@ class AsciiRenderer : public Renderer {
     auto windowY( WinHandle win ) const -> int override;
     void clearWindow( WinHandle win ) override;
     void drawBorder( WinHandle win ) override;
+    void drawBar( WinHandle win, int y, int x, const BarSpec& bar ) override;
+    void drawMenuCursor( WinHandle win, int y, int x, const std::string& asciiCursor ) override;
     void text( WinHandle win, int y, int x, const std::string& s ) override;
     void setAttr( WinHandle win, int attr, bool on ) override;
     void presentWindow( WinHandle win ) override;

@@ -36,6 +36,7 @@ void Window::hide(){
 }
 
 void Window::clear() {
+  renderer().setPanel( _win, panelKind() );
   renderer().clearWindow( _win );
 }
 

@@ -9,6 +9,7 @@
 #include <memory>
 #include <vector>
 #include "data/Mem.h"
+#include "v/sdl/UiFont.h"
 
 struct SDL_Window;
 union SDL_Event;
@@ -39,6 +40,7 @@ class PixelRenderer : public Renderer {
     auto windowY( WinHandle win ) const -> int override;
     void clearWindow( WinHandle win ) override;
     void drawBorder( WinHandle win ) override;
+    void setPanel( WinHandle win, Panel kind ) override;
     void text( WinHandle win, int y, int x, const std::string& s ) override;
     void setAttr( WinHandle win, int attr, bool on ) override;
     void presentWindow( WinHandle ) override {}
@@ -52,7 +54,16 @@ class PixelRenderer : public Renderer {
       int x{}, y{}, w{}, h{};  // cells
       int attr{};
       bool cleared{};          // filled this frame (3D: scenes leave their background to the GL world)
+      Panel panel{Panel::Dialogue};
     };
+    // UI drawn per mode (src/v/2d, src/v/3d): a dialogue/menu window's panel (background, then frame on top of
+    // its contents), and the text-row highlight for menus. Scenes get no panel in the pixel modes.
+    virtual void drawPanelBody( const Win& w ) = 0;
+    virtual void drawPanelFrame( const Win& w ) = 0;
+    virtual void drawRowHighlight( const Win& w, int px, int py, int pw, int ph ) = 0;
+    // Window pixel rectangle helpers.
+    static auto winPx( const Win& w ) -> int { return w.x * CELL_W; }
+    static auto winPy( const Win& w ) -> int { return w.y * CELL_H; }
     // Window flags for SDL_CreateWindow (3D adds SDL_WINDOW_OPENGL) and hooks for the subclass.
     virtual auto windowFlags() const -> uint64_t;
     virtual void beforeWindowCreated() {}   // e.g. GL attributes
@@ -66,6 +77,21 @@ class PixelRenderer : public Renderer {
     // Pixel helpers, in screen pixels, clipped to win (null = whole screen). ARGB; alpha 0 skips.
     void fillRect( const Win* win, int x, int y, int w, int h, uint32_t argb );
     void glyph( const Win* win, int px, int py, unsigned char c, uint32_t fg, uint32_t bg );
+    // Alpha-blended drawing (straight alpha, so the 3D overlay composites right).
+    void clip( const Win* w, int& x0, int& y0, int& x1, int& y1 ) const;  // to w (null = screen) and the screen
+    void blendPixel( int x, int y, uint32_t argb, unsigned coverage = 255 );
+    void blendRect( const Win* win, int x, int y, int w, int h, uint32_t argb );
+    // Rounded rectangle, anti-aliased corners; thickness 0 = filled, else an outline that thick.
+    void roundRect( const Win* win, int x, int y, int w, int h, int radius, uint32_t argb, int thickness = 0 );
+    // Vertical gradient fill (top color to bottom color), clipped to a rounded rect.
+    void gradientRoundRect( const Win* win, int x, int y, int w, int h, int radius, uint32_t top, uint32_t bottom );
+    // An image scaled into a rectangle (nearest), its left `fraction` only (bar fills).
+    void drawSprite( const Win* win, const BImg& img, int x, int y, int w, int h, float fraction = 1.0f );
+    // TrueType UI text at pixel (px, top); returns the advance. Falls back to the bitmap font without fonts/ui.ttf.
+    auto drawString( const Win* win, int px, int top, const std::string& s, uint32_t argb, int sizePx, bool bold = false ) -> int;
+    auto measureString( const std::string& s, int sizePx, bool bold = false ) -> int;
+    static constexpr int UI_TEXT_PX = 15;  // body text size: fits a 16-pixel cell row
+    UiFont _font, _fontBold;
     void drawTextImage( const Win* win, const Image& img, int srcX, int srcY, int srcW, int srcH, int dstX, int dstY );
     void saveScreenshotIfDue();
     auto screenshotDue() const -> bool;  // this frame will be saved (BICYCLE_SCREENSHOT)

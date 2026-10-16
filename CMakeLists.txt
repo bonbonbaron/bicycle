@@ -116,9 +116,9 @@ set( BICYCLE_SOURCES
 if ( BICYCLE_RENDER STREQUAL "ASCII" )
   list( APPEND BICYCLE_SOURCES src/v/ascii/AsciiRenderer.cpp src/c/SshInputListener.cpp )
 elseif ( BICYCLE_RENDER STREQUAL "2D" )
-  list( APPEND BICYCLE_SOURCES src/v/sdl/PixelRenderer.cpp src/v/2d/Renderer2D.cpp )
+  list( APPEND BICYCLE_SOURCES src/v/sdl/PixelRenderer.cpp src/v/sdl/UiFont.cpp src/v/2d/Renderer2D.cpp )
 elseif ( BICYCLE_RENDER STREQUAL "3D" )
-  list( APPEND BICYCLE_SOURCES src/v/sdl/PixelRenderer.cpp src/v/3d/Renderer3D.cpp )
+  list( APPEND BICYCLE_SOURCES src/v/sdl/PixelRenderer.cpp src/v/sdl/UiFont.cpp src/v/3d/Renderer3D.cpp )
 endif()
 
 add_executable( o ${BICYCLE_SOURCES} )

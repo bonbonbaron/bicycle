@@ -19,6 +19,7 @@
 #include <SDL3/SDL.h>
 #include <array>
 #include <cmath>
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -240,6 +241,59 @@ class Renderer3D final : public PixelRenderer {
       for ( int y = y0; y < y1; ++y ) std::fill( _fb.begin() + y * _fbW + x0, _fb.begin() + y * _fbW + x1, 0u );
     }
 
+    // 3D UI: drawn into the overlay (composited over the GL world with alpha), soft and glossy to sit over a lit
+    // scene: translucent gradient panels with a soft shadow and a light rim, a pill-shaped bar with a gradient fill
+    // colored by fraction (green -> amber -> red) and a glass highlight.
+    void drawBar( WinHandle win, int y, int x, const BarSpec& bar ) override {
+      const Win* w = static_cast<Win*>( win );
+      if ( !w || ( w->attr & ATTR_INVISIBLE ) ) return;
+      int px = ( w->x + x ) * CELL_W + 6;
+      const int top = ( w->y + y ) * CELL_H + 2;
+      const float frac = std::clamp( static_cast<float>( bar.curr ) / std::max( 1, bar.max ), 0.0f, 1.0f );
+      const int bw = std::max( 24, bar.len * CELL_W * 2 ), bh = 16;
+      const int labelW = bar.label.empty() ? 0 : measureString( bar.label, UI_TEXT_PX, true ) + 10;
+      const std::string nums = std::to_string( bar.curr ) + "/" + std::to_string( bar.max );
+      const int numsW = measureString( nums, UI_TEXT_PX ) + 10;
+      // A translucent plate behind the whole meter so it reads over any background.
+      gradientRoundRect( nullptr, px - 6, top - 4, labelW + bw + numsW + 12, bh + 8, 8, 0xA0202838u, 0xA0101420u );
+      if ( !bar.label.empty() ) {
+        drawString( w, px, top, bar.label, 0xFFFFFFFFu, UI_TEXT_PX, true );
+        px += labelW;
+      }
+      if ( bar.frameSprite || bar.fillSprite ) {
+        if ( bar.fillSprite ) drawSprite( w, *bar.fillSprite, px, top, bw, bh, frac );
+        if ( bar.frameSprite ) drawSprite( w, *bar.frameSprite, px, top, bw, bh );
+      }
+      else {
+        const float r = bh / 2.0f;
+        gradientRoundRect( w, px, top, bw, bh, bh / 2, 0xFF0A0C12u, 0xFF262A36u );  // recessed track
+        const uint32_t c0 = frac > 0.5f ? 0xFF7CF07Cu : frac > 0.25f ? 0xFFFFD860u : 0xFFFF7A60u;
+        const uint32_t c1 = frac > 0.5f ? 0xFF1E8E3Au : frac > 0.25f ? 0xFFC07810u : 0xFFB01E1Eu;
+        const int fw = bar.curr > 0 ? std::max( bh, static_cast<int>( bw * frac + 0.5f ) ) : 0;
+        if ( fw > 0 ) {
+          gradientRoundRect( w, px + 1, top + 1, fw - 2, bh - 2, static_cast<int>( r ) - 1, c0, c1 );
+          gradientRoundRect( w, px + 4, top + 2, std::max( 0, fw - 8 ), bh / 2 - 2, bh / 4, 0x90FFFFFFu, 0x10FFFFFFu );  // glass
+        }
+        roundRect( w, px, top, bw, bh, bh / 2, 0xFFD8E4FFu, 1 );  // rim
+      }
+      px += bw + 10;
+      drawString( w, px, top, nums, 0xFFFFFFFFu, UI_TEXT_PX );
+    }
+
+    void drawMenuCursor( WinHandle win, int y, int x, const std::string& ) override {
+      const Win* w = static_cast<Win*>( win );
+      if ( !w || ( w->attr & ATTR_INVISIBLE ) ) return;
+      // An anti-aliased glowing diamond.
+      const float cx = ( w->x + x ) * CELL_W + 10.5f, cy = ( w->y + y ) * CELL_H + 8.0f;
+      for ( int yy = static_cast<int>( cy ) - 9; yy <= static_cast<int>( cy ) + 9; ++yy ) {
+        for ( int xx = static_cast<int>( cx ) - 9; xx <= static_cast<int>( cx ) + 9; ++xx ) {
+          const float d = std::abs( xx + 0.5f - cx ) + std::abs( yy + 0.5f - cy );
+          if ( d < 9 ) blendPixel( xx, yy, 0xFF80B0FFu, static_cast<unsigned>( std::clamp( ( 9 - d ) * 18.0f, 0.0f, 90.0f ) ) );
+          if ( d < 5.5f ) blendPixel( xx, yy, 0xFFF0F6FFu, static_cast<unsigned>( std::clamp( ( 5.5f - d ) * 255.0f, 0.0f, 255.0f ) ) );
+        }
+      }
+    }
+
     // Backgrounds are 2D art; the 3D world (sky color, ground and scenery models) replaces them.
     void drawLayer( WinHandle, const Image&, int, int, bool, int, int ) override {}
 
@@ -271,6 +325,22 @@ class Renderer3D final : public PixelRenderer {
     }
 
   protected:
+    void drawPanelBody( const Win& w ) override {
+      const int x = winPx( w ), y = winPy( w ), pw = w.w * CELL_W, ph = w.h * CELL_H;
+      for ( int i = 8; i >= 1; i -= 1 ) {  // soft shadow
+        roundRect( nullptr, x - i + 6, y - i + 8, pw + 2 * i, ph + 2 * i, 14 + i, 0x0C000000u );
+      }
+      gradientRoundRect( nullptr, x, y, pw, ph, 12, 0xE6303C5Cu, 0xE6141A2Cu );
+    }
+    void drawPanelFrame( const Win& w ) override {
+      const int x = winPx( w ), y = winPy( w ), pw = w.w * CELL_W, ph = w.h * CELL_H;
+      roundRect( nullptr, x, y, pw, ph, 12, 0xFFA8C0F0u, 2 );
+      roundRect( nullptr, x + 3, y + 3, pw - 6, ph - 6, 9, 0x40FFFFFFu, 1 );
+    }
+    void drawRowHighlight( const Win& w, int px, int py, int pw, int ph ) override {
+      gradientRoundRect( &w, px - 2, py, pw + 4, ph, ph / 2, 0xC05A86E0u, 0xC0304E9Au );
+    }
+
     auto windowFlags() const -> uint64_t override { return SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE; }
     auto frameClearColor() const -> uint32_t override { return 0u; }  // overlay: transparent where nothing's drawn
 

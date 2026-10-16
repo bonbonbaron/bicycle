@@ -256,6 +256,7 @@ ffi.cdef([[
   int getSfxChannel();
   int addHudBar( const char* label, int max, int len, int x, int y );
   void setHudBar( int id, int val );
+  bool setHudBarSprites( int id, const char* framePath, const char* fillPath );
   void setHidden( Entity entity, bool hidden );
 
   Entity pop() {

@@ -21,7 +21,8 @@ class Window {
     void clear();
     virtual void render() = 0;
     virtual void onInput( Input& input ) = 0;
-    virtual void onTermResize() {}  // the screen changed size (gfx::cols() and gfx::lines() are already updated)
+    virtual void onTermResize() {}
+    virtual auto panelKind() const -> gfx::Panel { return gfx::Panel::Dialogue; }  // the screen changed size (gfx::cols() and gfx::lines() are already updated)
     void repaint();
 
     auto getX() const -> int;

@@ -166,6 +166,16 @@ See `scripts/blender/README.md`: `make_scene.py` authors the test scene headless
 (`blender -b scene.blend --python scripts/blender/export.py -- test/genome/models`), and the pack turns the OBJs
 into `.bmesh`. Genomes pick a mesh with `model = "<object>"`.
 
+## UI per render mode
+
+`src/v/common` (Window, Dialogue, TextMenu, Bar) lays UI out in cells and calls the renderer; each mode draws it
+its own way behind `gfx::Renderer` (`drawBar`, `drawMenuCursor`, `setPanel` + `clearWindow`/`drawBorder`). ASCII
+keeps curses boxes and the text bar. 2D (`src/v/2d`) draws flat pixel-art panels and a segmented bar; 3D
+(`src/v/3d`) draws translucent gradient panels and a glossy pill bar in the overlay. Both color the bar by
+fraction (green, then yellow/amber, then red), take optional bar sprites (`hp:sprites( frame, fill )` in
+`scripts/Hud.lua`), and render text with TrueType (`fonts/ui.ttf`, stb_truetype). In the pixel modes, ASCII-art
+images that have no pixel version are drawn as solid cell blocks, not characters.
+
 ## Memory pools
 
 All engine memory comes from one arena cut into bump-allocated pools (`include/data/Mem.h`, after jollybean's

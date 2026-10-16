@@ -22,7 +22,7 @@ void TextMenu::render() {
     mvprint( currRow++, WINDOW_PADDING/2 + CURSOR_WIDTH, _items.at( dispIdx ) );  
     unsetAttr( gfx::ATTR_STANDOUT );
   }
-  mvprint( _cursor.currItemIdx - _firstDispIdx + WINDOW_PADDING / 2, WINDOW_PADDING / 2, _cursor.img.string  );
+  gfx::renderer().drawMenuCursor( getHandle(), _cursor.currItemIdx - _firstDispIdx + WINDOW_PADDING / 2, WINDOW_PADDING / 2, _cursor.img.string );
 }
 
 // TODO I think we ought to split cursor logic from rendering logic

@@ -126,6 +126,19 @@ void AsciiRenderer::drawBorder( WinHandle win ) {
   ::box( W( win ), 0, 0 );
 }
 
+// ASCII's bar is text: HP [#######---] 7/10 (any value above 0 shows at least one segment).
+void AsciiRenderer::drawBar( WinHandle win, int y, int x, const BarSpec& bar ) {
+  const int filled = ( bar.curr * bar.len + bar.max - 1 ) / bar.max;
+  std::string s = bar.label.empty() ? "[" : bar.label + " [";
+  s += std::string( filled, '#' ) + std::string( bar.len - filled, '-' ) + "] ";
+  s += std::to_string( bar.curr ) + "/" + std::to_string( bar.max );
+  text( win, y, x, s );
+}
+
+void AsciiRenderer::drawMenuCursor( WinHandle win, int y, int x, const std::string& asciiCursor ) {
+  text( win, y, x, asciiCursor );
+}
+
 void AsciiRenderer::text( WinHandle win, int y, int x, const std::string& s ) {
   mvwprintw( W( win ), y, x, "%s", s.c_str() );
 }
