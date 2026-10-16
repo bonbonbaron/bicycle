@@ -8,8 +8,11 @@
 #                                 own space (origin at the feet, facing +X) for the game to place with a model gene;
 #                                 everything else ("static") has its world transform baked in.
 # bicycle-pack (the 'assets' build target) then turns each .obj into an Edgebreaker-compressed .bmesh.
-# Armatures: modifiers are applied, so a rigged mesh exports in its current pose; skeletal animation isn't
-# exported yet (see scripts/blender/README.md).
+#   <object>.bskin                (rigged meshes: an Armature modifier) the skeleton (hierarchy, inverse bind
+#                                 matrices), per-vertex joints/weights (the 4 largest, per OBJ vertex) and every
+#                                 action's keyframes, sampled per frame (include/data/Skin.h; float, uncompressed:
+#                                 dev builds read it as is, bicycle-pack quantizes and deflates it).
+# Rigged meshes are exported in their rest (bind) pose.
 import bpy
 import bmesh
 import os
@@ -55,8 +58,94 @@ def material_info(mat):
     return rgba, image
 
 
+C = None  # Z up -> Y up, as a 4x4 (set below, once mathutils is imported)
+
+
+def rig_of(obj):
+    m = next((m for m in obj.modifiers if m.type == "ARMATURE" and m.object), None)
+    return m.object if m else None
+
+
+def ordered_bones(arm):
+    """Bones with every parent before its children."""
+    out = []
+    def visit(b):
+        out.append(b)
+        for c in b.children:
+            visit(c)
+    for b in arm.data.bones:
+        if b.parent is None:
+            visit(b)
+    return out
+
+
+def flat(m):  # column major
+    return [m[r][c] for c in range(4) for r in range(4)]
+
+
+def export_skin(obj, rig, path):
+    from mathutils import Matrix
+    bones = ordered_bones(rig)
+    index = {b.name: i for i, b in enumerate(bones)}
+    mesh_from_rig = obj.matrix_world.inverted() @ rig.matrix_world
+    Ci = C.inverted()
+    def to_mesh_yup(m):
+        return C @ mesh_from_rig @ m @ Ci
+    out = bytearray(b"BSKN")
+    actions = [a for a in bpy.data.actions if any(fc.data_path.startswith("pose.bones") for fc in a.fcurves)]
+    nverts = len(obj.data.vertices)
+    out += struct.pack("<BBHHI", 1, 2, len(bones), len(actions), nverts)
+    for b in bones:
+        name = b.name.encode()
+        out += struct.pack("<B", len(name)) + name
+        out += struct.pack("<h", index[b.parent.name] if b.parent else -1)
+        out += struct.pack("<16f", *flat(to_mesh_yup(b.matrix_local).inverted()))
+    # Per vertex: the 4 strongest bone influences, normalized, as u8 summing to 255.
+    groups = {g.index: g.name for g in obj.vertex_groups}
+    for v in obj.data.vertices:
+        inf = sorted(((g.weight, index[groups[g.group]]) for g in v.groups
+                      if groups.get(g.group) in index and g.weight > 0), reverse=True)[:4]
+        if not inf:
+            inf = [(1.0, 0)]
+        total = sum(w for w, _ in inf)
+        q = [int(round(255 * w / total)) for w, _ in inf]
+        q[0] += 255 - sum(q)
+        joints = [j for _, j in inf] + [0] * (4 - len(inf))
+        q += [0] * (4 - len(q))
+        out += struct.pack("<4B4B", *joints, *q)
+    scene = bpy.context.scene
+    saved = rig.animation_data.action if rig.animation_data else None
+    rig.data.pose_position = "POSE"
+    for act in actions:
+        rig.animation_data.action = act
+        start, end = (int(x) for x in act.frame_range)
+        frames = int(act.get("bicycle_frames", end - start))  # last key repeats the first for looping
+        fps = scene.render.fps / scene.render.fps_base
+        name = act.name.encode()
+        out += struct.pack("<B", len(name)) + name + struct.pack("<fH", fps, frames)
+        for f in range(frames):
+            scene.frame_set(start + f)
+            glob = [to_mesh_yup(rig.pose.bones[b.name].matrix) for b in bones]
+            for i, b in enumerate(bones):
+                local = glob[index[b.parent.name]].inverted() @ glob[i] if b.parent else glob[i]
+                t, q, _ = local.decompose()
+                out += struct.pack("<3f4f", t.x, t.y, t.z, q.x, q.y, q.z, q.w)
+    if saved:
+        rig.animation_data.action = saved
+    rig.data.pose_position = "REST"
+    with open(path, "wb") as f:
+        f.write(bytes(out))
+    print("bicycle export: %s: %d joints, %d actions (%s), %d skinned verts" % (
+        os.path.basename(path), len(bones), len(actions), ", ".join(a.name for a in actions), nverts))
+
+
 def export_object(obj, depsgraph):
     role = obj.get("bicycle_role", "static")
+    rig = rig_of(obj)
+    if rig:
+        rig.data.pose_position = "REST"  # export the mesh in its bind pose
+        bpy.context.view_layer.update()
+        depsgraph = bpy.context.evaluated_depsgraph_get()
     ev = obj.evaluated_get(depsgraph)
     mesh = ev.to_mesh()
     bm = bmesh.new()
@@ -108,12 +197,14 @@ def export_object(obj, depsgraph):
         f.write("\n".join(mtl))
     print("bicycle export: %s (%s): %d verts, %d tris, %d materials, %d textures" % (
         name, role, len(mesh.vertices), len(mesh.polygons), len(by_mat), textures))
-    if any(m.type == "ARMATURE" for m in obj.modifiers):
-        print("bicycle export: %s is rigged; exported in its current pose (skeletal animation isn't exported)" % name)
     ev.to_mesh_clear()
+    if rig:
+        export_skin(obj, rig, os.path.join(OUT, name + ".bskin"))
     return {"name": name, "role": role}
 
 
+from mathutils import Matrix  # noqa: E402
+C = Matrix(((1, 0, 0, 0), (0, 0, 1, 0), (0, -1, 0, 0), (0, 0, 0, 1)))
 depsgraph = bpy.context.evaluated_depsgraph_get()
 objects = [export_object(o, depsgraph) for o in bpy.context.scene.objects if o.type == "MESH"]
 with open(os.path.join(OUT, "scene3d.lua"), "w") as f:

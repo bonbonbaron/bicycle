@@ -27,11 +27,22 @@ Everything runs headless with Blender 4.x (tested with 4.5.9 LTS), from the repo
 4. In the game: the 3D build (`-DBICYCLE_RENDER=3D`) loads `scene3d.lua`'s static objects as scenery, and any
    genome with `model = "<object>"` (e.g. `test/genome/hero.lua`) is drawn as that mesh.
 
+## Skeletal animation
+
+`make_scene.py` builds `pilgrim3d` as a rigged character: armature `pilgrim3d_rig` (hips, spine, head, leg_L/R,
+arm_L/R), with the robe/legs/arms/head weighted to their bones, and two actions authored as keyframes in batch
+mode: `walk` (24 frames) and `idle` (48 frames). `export.py` writes the mesh in its rest pose plus
+`<object>.bskin`: the joint hierarchy, inverse bind matrices, each OBJ vertex's 4 strongest joints/weights
+(normalised to sum 255), and per-action keyframes (translation + quaternion per joint per frame).
+
+The packer folds the weights into the `.bmesh` (an 8th stream that follows Edgebreaker's vertex reordering) and
+stores a quantized `.bskin` (16-bit translations, smallest-three quaternions, delta + zigzag varints, then deflate:
+16.5 KB -> 1 KB for the pilgrim). The 3D renderer skins on the GPU (`uBones[32]`); `anim:set("walk_left")` picks the
+action from the tag's prefix (`walk`, `idle`), and a walking model that stands still for ~0.3 s plays `idle`.
+`BICYCLE_MODEL_ACTION=<action>` pins every rigged model to one action (screenshots).
+
 ## Not done yet
 
-* Skeletal animation. A rigged mesh exports in its current pose (the exporter prints a note). Exporting it would
-  mean writing per-vertex bone indices/weights plus per-bone keyframes from the armature's actions, a skinning
-  vertex shader, and an Animator hook that picks the action from the 2D strip name (walk_left, ...). For now the
-  engine turns a model toward its direction of travel and bobs it while it walks.
+* Blending between actions (switches are immediate), more than 32 joints, and more than 4 weights per vertex.
 * Per-object transforms for static objects (they're baked), vertex colors, multiple UV layers, and more than
   256 materials per mesh.
