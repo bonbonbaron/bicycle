@@ -54,6 +54,7 @@ ffi.cdef([[
   void view3dFog( float r, float g, float b, float nearZ, float farZ );
   void view3dLight( float dx, float dy, float dz, float r, float g, float b, float ambient, bool shadows );
   void view3dBillboardPixel( float meters );
+  void view3dCrosshair( bool on );
   void playSoundFXAt( int key, int vel, float x, float y, float z, float ref, float maxDist );
 ]])
 local C = ffi.C
@@ -209,6 +210,7 @@ function W.View.light( dir, color, ambient, shadows )
   C.view3dLight( dir[1], dir[2], dir[3], color[1], color[2], color[3], ambient or 0.38, shadows ~= false )
 end
 function W.View.billboardPixel( m ) C.view3dBillboardPixel( m ) end
+function W.View.crosshair( on ) C.view3dCrosshair( on ) end
 
 -- Positional sound: a SoundFont SFX key at a point, panned/attenuated for the camera.
 function W.sound( key, vel, x, y, z, ref, maxDist ) C.playSoundFXAt( key, vel or 100, x, y, z, ref or 3, maxDist or 60 ) end

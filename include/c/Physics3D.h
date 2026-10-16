@@ -91,6 +91,7 @@ struct View {
   float ambient{ 0.38f };
   bool shadows{ true };
   float billboardPixel{ 1.f / 16 };  // meters per sprite pixel (billboards)
+  bool crosshair{};                  // a center-screen crosshair (first person)
 };
 
 // Overlap reports (begin/end) for entities with a collType; the engine routes them to Lua's onCollision.
