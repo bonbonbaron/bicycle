@@ -5,6 +5,7 @@
 #include "v/common/Image.h"
 #include "v/common/ColorPalette.h"
 #include "c/Input.h"
+#include "c/InputState.h"
 #include "c/Trigger.h"
 #include "m/World.h"
 #include "m/Box.h"
@@ -148,16 +149,93 @@ void PixelRenderer::handleEvent( const SDL_Event& e ) {
       }
       break;
     }
+    case SDL_EVENT_MOUSE_MOTION:
+      inputState().mouseDx += e.motion.xrel;
+      inputState().mouseDy += e.motion.yrel;
+      break;
+    case SDL_EVENT_MOUSE_BUTTON_DOWN:
+    case SDL_EVENT_MOUSE_BUTTON_UP: {
+      const int b = e.button.button == SDL_BUTTON_LEFT ? 0 : e.button.button == SDL_BUTTON_RIGHT ? 1 : e.button.button == SDL_BUTTON_MIDDLE ? 2 : -1;
+      if ( b < 0 ) break;
+      if ( e.type == SDL_EVENT_MOUSE_BUTTON_DOWN ) {
+        inputState().mouseButtons |= 1u << b;
+        inputState().mousePressed |= 1u << b;
+      }
+      else inputState().mouseButtons &= ~( 1u << b );
+      break;
+    }
+    case SDL_EVENT_MOUSE_WHEEL:
+      inputState().wheel += e.wheel.y;
+      break;
+    case SDL_EVENT_GAMEPAD_ADDED:
+      if ( !_pad ) _pad = SDL_OpenGamepad( e.gdevice.which );
+      break;
+    case SDL_EVENT_GAMEPAD_REMOVED:
+      if ( _pad && SDL_GetGamepadID( static_cast<SDL_Gamepad*>( _pad ) ) == e.gdevice.which ) {
+        SDL_CloseGamepad( static_cast<SDL_Gamepad*>( _pad ) );
+        _pad = nullptr;
+      }
+      break;
+    case SDL_EVENT_WINDOW_FOCUS_LOST:
+      if ( inputState().mouseCaptured ) setMouseCapture( false );
+      break;
     default:
       break;
   }
 }
 
+void PixelRenderer::setMouseCapture( bool on ) {
+  if ( _window ) SDL_SetWindowRelativeMouseMode( _window, on );
+  inputState().mouseCaptured = on;
+}
+
+void PixelRenderer::enableGamepad() {
+  if ( _padInit ) return;
+  _padInit = SDL_InitSubSystem( SDL_INIT_GAMEPAD );
+}
+
 void PixelRenderer::pollInput() {
+  auto& in = inputState();
+  const Bitset before = in.held;
+  const unsigned padBefore = in.padButtons;
+  in.beginFrame();
   SDL_Event e;
   while ( SDL_PollEvent( &e ) ) {
     handleEvent( e );
   }
+  // Held keys straight from SDL's keyboard state (the events above only report presses).
+  int n{};
+  const bool* ks = SDL_GetKeyboardState( &n );
+  in.held.reset();
+  auto hold = [&]( SDL_Scancode sc, LogicalKey k ) { if ( sc < n && ks[sc] ) in.held.set( static_cast<unsigned>( k ) ); };
+  for ( int i = 0; i < 26; ++i ) hold( static_cast<SDL_Scancode>( SDL_SCANCODE_A + i ), static_cast<LogicalKey>( static_cast<int>( LogicalKey::A ) + i ) );
+  for ( int i = 0; i < 9; ++i ) hold( static_cast<SDL_Scancode>( SDL_SCANCODE_1 + i ), static_cast<LogicalKey>( static_cast<int>( LogicalKey::Key1 ) + i ) );
+  hold( SDL_SCANCODE_0, LogicalKey::Key0 );
+  hold( SDL_SCANCODE_SPACE, LogicalKey::Space );
+  hold( SDL_SCANCODE_RETURN, LogicalKey::Enter );
+  hold( SDL_SCANCODE_ESCAPE, LogicalKey::Escape );
+  hold( SDL_SCANCODE_TAB, LogicalKey::Tab );
+  hold( SDL_SCANCODE_LSHIFT, LogicalKey::LeftShift );
+  hold( SDL_SCANCODE_RSHIFT, LogicalKey::RightShift );
+  hold( SDL_SCANCODE_LCTRL, LogicalKey::LeftCtrl );
+  hold( SDL_SCANCODE_RCTRL, LogicalKey::RightCtrl );
+  hold( SDL_SCANCODE_UP, LogicalKey::W );  // arrows = WASD, as for presses
+  hold( SDL_SCANCODE_LEFT, LogicalKey::A );
+  hold( SDL_SCANCODE_DOWN, LogicalKey::S );
+  hold( SDL_SCANCODE_RIGHT, LogicalKey::D );
+  in.pressed = in.held & ~before;
+  in.padConnected = _pad != nullptr;
+  in.padButtons = 0;
+  if ( auto* pad = static_cast<SDL_Gamepad*>( _pad ) ) {
+    auto axis = [&]( SDL_GamepadAxis a ) { return SDL_GetGamepadAxis( pad, a ) / 32767.0f; };
+    in.axes = { axis( SDL_GAMEPAD_AXIS_LEFTX ), axis( SDL_GAMEPAD_AXIS_LEFTY ), axis( SDL_GAMEPAD_AXIS_RIGHTX ),
+                axis( SDL_GAMEPAD_AXIS_RIGHTY ), axis( SDL_GAMEPAD_AXIS_LEFT_TRIGGER ), axis( SDL_GAMEPAD_AXIS_RIGHT_TRIGGER ) };
+    for ( int b = 0; b < SDL_GAMEPAD_BUTTON_COUNT && b < 32; ++b ) {
+      if ( SDL_GetGamepadButton( pad, static_cast<SDL_GamepadButton>( b ) ) ) in.padButtons |= 1u << b;
+    }
+  }
+  else in.axes = {};
+  in.padPressed = in.padButtons & ~padBefore;
 }
 
 // --- windows --------------------------------------------------------------------------------------------------------

@@ -17,6 +17,7 @@
 #include <cctype>
 #include <cstdio>
 #include "c/Input.h"
+#include "c/InputState.h"
 
 namespace bicycle {
 
@@ -507,10 +508,35 @@ namespace bicycle {
       }
     }
 
+    // BICYCLE_SCRIPTED_MOUSE="12:0@30-60;L@80-80;R@90-95": mouse motion (dx:dy pixels per frame) or a held button
+    // (L/R/M) over a frame range, into the polled input state (include/c/InputState.h), like a real mouse.
+    // Scripted key presses above also count as held keys on their frames.
+    struct MouseScript { float dx, dy; int button; long from, to; };
+    std::vector<MouseScript> mouseScript;
+    if ( const char* s = std::getenv( "BICYCLE_SCRIPTED_MOUSE" ) ) {
+      std::stringstream ss( s );
+      std::string item;
+      while ( std::getline( ss, item, ';' ) ) {
+        MouseScript m{};
+        char b{};
+        if ( std::sscanf( item.c_str(), "%f:%f@%ld-%ld", &m.dx, &m.dy, &m.from, &m.to ) == 4 ) { m.button = -1; mouseScript.push_back( m ); }
+        else if ( std::sscanf( item.c_str(), "%c@%ld-%ld", &b, &m.from, &m.to ) == 3 ) {
+          m.button = b == 'L' ? 0 : b == 'R' ? 1 : 2;
+          mouseScript.push_back( m );
+        }
+      }
+    }
+    unsigned scriptedButtons{};
+
     while ( wm.size() > 0 ) {
       if ( maxFrames > 0 && frames >= maxFrames ) break;
       // Inputs
       Timer::run();
+      auto& held = inputState();
+      if ( gfx::renderer().mode() == gfx::Mode::Ascii ) {  // terminals report presses only: no held state
+        held.beginFrame();
+        held.held.reset();
+      }
       gfx::renderer().pollInput();
       for ( const auto& p : script ) {
         if ( frames >= p.from && frames <= p.to && ( frames - p.from ) % p.every == 0 ) {
@@ -518,8 +544,19 @@ namespace bicycle {
           in.currKeysPressed.set( static_cast<unsigned>( p.key ) );
           in.lastPressed = p.key;
           Trigger::sendInput( in );
+          if ( frames == p.from || p.every > 1 ) held.pressed.set( static_cast<unsigned>( p.key ) );
+          held.held.set( static_cast<unsigned>( p.key ) );
         }
       }
+      unsigned buttons{};
+      for ( const auto& m : mouseScript ) {
+        if ( frames < m.from || frames > m.to ) continue;
+        if ( m.button < 0 ) { held.mouseDx += m.dx; held.mouseDy += m.dy; }
+        else buttons |= 1u << m.button;
+      }
+      held.mouseButtons = ( held.mouseButtons & ~scriptedButtons ) | buttons;
+      held.mousePressed |= buttons & ~scriptedButtons;
+      scriptedButtons = buttons;
       ++frames;
       if ( gfx::renderer().quitRequested() ) {
         break;

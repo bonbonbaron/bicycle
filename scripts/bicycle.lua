@@ -446,4 +446,8 @@ function getUpdates()
     bridge.keys.len = 0
     bridge.input.lastPressed = ffi.C.NOTHING
   end
+  -- Real-time games: a per-frame hook after the events (Constants::MILLISECONDS_PER_FRAME apart).
+  if onFrame then onFrame( frameDt ) end
 end
+
+frameDt = 1 / 30

@@ -99,6 +99,9 @@ class Renderer {
     virtual void setModelAction( Entity entity, const std::string& action ) {}
     // A sprite/tileset image just loaded: the pixel modes pack it into their texture atlas (ASCII ignores it).
     virtual void preloadImage( const std::shared_ptr<const BImg>& img ) {}
+    // Real-time input (include/c/InputState.h): mouse look and gamepads (pixel modes; ASCII ignores them).
+    virtual void setMouseCapture( bool on ) {}
+    virtual void enableGamepad() {}
 };
 
 auto renderer() -> Renderer&;  // the build's renderer (BICYCLE_RENDER)

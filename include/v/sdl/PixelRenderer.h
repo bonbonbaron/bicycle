@@ -32,6 +32,8 @@ class PixelRenderer : public Renderer {
     auto lines() const -> int override { return _fbH / CELL_H; }
     auto checkResize() -> bool override;
     void pollInput() override;
+    void setMouseCapture( bool on ) override;
+    void enableGamepad() override;
     auto quitRequested() const -> bool override { return _quit; }
 
     auto createWindow( int x, int y, int w, int h ) -> WinHandle override;
@@ -120,6 +122,8 @@ class PixelRenderer : public Renderer {
 
   private:
     void handleEvent( const SDL_Event& e );
+    void* _pad{};       // SDL_Gamepad* (enableGamepad)
+    bool _padInit{};
 };
 
 auto colorToArgb( int color ) -> uint32_t;  // Color (ColorPalette.h) -> ARGB

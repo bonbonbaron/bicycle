@@ -11,7 +11,9 @@ using Acceleration = Box;
 //        entity, since the center follows it).
 // FOLLOW_LERP: eases toward another entity (plus an offset) each frame, framerate-independently, with a bob.
 // See Kinematics::linear/orbit/combo/follow and include/c/MotionMath.h.
-enum MotionType { LINEAR, ORBITAL, COMBO, FOLLOW_LERP };
+// LINEAR3D/ORBITAL3D/FOLLOW3D: the same on a 3D entity's transform (include/c/Physics3D.h), in meters; 2D boxes
+// are untouched by them.
+enum MotionType { LINEAR, ORBITAL, COMBO, FOLLOW_LERP, LINEAR3D, ORBITAL3D, FOLLOW3D };
 
 // Advantageous to use an AoS instead of SoA for vectorized additions.
 

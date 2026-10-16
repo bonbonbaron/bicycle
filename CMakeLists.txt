@@ -153,6 +153,10 @@ if ( NOT CMAKE_CROSSCOMPILING )
   set_tests_properties( pack-assets PROPERTIES FIXTURES_SETUP packed )
   add_test( NAME codecs COMMAND bicycle-tests test WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}" )
   add_test( NAME motion COMMAND bicycle-motion-tests )
+  # True 3D: math (include/m/Math3D.h), level collision, character physics and raycasts (src/c/Physics3D.cpp).
+  add_executable( bicycle-3d-tests tests/math3d_test.cpp src/c/Physics3D.cpp )
+  target_link_libraries( bicycle-3d-tests PRIVATE bicycle_data )
+  add_test( NAME math3d COMMAND bicycle-3d-tests )
   set_tests_properties( codecs PROPERTIES FIXTURES_REQUIRED packed )
 endif()
 
@@ -162,7 +166,8 @@ set( BICYCLE_SOURCES
   src/v/common/Image.cpp src/v/common/ColorPalette.cpp src/v/common/Window.cpp src/v/common/Dialogue.cpp
   src/v/common/Menu.cpp src/v/common/TextMenu.cpp src/v/common/Scene.cpp src/v/common/Bar.cpp
   src/c/Trigger.cpp src/c/Timer.cpp src/c/WindowManager.cpp src/c/CollisionDetector.cpp
-  src/c/Kinematics.cpp src/c/Animator.cpp src/c/MidiPlayer.cpp src/c/Dice.cpp )
+  src/c/Kinematics.cpp src/c/Animator.cpp src/c/MidiPlayer.cpp src/c/Dice.cpp
+  src/c/Physics3D.cpp src/c/World3DApi.cpp src/c/InputState.cpp )
 # Not built (unfinished or replaced): src/c/Input.cpp (Linux evdev keyboard), src/c/RenderSystem.cpp, src/v/common/Graph.cpp
 if ( BICYCLE_RENDER STREQUAL "ASCII" )
   list( APPEND BICYCLE_SOURCES src/v/ascii/AsciiRenderer.cpp src/c/SshInputListener.cpp )
