@@ -38,7 +38,7 @@ find_package( Threads REQUIRED )
 
 # --- assets: codecs (inflate, strips, Edgebreaker meshes) and the packer -------------------------------------------
 add_library( bicycle_data STATIC
-  src/data/tinfl.c src/data/Mem.cpp src/data/Pack.cpp src/data/Strip.cpp src/data/BImg.cpp src/data/Mesh.cpp
+  src/data/tinfl.c src/data/Mem.cpp src/data/Pack.cpp src/data/Obj.cpp src/data/Strip.cpp src/data/BImg.cpp src/data/Mesh.cpp
   src/data/Edgebreaker.cpp )
 target_include_directories( bicycle_data PUBLIC include )
 # Memory pool sizes in MB (include/data/Mem.h); the same names as environment variables override them at run time.
@@ -75,7 +75,11 @@ else()
   set( BICYCLE_PACKER_TARGET bicycle-pack )
 endif()
 
-# `cmake --build build` packs each game's assets into <game>/assets.bpak (the 'assets' target).
+# Dev (default): the engine reads loose, uncompressed assets straight from the game folder (Lua, .bimg, .obj
+# meshes, .sf2/.mid): nothing to pack or compile after editing. Release (-DBICYCLE_RELEASE_ASSETS=ON): every
+# build packs <game>/assets.bpak (compressed) and the engine reads assets from it. `cmake --build build --target
+# package` packs in either mode, to finalize a game.
+option( BICYCLE_RELEASE_ASSETS "Pack and compress assets every build and load them from the pack" OFF )
 set( BICYCLE_GAMES "test" CACHE STRING "Game folders whose assets get packed" )
 set( packs )
 foreach( game ${BICYCLE_GAMES} )
@@ -86,7 +90,12 @@ foreach( game ${BICYCLE_GAMES} )
     COMMENT "Packing ${game}'s assets" VERBATIM )
   list( APPEND packs "${CMAKE_SOURCE_DIR}/${game}/assets.bpak" )
 endforeach()
-add_custom_target( assets ALL DEPENDS ${packs} )
+if ( BICYCLE_RELEASE_ASSETS )
+  add_custom_target( assets ALL DEPENDS ${packs} )
+else()
+  add_custom_target( assets DEPENDS ${packs} )
+endif()
+add_custom_target( package DEPENDS ${packs} )
 
 # Headless codec tests: `ctest --test-dir build` (or build/bicycle-tests test).
 if ( NOT CMAKE_CROSSCOMPILING )
@@ -116,6 +125,9 @@ add_executable( o ${BICYCLE_SOURCES} )
 target_include_directories( o PRIVATE include )
 target_link_libraries( o PRIVATE bicycle_data bicycle_luajit bicycle_fluidsynth Threads::Threads )
 target_compile_definitions( o PRIVATE BICYCLE_RENDER_${BICYCLE_RENDER} )
+if ( BICYCLE_RELEASE_ASSETS )
+  target_compile_definitions( o PRIVATE BICYCLE_RELEASE_ASSETS )
+endif()
 if ( BICYCLE_RENDER STREQUAL "ASCII" )
   target_link_libraries( o PRIVATE bicycle_curses )
 else()

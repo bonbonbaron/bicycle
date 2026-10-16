@@ -246,18 +246,16 @@ void MidiPlayer::unpauseSong() {
 
 // SoundFonts stack: programs are looked up in the most recently loaded one first.
 auto MidiPlayer::loadSoundfont( const std::string& sfFilepath ) -> int {
-  std::string name = sfFilepath;
-  if ( assets::mounted() ) {
-    auto data = assets::read( sfFilepath, mem::AUDIO );
-    if ( !data ) {
-      return -1;
-    }
-    name = MEM_PREFIX + sfFilepath;
+  // The game's SoundFont is read (from the pack or the loose file) into the AUDIO pool and handed to fluidsynth
+  // through the in-memory sfloader above. (The GM fallback is streamed from disk: it's ~30 MB.)
+  auto data = assets::read( sfFilepath, mem::AUDIO );
+  if ( !data ) {
+    return -1;
+  }
+  const std::string name = MEM_PREFIX + sfFilepath;
+  {
     std::unique_lock<std::mutex> l( memMtx );
     memFiles[name] = std::make_shared<const mem::Blob>( std::move( *data ) );
-  }
-  else if ( !fileExists( sfFilepath ) ) {
-    return -1;
   }
   auto id = fluid_synth_sfload( _synthP, name.c_str(), 1 );
   profile( ( "SoundFont " + sfFilepath ).c_str() );

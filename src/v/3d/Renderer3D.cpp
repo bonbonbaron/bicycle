@@ -9,6 +9,7 @@
 #include "v/sdl/PixelRenderer.h"
 #include "v/common/Image.h"
 #include "data/Mesh.h"
+#include "data/Obj.h"
 #include "data/BImg.h"
 #include "data/Pack.h"
 #include "m/World.h"
@@ -398,12 +399,36 @@ class Renderer3D final : public PixelRenderer {
       return t;
     }
 
+    // Dev builds load meshes straight from the exporter's OBJ (+ .mtl), uncompressed; texture names are mapped to
+    // the .bimg next to the OBJ, as the packer does.
+    auto loadLooseObj( const std::string& bmeshPath ) -> std::optional<MeshData> {
+      if ( bmeshPath.size() < 6 || bmeshPath.compare( bmeshPath.size() - 6, 6, ".bmesh" ) != 0 ) return std::nullopt;
+      const std::string obj = bmeshPath.substr( 0, bmeshPath.size() - 6 ) + ".obj";
+      MeshData m;
+      std::string err;
+      if ( !readObj( obj, m, err ) ) return std::nullopt;
+      const std::string gameDir = "./" + _gameName + "/";
+      std::string dir = obj.substr( 0, obj.find_last_of( '/' ) + 1 );
+      if ( dir.rfind( gameDir, 0 ) == 0 ) dir = dir.substr( gameDir.size() );
+      for ( auto& mat : m.materials ) {
+        if ( mat.texture.empty() ) continue;
+        std::string base = mat.texture.substr( mat.texture.find_last_of( "/\\" ) + 1 );
+        base = base.substr( 0, base.find_last_of( '.' ) ) + ".bimg";
+        mat.texture = assets::exists( gameDir + dir + base ) ? dir + base : "";
+      }
+      return m;
+    }
+
     auto loadMesh( const std::string& path ) -> std::shared_ptr<GpuMesh> {
       if ( auto it = _meshes.find( path ); it != _meshes.end() ) return it->second;
-      auto bytes = assets::read( path, mem::GRAPHIC );
-      auto m = bytes ? mesh::decode( *bytes ) : std::nullopt;
+      std::optional<MeshData> m;
+      {
+        auto bytes = assets::read( path, mem::TEMPORARY );  // packed .bmesh (release builds)
+        if ( bytes ) m = mesh::decode( *bytes );
+      }
+      if ( !m ) m = loadLooseObj( path );  // dev builds: the .obj the Blender exporter wrote
       if ( !m ) {
-        std::fprintf( stderr, "bicycle 3D: can't load mesh %s (build the 'assets' target: meshes are packed)\n", path.c_str() );
+        std::fprintf( stderr, "bicycle 3D: can't load mesh %s (no .bmesh in the pack and no loose .obj)\n", path.c_str() );
         return nullptr;
       }
       // Expand to one vertex per corner (normals and uvs are per corner), grouped by material.
@@ -429,7 +454,7 @@ class Renderer3D final : public PixelRenderer {
           const auto& mm = m->materials[mat];
           r.rgba = mm.rgba;
           if ( !mm.texture.empty() ) {
-            auto tb = assets::read( "./" + _gameName + "/" + mm.texture, mem::GRAPHIC );
+            auto tb = assets::read( "./" + _gameName + "/" + mm.texture, mem::TEMPORARY );
             auto ti = tb ? BImg::parse( *tb ) : std::nullopt;
             if ( ti ) r.tex = texture( *ti );
           }

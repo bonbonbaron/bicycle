@@ -55,22 +55,19 @@ void Trigger::sys(const Action action, const System system, Entity entity) {
   }
 }
 
-// require() for the game's own modules (e.g. require("./test/genome/hero")): loads them from the asset pack.
+// require() for the game's own modules (e.g. require("./test/genome/hero")): reads them through assets::read
+// (the pack in release builds, the loose file in dev) into the TEXT pool.
 // Modules that aren't in the pack fall through to Lua's usual file searchers.
 static int packSearcher( lua_State* L ) {
   std::string name = luaL_checkstring( L, 1 );
-  if ( !assets::mounted() ) {
-    lua_pushstring( L, "\n\tnot in the asset pack (none mounted)" );
-    return 1;
-  }
   std::string path = name;
   if ( path.rfind( "./", 0 ) != 0 ) {
     for ( auto& c : path ) if ( c == '.' ) c = '/';
   }
   path += ".lua";
-  auto code = assets::read( path, mem::TEXT );
-  if ( !code || !assets::exists( path ) ) {
-    lua_pushstring( L, ( "\n\tno '" + path + "' in the asset pack" ).c_str() );
+  auto code = assets::read( path, mem::TEXT );  // the pack (release) or the loose file (dev), into TEXT
+  if ( !code ) {
+    lua_pushstring( L, ( "\n\tno '" + path + "' in the asset pack or folder" ).c_str() );
     return 1;
   }
   if ( luaL_loadbuffer( L, code->data(), code->size(), ( "@" + path ).c_str() ) != LUA_OK ) {
@@ -97,8 +94,10 @@ void Trigger::init( const std::string& gameName ) {
     L = luaL_newstate();
   }
   luaL_openlibs(L);
-  // Assets: <game>/assets.bpak if it's there (see include/data/Pack.h).
+  // Release builds read <game>/assets.bpak (see include/data/Pack.h); dev builds read loose files only.
+#ifdef BICYCLE_RELEASE_ASSETS
   assets::mount( gameName );
+#endif
   lua_getglobal( L, "package" );
   lua_getfield( L, -1, "loaders" );  // LuaJIT (Lua 5.1) calls them loaders
   if ( lua_istable( L, -1 ) ) {

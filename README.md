@@ -81,6 +81,7 @@ o test
 * `BICYCLE_DEPS_DIR` (`build/_deps`): where downloads and dependency builds go.
 * `BICYCLE_RENDER` (`ASCII`): `ASCII`, `2D` or `3D`.
 * `BICYCLE_GAMES` (`test`): game folders whose assets the `assets` target packs.
+* `BICYCLE_RELEASE_ASSETS` (OFF): pack assets every build and load them from the pack (see Assets).
 
 ### Music
 
@@ -112,13 +113,24 @@ Add `-DBICYCLE_RENDER=2D` or `3D` for `o-2d.exe` / `o-3d.exe`. The resulting exe
 
 ## Assets
 
+### Dev workflow vs finalizing a game
+
+**Dev (the default)**: the engine reads loose, uncompressed files straight from the game folder: Lua and genomes,
+Aseprite `.bimg` exports, `.mid`/`.sf2`, and meshes as the `.obj`/`.mtl` the Blender exporter writes (parsed at load,
+`src/data/Obj.cpp`). Edit a file and rerun `./o test`: there is no pack and no compile step, and no pack is mounted
+even if an old `assets.bpak` is lying around.
+
+**Release / finalizing**: configure with `-DBICYCLE_RELEASE_ASSETS=ON`; then every build runs the `assets` target and
+the engine mounts `<game>/assets.bpak` and reads through it. `cmake --build build --target package` packs a game
+in either mode. Both paths read into the same memory pools (see below); only the source of the bytes differs.
+
 ### Packing and compression
 
-Every build runs the `assets` target (`tools/pack`, a host tool, also when cross-compiling), which compresses each
-game folder's `main.lua` and `genome/**` into `<game>/assets.bpak`. The engine mounts the pack at start-up and
-reads everything through it (`include/data/Pack.h`): Lua modules (a `package.loaders` searcher), Aseprite exports,
-MIDI, SoundFonts, images and meshes. Files missing from the pack are read from disk, and `BICYCLE_LOOSE_ASSETS=1`
-ignores the pack (handy while editing).
+The `assets`/`package` target (`tools/pack`, a host tool, also when cross-compiling) compresses each game folder's
+`main.lua` and `genome/**` into `<game>/assets.bpak`. A release build mounts the pack at start-up and reads
+everything through it (`include/data/Pack.h`): Lua modules (a `package.loaders` searcher), Aseprite exports, MIDI,
+SoundFonts, images and meshes. Files missing from the pack are read from disk, and `BICYCLE_LOOSE_ASSETS=1`
+ignores the pack.
 
 | entry | stored as | decoded with |
 |---|---|---|
