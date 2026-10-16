@@ -30,10 +30,8 @@ function Gene.getTxtAsset( assetType, assetName )
   checkType( assetName, "string" )
   local dir = Gene.getAssetDir( assetType )
   local fp = dir..assetName..".txt"  -- TODO make this more generalizable
-  local file = io.open( fp, "r" )
-  if not file then error("Couldn't open "..key.." file '"..fp.."'.") end
-  local contents = file:read("*a")
-  file:close()
+  local contents = Asset.read( fp )
+  if not contents then error("Couldn't open "..assetType.." file '"..fp.."'.") end
   return contents
 end
 
@@ -66,15 +64,13 @@ end
 
 function Sprite.getAsset( name )
   local fp = "./"..gameName.."/genome/"..Sprite.assetName( name )..".lua"
-  local chunk, err = loadfile( fp )
-  if not chunk then error( "Couldn't load sprite asset '"..fp.."': "..tostring(err) ) end
-  return chunk()
+  local result, err = Asset.dofile( fp )
+  if err then error( "Couldn't load sprite asset '"..fp.."': "..tostring(err) ) end
+  return result
 end
 
 function Sprite.exists( name )
-  local f = io.open( "./"..gameName.."/genome/"..Sprite.assetName( name )..".lua", "r" )
-  if f then f:close() end
-  return f ~= nil
+  return Asset.exists( "./"..gameName.."/genome/"..Sprite.assetName( name )..".lua" )
 end
 
 local function splitLines( str )

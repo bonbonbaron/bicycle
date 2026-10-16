@@ -5,6 +5,8 @@
 #   fluidsynth 2.6.1 (C++11 threads instead of glib; no libsndfile/jack/sdl/...; WASAPI/DirectSound/WaveOut on
 #              Windows, ALSA/PulseAudio on Linux when their headers are installed)
 #   A General MIDI SoundFont (GeneralUser GS) into ./sf2/default-GM.sf2, the engine's music fallback.
+#   miniz      3.0.2, deflate for the asset packer (tools/pack); the engine inflates with jollybean's tinfl
+#   SDL3       3.4.18 for the 2D and 3D render modes (static)
 # Everything is static, so o.exe doesn't need DLLs from these. Downloads and builds land in <build>/_deps and are
 # reused by later configures; delete that folder to rebuild them.
 #
@@ -28,6 +30,11 @@ set( BICYCLE_NCURSES_SHA256 136d91bc269a9a5785e5f9e980bc76ab57428f604ce3e5a5a90c
 # GeneralUser GS by S. Christian Collins (free to use and redistribute), pinned to a commit.
 set( BICYCLE_GM_SF2_URL "https://github.com/mrbumpy409/GeneralUser-GS/raw/97049183643d5fc5a9322a69c5b09efb667c6c3a/GeneralUser-GS.sf2" )
 set( BICYCLE_GM_SF2_SHA256 9575028c7a1f589f5770fccc8cff2734566af40cd26ed836944e9a5152688cfe )
+
+set( BICYCLE_MINIZ_URL "https://github.com/richgel999/miniz/releases/download/3.0.2/miniz-3.0.2.zip" )
+set( BICYCLE_MINIZ_SHA256 ada38db0b703a56d3dd6d57bf84a9c5d664921d870d8fea4db153979fb5332c5 )
+set( BICYCLE_SDL3_URL "https://github.com/libsdl-org/SDL/archive/refs/tags/release-3.4.18.tar.gz" )
+set( BICYCLE_SDL3_SHA256 c4b08b950bd29d83caae0ab8d884298d27046a9d30700fb42841c50992665c90 )
 
 include( ProcessorCount )
 ProcessorCount( BICYCLE_JOBS )
@@ -279,4 +286,40 @@ function( bicycle_gm_soundfont )
     return()
   endif()
   file( RENAME "${dst}.part" "${dst}" )
+endfunction()
+
+# --- miniz (packer only) -----------------------------------------------------------------------------------------
+# Sets BICYCLE_MINIZ_DIR (miniz.c + miniz.h).
+function( bicycle_miniz )
+  bicycle_fetch( miniz "${BICYCLE_MINIZ_URL}" ${BICYCLE_MINIZ_SHA256} src )
+  set( BICYCLE_MINIZ_DIR "${src}" PARENT_SCOPE )
+endfunction()
+
+# --- SDL3 (2D and 3D modes) --------------------------------------------------------------------------------------
+# Defines bicycle_sdl3: SDL3, static.
+function( bicycle_sdl3 )
+  if ( BICYCLE_USE_SYSTEM_DEPS )
+    find_package( SDL3 CONFIG QUIET )
+    if ( SDL3_FOUND )
+      add_library( bicycle_sdl3 INTERFACE )
+      if ( TARGET SDL3::SDL3-static )
+        target_link_libraries( bicycle_sdl3 INTERFACE SDL3::SDL3-static )
+      else()
+        target_link_libraries( bicycle_sdl3 INTERFACE SDL3::SDL3 )
+      endif()
+      message( STATUS "bicycle: SDL3 (system)" )
+      return()
+    endif()
+  endif()
+  bicycle_fetch( sdl3 "${BICYCLE_SDL3_URL}" ${BICYCLE_SDL3_SHA256} src )
+  bicycle_build_cmake_dep( sdl3 "${src}"
+    -DSDL_SHARED=OFF -DSDL_STATIC=ON -DSDL_TEST_LIBRARY=OFF -DSDL_TESTS=OFF -DSDL_EXAMPLES=OFF
+    -DSDL_INSTALL_DOCS=OFF -DSDL_DISABLE_INSTALL_DOCS=ON -DSDL_CAMERA=OFF -DSDL_SENSOR=OFF -DSDL_HAPTIC=OFF
+    -DSDL_JOYSTICK=OFF -DSDL_HIDAPI=OFF -DSDL_POWER=OFF -DSDL_AUDIO=OFF -DSDL_GPU=OFF -DSDL_VULKAN=OFF
+    -DSDL_DIALOG=OFF -DSDL_TRAY=OFF -DSDL_PIPEWIRE=OFF -DSDL_PULSEAUDIO=OFF -DSDL_ALSA=OFF -DSDL_JACK=OFF
+    -DSDL_SNDIO=OFF -DSDL_IBUS=OFF -DSDL_LIBURING=OFF -DSDL_DBUS=OFF -DSDL_LIBUDEV=OFF )
+  find_package( SDL3 CONFIG REQUIRED PATHS "${BICYCLE_DEPS_PREFIX}" NO_DEFAULT_PATH )
+  add_library( bicycle_sdl3 INTERFACE )
+  target_link_libraries( bicycle_sdl3 INTERFACE SDL3::SDL3-static )
+  message( STATUS "bicycle: SDL3 3.4.18 (fetched, static)" )
 endfunction()

@@ -29,6 +29,14 @@ end
 function Scene:getBg( path )
   local bg = {}
   checkType(path ,"string")
+  local packed = Asset.list( path:gsub( "/%*%.txt$", "" ) )
+  if packed then
+    for _, fp in ipairs( packed ) do
+      if fp:match( "%.txt$" ) then table.insert( bg, Asset.read( fp ) ) end
+    end
+    if #bg == 0 then error("Found no files in "..path) end
+    return bg
+  end
   handle = self:getFileIter( path )
   -- Process each file found above with callback argument.
   numFiles = 0

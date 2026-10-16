@@ -10,6 +10,7 @@
 #include "c/Dice.h"
 #include "c/Animator.h"
 #include "v/common/Renderer.h"
+#include "data/Pack.h"
 
 namespace bicycle {
 
@@ -273,6 +274,37 @@ namespace bicycle {
     TimerId createTimer( const unsigned timeMs, Entity entity, const unsigned timeoutType, const bool repeat, const TimeoutAddr addr ) {
       auto& timer = Timer::getInstance();
       return timer.create( timeMs, entity, timeoutType, repeat, addr );
+    }
+
+    // ASSETS (the game's asset pack, or loose files; see include/data/Pack.h)
+    // Returns the asset's bytes (valid until the next call) and their length, or null.
+    const char* assetRead( const char* path, size_t* len ) {
+      static thread_local std::string buf;
+      auto data = assets::read( path );
+      if ( !data ) {
+        return nullptr;
+      }
+      buf = std::move( *data );
+      *len = buf.size();
+      return buf.data();
+    }
+
+    bool assetExists( const char* path ) {
+      return assets::exists( path );
+    }
+
+    bool assetPacked() {
+      return assets::mounted();
+    }
+
+    // Newline-separated paths of the pack's files in a folder ("" without a pack).
+    const char* assetList( const char* dir ) {
+      static thread_local std::string buf;
+      buf.clear();
+      for ( const auto& p : assets::list( dir ) ) {
+        buf += p + "\n";
+      }
+      return buf.c_str();
     }
 
     int rollDice( const int min, const int max ) {

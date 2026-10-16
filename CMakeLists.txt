@@ -31,7 +31,51 @@ endif()
 bicycle_luajit()
 bicycle_fluidsynth()
 bicycle_gm_soundfont()
+bicycle_miniz()
 find_package( Threads REQUIRED )
+
+# --- assets: codecs (inflate, strips, Edgebreaker meshes) and the packer -------------------------------------------
+add_library( bicycle_data STATIC
+  src/data/tinfl.c src/data/Pack.cpp src/data/Strip.cpp src/data/BImg.cpp src/data/Mesh.cpp src/data/Edgebreaker.cpp )
+target_include_directories( bicycle_data PUBLIC include )
+
+set( MINIZ_DIR "${BICYCLE_MINIZ_DIR}" )
+if ( CMAKE_CROSSCOMPILING )
+  # The packer runs during the build, so build it for this machine, not the target.
+  set( hostBin "${BICYCLE_DEPS_DIR}/build/bicycle-pack-host" )
+  if ( NOT EXISTS "${hostBin}/CMakeCache.txt" )
+    bicycle_run( "configuring the host asset packer" "${CMAKE_COMMAND}" -S "${CMAKE_SOURCE_DIR}/tools/pack" -B "${hostBin}"
+      -G "${CMAKE_GENERATOR}" -DCMAKE_BUILD_TYPE=Release "-DMINIZ_DIR=${MINIZ_DIR}" )
+  endif()
+  add_custom_target( bicycle-pack-host COMMAND "${CMAKE_COMMAND}" --build "${hostBin}" --config Release BYPRODUCTS "${hostBin}/bicycle-pack" )
+  set( BICYCLE_PACKER "${hostBin}/bicycle-pack" )
+  set( BICYCLE_PACKER_TARGET bicycle-pack-host )
+else()
+  add_subdirectory( tools/pack )
+  set( BICYCLE_PACKER "$<TARGET_FILE:bicycle-pack>" )
+  set( BICYCLE_PACKER_TARGET bicycle-pack )
+endif()
+
+# `cmake --build build` packs each game's assets into <game>/assets.bpak (the 'assets' target).
+set( BICYCLE_GAMES "test" CACHE STRING "Game folders whose assets get packed" )
+set( packs )
+foreach( game ${BICYCLE_GAMES} )
+  file( GLOB_RECURSE gameFiles CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/${game}/main.lua" "${CMAKE_SOURCE_DIR}/${game}/genome/*" )
+  add_custom_command( OUTPUT "${CMAKE_SOURCE_DIR}/${game}/assets.bpak"
+    COMMAND "${BICYCLE_PACKER}" "${CMAKE_SOURCE_DIR}/${game}" "${CMAKE_SOURCE_DIR}/${game}/assets.bpak"
+    DEPENDS ${gameFiles} ${BICYCLE_PACKER_TARGET}
+    COMMENT "Packing ${game}'s assets" VERBATIM )
+  list( APPEND packs "${CMAKE_SOURCE_DIR}/${game}/assets.bpak" )
+endforeach()
+add_custom_target( assets ALL DEPENDS ${packs} )
+
+# Headless codec tests: `ctest --test-dir build` (or build/bicycle-tests test).
+if ( NOT CMAKE_CROSSCOMPILING )
+  add_executable( bicycle-tests tests/codec_test.cpp )
+  target_link_libraries( bicycle-tests PRIVATE bicycle_pack_codecs )
+  enable_testing()
+  add_test( NAME codecs COMMAND bicycle-tests test WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}" )
+endif()
 
 set( BICYCLE_SOURCES
   src/main.cpp src/bicycle.cpp src/trigLUT.cpp
@@ -47,7 +91,7 @@ endif()
 
 add_executable( o ${BICYCLE_SOURCES} )
 target_include_directories( o PRIVATE include )
-target_link_libraries( o PRIVATE bicycle_luajit bicycle_fluidsynth Threads::Threads )
+target_link_libraries( o PRIVATE bicycle_data bicycle_luajit bicycle_fluidsynth Threads::Threads )
 target_compile_definitions( o PRIVATE BICYCLE_RENDER_${BICYCLE_RENDER} )
 if ( BICYCLE_RENDER STREQUAL "ASCII" )
   target_link_libraries( o PRIVATE bicycle_curses )

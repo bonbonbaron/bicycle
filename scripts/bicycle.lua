@@ -261,7 +261,39 @@ ffi.cdef([[
   TimerId createTimer( const unsigned timeMs, Entity entity, const unsigned timeoutType, const bool repeat, const TimeoutAddr addr );
 
   int rollDice( const int min, const int max );
+
+  const char* assetRead( const char* path, size_t* len );
+  bool assetExists( const char* path );
+  bool assetPacked();
+  const char* assetList( const char* dir );
 ]])
+
+-- Game assets come from <game>/assets.bpak when it's there (inflated by the engine), else from loose files.
+Asset = {}
+function Asset.read( path )
+  local len = ffi.new( "size_t[1]" )
+  local p = ffi.C.assetRead( path, len )
+  if p == nil then return nil end
+  return ffi.string( p, len[0] )
+end
+function Asset.exists( path )
+  return ffi.C.assetExists( path )
+end
+-- Runs a Lua asset (a genome table, tilemap, ...) and returns its result.
+function Asset.dofile( path )
+  local code = Asset.read( path )
+  if not code then return nil, "no asset '"..path.."'" end
+  local chunk, err = loadstring( code, "@"..path )
+  if not chunk then return nil, err end
+  return chunk()
+end
+-- Paths of the files in a folder: from the pack, or nil when there's no pack (list the folder yourself).
+function Asset.list( dir )
+  if not ffi.C.assetPacked() then return nil end
+  local out = {}
+  for line in ffi.string( ffi.C.assetList( dir ) ):gmatch( "[^\n]+" ) do table.insert( out, line ) end
+  return out
+end
 
 -- Set BICYCLE_DEBUG_LOG=<file> to have games log events (dbglog) for testing; otherwise a no-op.
 local debugLogFile = os.getenv( "BICYCLE_DEBUG_LOG" ) and io.open( os.getenv( "BICYCLE_DEBUG_LOG" ), "w" )

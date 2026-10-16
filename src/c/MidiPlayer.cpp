@@ -1,9 +1,87 @@
 #include <chrono>
 #include <cstdio>
+#include <cstring>
 #include <cstdlib>
 #include <fstream>
 #include <iterator>
 #include "c/MidiPlayer.h"
+#include "data/Pack.h"
+#include <cstdio>
+#include <cstring>
+#include <map>
+#include <memory>
+#include <mutex>
+
+// SoundFonts inside the asset pack are inflated into memory and handed to fluidsynth through its SoundFont
+// loader's file callbacks: names starting with MEM_PREFIX are memory buffers, anything else is a real file.
+// fluidsynth re-opens SoundFonts for dynamic sample loading, so the buffers stay alive for the whole game.
+namespace {
+  constexpr const char* MEM_PREFIX = "bicycle-mem://";
+  std::mutex memMtx;
+  std::map<std::string, std::shared_ptr<const std::string>> memFiles;
+
+  struct SfHandle {
+    FILE* fp{};
+    std::shared_ptr<const std::string> mem;
+    long long pos{};
+  };
+
+  void* sfOpen( const char* filename ) {
+    const std::string name( filename );
+    if ( name.rfind( MEM_PREFIX, 0 ) == 0 ) {
+      std::unique_lock<std::mutex> l( memMtx );
+      auto it = memFiles.find( name );
+      return it == memFiles.end() ? nullptr : new SfHandle{ nullptr, it->second, 0 };
+    }
+    FILE* fp = std::fopen( filename, "rb" );
+    return fp ? new SfHandle{ fp, nullptr, 0 } : nullptr;
+  }
+
+  int sfRead( void* buf, fluid_long_long_t count, void* handle ) {
+    auto* h = static_cast<SfHandle*>( handle );
+    if ( h->fp ) {
+      return std::fread( buf, static_cast<size_t>( count ), 1, h->fp ) == 1 ? FLUID_OK : FLUID_FAILED;
+    }
+    if ( count < 0 || h->pos + count > static_cast<long long>( h->mem->size() ) ) return FLUID_FAILED;
+    std::memcpy( buf, h->mem->data() + h->pos, static_cast<size_t>( count ) );
+    h->pos += count;
+    return FLUID_OK;
+  }
+
+  int sfSeek( void* handle, fluid_long_long_t offset, int origin ) {
+    auto* h = static_cast<SfHandle*>( handle );
+    if ( h->fp ) {
+#ifdef _WIN32
+      return _fseeki64( h->fp, offset, origin ) == 0 ? FLUID_OK : FLUID_FAILED;
+#else
+      return fseeko( h->fp, offset, origin ) == 0 ? FLUID_OK : FLUID_FAILED;
+#endif
+    }
+    long long base = origin == SEEK_SET ? 0 : origin == SEEK_CUR ? h->pos : static_cast<long long>( h->mem->size() );
+    if ( base + offset < 0 || base + offset > static_cast<long long>( h->mem->size() ) ) return FLUID_FAILED;
+    h->pos = base + offset;
+    return FLUID_OK;
+  }
+
+  fluid_long_long_t sfTell( void* handle ) {
+    auto* h = static_cast<SfHandle*>( handle );
+    if ( h->fp ) {
+#ifdef _WIN32
+      return _ftelli64( h->fp );
+#else
+      return ftello( h->fp );
+#endif
+    }
+    return h->pos;
+  }
+
+  int sfClose( void* handle ) {
+    auto* h = static_cast<SfHandle*>( handle );
+    if ( h->fp ) std::fclose( h->fp );
+    delete h;
+    return FLUID_OK;
+  }
+}
 
 // BICYCLE_PROFILE=<file> appends how long each audio start-up step took (ms), to find what slows start-up.
 static void profile( const char* what ) {
@@ -71,6 +149,10 @@ MidiPlayer::MidiPlayer() {
 
   // Synthesizer
   _synthP = new_fluid_synth( _settingsP );
+  if ( fluid_sfloader_t* loader = new_fluid_defsfloader( _settingsP ) ) {
+    fluid_sfloader_set_callbacks( loader, sfOpen, sfRead, sfSeek, sfTell, sfClose );
+    fluid_synth_add_sfloader( _synthP, loader );  // tried before the built-in one
+  }
   fluid_synth_set_gain( _synthP, 1.0 );
   profile( "settings + synth" );
 
@@ -105,15 +187,17 @@ MidiPlayer::~MidiPlayer() {
 }
 
 // Replaces whatever song was queued.
+// The song comes from the asset pack (inflated) or the file.
 auto MidiPlayer::loadMidi( const std::string& midiFilepath ) -> bool {
-  if ( !fileExists( midiFilepath ) ) {
+  auto midi = assets::read( midiFilepath );
+  if ( !midi ) {
     return false;
   }
   fluid_player_stop( _playerP );
   delete_fluid_player( _playerP );
   _playerP = new_fluid_player( _synthP );
   _tick = 0;
-  const bool ok = fluid_player_add( _playerP, midiFilepath.c_str() ) == FLUID_OK;
+  const bool ok = fluid_player_add_mem( _playerP, midi->data(), midi->size() ) == FLUID_OK;
   profile( ( "MIDI " + midiFilepath ).c_str() );
   return ok;
 }
@@ -161,10 +245,20 @@ void MidiPlayer::unpauseSong() {
 
 // SoundFonts stack: programs are looked up in the most recently loaded one first.
 auto MidiPlayer::loadSoundfont( const std::string& sfFilepath ) -> int {
-  if ( !fileExists( sfFilepath ) ) {
+  std::string name = sfFilepath;
+  if ( assets::mounted() ) {
+    auto data = assets::read( sfFilepath );
+    if ( !data ) {
+      return -1;
+    }
+    name = MEM_PREFIX + sfFilepath;
+    std::unique_lock<std::mutex> l( memMtx );
+    memFiles[name] = std::make_shared<const std::string>( std::move( *data ) );
+  }
+  else if ( !fileExists( sfFilepath ) ) {
     return -1;
   }
-  auto id = fluid_synth_sfload( _synthP, sfFilepath.c_str(), 1 );
+  auto id = fluid_synth_sfload( _synthP, name.c_str(), 1 );
   profile( ( "SoundFont " + sfFilepath ).c_str() );
   return id == FLUID_FAILED ? -1 : id;
 }
