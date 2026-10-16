@@ -14,12 +14,17 @@ class Dialogue : public Window {
     // Public functions
     void render() override;
     void onInput( Input& input ) override;
+    auto isDone() const -> bool;  // E or Space was pressed on the last page
   private:
     // Private members
     std::string _content;
     std::vector<LineLimits> lineLimits{};
     unsigned initLineNum{};
+    bool _done{};
     // Private functions
     void init();
     void delimitLines();
+    auto getTextRows() const -> unsigned;
+    auto lastPageStart() const -> unsigned;
+    auto isOnLastPage() const -> bool;
 };

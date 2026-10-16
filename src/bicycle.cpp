@@ -54,6 +54,20 @@ namespace bicycle {
       return push<Dialogue>( text, x, y, w, h ); 
     }
 
+    // Whether the top window is a dialogue whose reader pressed E or Space on its last page.
+    bool isDialogueDone() {
+      auto dialogue = dynamic_pointer_cast<Dialogue>( WindowManager::getInstance().back() );
+      return dialogue != nullptr && dialogue->isDone();
+    }
+
+    int getScreenWidth() {
+      return COLS;
+    }
+
+    int getScreenHeight() {
+      return LINES;
+    }
+
     // MENUS
 
     Entity pushTextMenu( int x, int y, int w, int h ) {
@@ -190,35 +204,11 @@ namespace bicycle {
       }
     }
 
-    // Text box glued to the bottom of the current scene: one row per '\n'-separated line; "" hides it.
-    void setTextBox( const char* text ) {
-      auto scene = currScene();
-      if ( ! scene ) {
-        return;
-      }
-      std::vector<std::string> lines{};
-      std::string s( text ? text : "" );
-      for ( size_t start = 0; ! s.empty() && start <= s.size(); ) {
-        size_t end = s.find( '\n', start );
-        if ( end == std::string::npos ) {
-          end = s.size();
-        }
-        lines.push_back( s.substr( start, end - start ) );
-        start = end + 1;
-      }
-      scene->setTextBox( lines );
-    }
-
     void setHidden( Entity entity, bool hidden ) {
       auto scene = currScene();
       if ( scene ) {
         scene->setHidden( entity, hidden );
       }
-    }
-
-    int getTextBoxWidth() {
-      auto scene = currScene();
-      return scene ? scene->getTextBoxWidth() : 40;
     }
 
     Entity popWindow() {

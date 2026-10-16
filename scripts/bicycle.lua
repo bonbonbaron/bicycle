@@ -208,6 +208,9 @@ ffi.cdef([[
   typedef enum { RECT, COLLRECT, IMAGE } Component;
   typedef enum { SYS_TIMER, SYS_MOTION } System;
   Entity pushDialogue( const char* text, int x, int y, int w, int h );
+  bool isDialogueDone();
+  int getScreenWidth();
+  int getScreenHeight();
   Entity pushTextMenu( int x, int y, int w, int h );
   void addItem( const char* text );
   unsigned getSelection();
@@ -247,8 +250,6 @@ ffi.cdef([[
   int getSfxChannel();
   int addHudBar( const char* label, int max, int len, int x, int y );
   void setHudBar( int id, int val );
-  void setTextBox( const char* text );
-  int getTextBoxWidth();
   void setHidden( Entity entity, bool hidden );
 
   Entity pop() {
@@ -295,6 +296,10 @@ end
 
 function focusOn( entity )
   focus = entity
+end
+
+function getFocus()
+  return focus
 end
 
 --TODO write wrappers for menu and dialogue that 1) don't require dimensions and 2) auto-focus on them, 3) send moveCursorUp/Down()

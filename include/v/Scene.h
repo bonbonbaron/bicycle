@@ -105,9 +105,6 @@ class Scene : public Window {
     // HUD: meters glued to the screen, drawn over every layer.
     auto addHudBar( const std::string& label, const int max, const int len, const int x, const int y ) -> int;
     auto getHudBar( const int id ) -> Bar*;
-    // Text box glued to the bottom of the screen, drawn over everything. One string per row; empty hides it.
-    void setTextBox( const std::vector<std::string>& lines );
-    auto getTextBoxWidth() const -> int;  // usable characters per row
     void setHidden( const Entity entity, const bool hidden );  // e.g. to flash a character
 
   private:
@@ -118,7 +115,5 @@ class Scene : public Window {
     void updateCameraLimits();
     std::vector<Bar> _hud{};
     std::unordered_map<Entity, bool> _hidden{};
-    std::vector<std::string> _textBox{};
     void renderHud();
-    void renderTextBox();
 };

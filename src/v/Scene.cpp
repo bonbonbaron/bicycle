@@ -178,7 +178,6 @@ void Scene::render() {
     renderFg( layer );
   }
   renderHud();
-  renderTextBox();
 }
 
 auto Scene::addHudBar( const std::string& label, const int max, const int len, const int x, const int y ) -> int {
@@ -198,32 +197,6 @@ void Scene::renderHud() {
   for ( const auto& bar : _hud ) {
     bar.draw( *this );
   }
-}
-
-void Scene::setTextBox( const std::vector<std::string>& lines ) {
-  _textBox = lines;
-}
-
-// The box spans the window inside its border with one column of padding: | text |
-auto Scene::getTextBoxWidth() const -> int {
-  return std::max( 1, static_cast<int>( getWidth() ) - 6 );
-}
-
-void Scene::renderTextBox() {
-  if ( _textBox.empty() ) {
-    return;
-  }
-  const int w = getTextBoxWidth() + 4;           // + "| " and " |"
-  const int h = static_cast<int>( _textBox.size() ) + 2;
-  const int top = std::max( 1, static_cast<int>( getHeight() ) - 1 - h );  // just above the bottom border
-  const std::string edge = "+" + std::string( w - 2, '-' ) + "+";
-  mvprint( top, 1, edge );
-  for ( int i = 0; i < static_cast<int>( _textBox.size() ); ++i ) {
-    std::string row = _textBox.at( i ).substr( 0, w - 4 );
-    row.resize( w - 4, ' ' );
-    mvprint( top + 1 + i, 1, "| " + row + " |" );
-  }
-  mvprint( top + h - 1, 1, edge );
 }
 
 void Scene::onInput( Input& input ) {

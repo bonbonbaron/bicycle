@@ -405,7 +405,7 @@ Gene["GeneLoader"] = {
     --TODO insert into world vel array
   end,
   name = 0,  -- do nothing, just allow it to exist
-  lines = 0,  -- what an NPC says when talked to (see TextBox.lua); read by its genome
+  lines = 0,  -- what an NPC says when talked to (see Dialogue.lua); read by its genome
   onInput = function(entity, gene) end,  -- do nothing, just allow it to exist
   onCollision = function(entity, gene) end,  -- do nothing, just allow it to exist
   onTimer = function(entity, gene) end,  -- do nothing, just allow it to exist

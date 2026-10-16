@@ -34,48 +34,80 @@ void Dialogue::onInput( Input& input ) {
   switch( input.lastPressed ) {
     case LogicalKey::J:
       ++initLineNum;
-      initLineNum = std::clamp<unsigned>( initLineNum, 0, lineLimits.size()  - 4 );
+      initLineNum = std::clamp<unsigned>( initLineNum, 0, lastPageStart() );
       break;
     case LogicalKey::K:
       if ( initLineNum > 0 ) {
         --initLineNum;
       }
-      initLineNum = std::clamp<unsigned>( initLineNum, 0, lineLimits.size() );
       break;
     case LogicalKey::F:
-      initLineNum = std::clamp<unsigned>( initLineNum + getHeight(), 0, lineLimits.size() - 1 );
+      initLineNum = std::min( initLineNum + getTextRows(), lastPageStart() );
       break;
     case LogicalKey::B:
-      initLineNum -= std::min( initLineNum, getHeight() );
-      initLineNum = std::clamp<unsigned>( initLineNum, 0, lineLimits.size() - 1 );
+      initLineNum -= std::min( initLineNum, getTextRows() );
+      break;
+    case LogicalKey::E:
+    case LogicalKey::Space:  // next page, or done after the last one
+      if ( isOnLastPage() ) {
+        _done = true;
+      }
+      else {
+        initLineNum += getTextRows();
+      }
       break;
     default:
       Window::onInput( input );
   }
-  render();
 }
 
+// Rows of text that fit inside the border, minus one for the "more"/"close" hint.
+auto Dialogue::getTextRows() const -> unsigned {
+  return std::max( 1u, getHeight() > 3 ? getHeight() - 3 : 1u );
+}
+
+auto Dialogue::lastPageStart() const -> unsigned {
+  return lineLimits.size() > getTextRows() ? static_cast<unsigned>( lineLimits.size() ) - getTextRows() : 0;
+}
+
+auto Dialogue::isOnLastPage() const -> bool {
+  return initLineNum + getTextRows() >= lineLimits.size();
+}
+
+auto Dialogue::isDone() const -> bool {
+  return _done;
+}
+
+// Splits _content into rows that fit inside the border: at spaces, at newlines (a blank row for each extra one),
+// and inside words too long for a row.
 void Dialogue::delimitLines() {
-  constexpr int NUM_INSTANCES_TO_FIND{1};
   assert( getWidth() > WINDOW_PADDING );
   const int WIDTH = static_cast<int>( getWidth() - WINDOW_PADDING );
-  LineLimits currLineLims;
-  for ( ;; ) {
-    if ( static_cast<int>( _content.length() - currLineLims.start ) <= WIDTH ) {
-      lineLimits.push_back( { currLineLims.start, static_cast<int>(_content.length() - currLineLims.start) } );
-      break;
+  unsigned start{};
+  while ( start < _content.length() ) {
+    const auto newline = _content.find( '\n', start );
+    const unsigned paraEnd = newline == std::string::npos ? _content.length() : newline;
+    if ( static_cast<int>( paraEnd - start ) <= WIDTH ) {  // the rest of the paragraph fits
+      lineLimits.push_back( { start, static_cast<int>( paraEnd - start ) } );
+      start = paraEnd + 1;
+      continue;
     }
-    currLineLims.len = _content.rfind( " ", currLineLims.start + WIDTH, NUM_INSTANCES_TO_FIND ) - currLineLims.start;
-    lineLimits.push_back( currLineLims );
-    assert( ( currLineLims.len ) <= WIDTH );
-    assert ( currLineLims.len > 0 );
-    currLineLims.start += currLineLims.len + 1;
+    auto space = _content.rfind( ' ', start + WIDTH );
+    if ( space == std::string::npos || space <= start ) {  // one long word: break it
+      lineLimits.push_back( { start, WIDTH } );
+      start += WIDTH;
+      continue;
+    }
+    lineLimits.push_back( { start, static_cast<int>( space - start ) } );
+    start = space + 1;
   }
 }
 
 void Dialogue::render() {
   int windowRow{1};
-  for ( unsigned i = initLineNum; i < getHeight() && i < lineLimits.size(); ++i ) {
+  for ( unsigned i = initLineNum; i < initLineNum + getTextRows() && i < lineLimits.size(); ++i ) {
     mvprint( windowRow++, 1, std::string( _content, lineLimits.at(i).start, lineLimits.at(i).len ) );
   }
+  const std::string hint = isOnLastPage() ? "[E] close" : "[E] more";
+  mvprint( getHeight() - 2, std::max( 1, static_cast<int>( getWidth() ) - 1 - static_cast<int>( hint.length() ) ), hint );
 }
