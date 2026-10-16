@@ -142,6 +142,35 @@ local function getPixelValues(pixel, colorMode, spritePal)
 	end
 end
 
+-- Pixel export (cfg.pixels): .bimg files, bicycle's raw indexed image (include/data/BImg.h):
+--   "BIMG" u16 w, u16 h, u16 nColors, u16 0, nColors RGBA u32 (R in the low byte), then w*h u8 palette indices.
+-- Index 0 is always transparent. The layer's palette set (<layer>_palette.lua) maps each RGBA value to its index.
+local TRANSPARENT = 0
+local function paletteIndex(colorpal, pixelValue)
+	if (pixelValue >> 24) == 0 then pixelValue = TRANSPARENT end  -- every fully transparent color is index 0
+	colorpal:add(pixelValue)
+	return colorpal.members[pixelValue]
+end
+
+local function writeBimg(path, w, h, colorpal, indices)
+	if colorpal.idx > 256 then
+		error(path..": "..colorpal.idx.." colors; a .bimg layer can have at most 256")
+	end
+	local pal = {}
+	for value, idx in pairs(colorpal.members) do pal[idx + 1] = value end
+	local out = { "BIMG", string.pack("<I2I2I2I2", w, h, colorpal.idx, 0) }
+	for i = 1, colorpal.idx do out[#out + 1] = string.pack("<I4", pal[i] & 0xFFFFFFFF) end
+	local row = {}
+	for y = 0, h - 1 do
+		for x = 0, w - 1 do row[x + 1] = indices[y * w + x + 1] or 0 end
+		out[#out + 1] = string.char(table.unpack(row, 1, w))
+	end
+	local f = assert(io.open(path, "wb"))
+	f:write(table.concat(out))
+	f:close()
+	dbgp("wrote "..path.." ("..w.."x"..h..", "..colorpal.idx.." colors)")
+end
+
 local function getAnimTag(sprite, frameIdx)
 	for i = 1,#sprite.tags do
 		local tag = sprite.tags[i]
@@ -199,6 +228,7 @@ local function makeSprite(ctr, globAnim)
 		end
 		local colorpalName = layerName.."_palette"
 		local colorpal = Set.new(colorpalName)
+		if cfg.pixels then colorpal:add(TRANSPARENT) end  -- index 0
 		local cmIdx
 		local outputLayer = {}
 		if layer.isReference then
@@ -222,6 +252,8 @@ local function makeSprite(ctr, globAnim)
 				local outputTileIdx = 0
 				local outputTilemap = {}
 				local outputTileset = { anim = {}, colormap = layerName.."_tileset_colormap", ascii = {} }
+				local tilesetPixels = {}  -- pixel export: palette indices of the tileset strip (tile i at x = i * TILE_W)
+				local tilesetW = TILE_W * #layer.tileset
 				local outputCollmap = {}
 				local outputCollset = {}
 				-- Generate the tileset.
@@ -242,12 +274,19 @@ local function makeSprite(ctr, globAnim)
 					-- Tile image
 					local tileImg = tile.image -- the image of a cel within tileset
 					-- ASCII version of the tile, same 2-chars-per-pixel scheme as colormaps. ascii[tileIdx + 1] is tile tileIdx.
-					outputTileset.ascii[tileIdx + 1] = ascii.image_to_ascii(s, tileImg, nil, "detailed", false, TILE_W, TILE_H)
+					if cfg.ascii then
+						outputTileset.ascii[tileIdx + 1] = ascii.image_to_ascii(s, tileImg, nil, "detailed", false, TILE_W, TILE_H)
+					end
 					for pixel in tileImg:pixels() do
 						local srcX, srcY, pixelValue = getPixelValues(pixel, colorMode, spritePal)
-						colorpal:add(pixelValue)
-						cmIdx = colorpal.members[pixelValue]
-						outputTilesetImg:drawPixel(srcX + TILE_W * outputTileIdx, srcY, cmIdx)
+						if cfg.pixels then
+							cmIdx = paletteIndex(colorpal, pixelValue)
+							tilesetPixels[srcY * tilesetW + srcX + TILE_W * outputTileIdx + 1] = cmIdx
+						else
+							colorpal:add(pixelValue)
+							cmIdx = colorpal.members[pixelValue]
+							outputTilesetImg:drawPixel(srcX + TILE_W * outputTileIdx, srcY, cmIdx)
+						end
 					end  -- for each pixel in the current cel
 					outputTileIdx = outputTileIdx + 1
 				end  -- for each tile's cel
@@ -287,10 +326,16 @@ local function makeSprite(ctr, globAnim)
 				outputLayer.collmap = layerCollmapName
 				outputLayer.collset = layerCollsetName
 				g.serialize_table( layerTilemapName, outputTilemap, DEBUG )
-				g.serialize_table( layerTilesetName, outputTileset, DEBUG )
 				g.serialize_table( layerCollmapName, outputCollmap, DEBUG )
 				g.serialize_table( layerCollsetName, outputCollset, DEBUG )
-				outputTilesetImg:saveAs(outputColormapFp)
+				if cfg.pixels then
+					outputTileset.pixels = layerName.."_tileset_pixels"
+					outputTileset.colormap = outputTileset.pixels
+					writeBimg(cfg.genomePath..outputTileset.pixels..".bimg", tilesetW, TILE_H, colorpal, tilesetPixels)
+				else
+					outputTilesetImg:saveAs(outputColormapFp)
+				end
+				g.serialize_table( layerTilesetName, outputTileset, DEBUG )
 				outputTilesetImg = nil
 			elseif layer.isImage then
 				local outputAnimSrcRects = { strips = {} }
@@ -312,12 +357,8 @@ local function makeSprite(ctr, globAnim)
 				-- so layers stay frame-aligned and can be composited.
 				outputW = s.width * #s.frames
 				outputH = s.height
-				local outputFullImg
-				if cfg.ascii then
-					outputFullImg = ""
-				else
-					outputFullImg = Image(outputW, outputH, ColorMode.INDEXED)
-				end
+				local outputFullImg = ""
+				local framePixels = {}  -- pixel export: palette indices of the frame strip
 				local cumulativeWidth = 0
 				local outputCollRects = {}
 				local outputCollSet = {}
@@ -329,12 +370,15 @@ local function makeSprite(ctr, globAnim)
 					if cfg.ascii then
 							local currCelAsAscii = ascii.image_to_ascii(s, cel and cel.image, cel, "detailed", false)
 							table.insert(asciiFrames, currCelAsAscii)
-					elseif cel then
-						for pixel in cel.image:pixels() do  -- TODO support animation (multiple cels)
+					end
+					if cfg.pixels and cel then
+						for pixel in cel.image:pixels() do
 							local srcX, srcY, pixelValue = getPixelValues(pixel, colorMode, spritePal)
-							colorpal:add(pixelValue)
-							cmIdx = colorpal.members[pixelValue]
-							outputFullImg:drawPixel(cumulativeWidth + srcX, srcY, cmIdx )  -- This is the key fork in the road between pixel and ASCII.
+							-- The cel can be smaller than the canvas: place it by its position within this frame's slot.
+							local x, y = cel.position.x + srcX, cel.position.y + srcY
+							if x >= 0 and x < s.width and y >= 0 and y < s.height then
+								framePixels[y * outputW + cumulativeWidth + x + 1] = paletteIndex(colorpal, pixelValue)
+							end
 							-- For now, support only one collision type per frame.
 							if layer.name == "collision" and s.properties.colorToCollisionType then
 								collType = collType or s.properties.colorToCollisionType[tostring(pixelValue)]
@@ -381,8 +425,14 @@ local function makeSprite(ctr, globAnim)
 				outputLayer.colormap = colormapName
 				if cfg.ascii then
 					g.serialize_table(colormapName, {img = outputFullImg}, DEBUG)
-				else
-					outputFullImg:saveAs(outputColormapFp)
+				end
+				if cfg.pixels then
+					-- Frames side by side, each the full canvas: frame f's pixels start at x = (f - 1) * canvas width,
+					-- matching the anim src rects (which are in pixels).
+					outputLayer.pixels = layerName.."_pixels"
+					outputLayer.pixelW = outputW
+					outputLayer.pixelH = outputH
+					writeBimg(cfg.genomePath..outputLayer.pixels..".bimg", outputW, outputH, colorpal, framePixels)
 				end
 				-- If there are any animation frames, write out the source rectangles for each frame.
 				-- Collision map

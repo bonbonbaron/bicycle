@@ -1,8 +1,11 @@
 require("bicycle")
 
 -- Meters glued to the top of the screen, e.g. a health bar:
---   local hp = Hud.bar( "HP", 10 )   -- starts full; drawn as  HP [##########] 10/10
---   hp:set( 7 )                      -- HP [#######---] 7/10
+--   local hp = Hud.bar( "HP", 10 )   -- starts full
+--   hp:set( 7 )
+-- Each render mode draws it its own way: ASCII as text (HP [#######---] 7/10), 2D and 3D as a graphical bar
+-- colored by how full it is. hp:sprites( "genome/ui/hp_frame.bimg", "genome/ui/hp_fill.bimg" ) draws it from
+-- images in the pixel modes instead (the fill is cropped to the fraction).
 -- Bars stack down from the top-left inside the scene's border unless you pass x and y (screen cells).
 local Hud = {}
 local Bar = {}
@@ -24,6 +27,10 @@ function Bar:set( value )
   self.value = math.max( 0, math.min( self.max, value ) )
   ffi.C.setHudBar( self.id, self.value )
   return self.value
+end
+
+function Bar:sprites( framePath, fillPath )
+  return ffi.C.setHudBarSprites( self.id, framePath, fillPath )
 end
 
 function Bar:add( delta )

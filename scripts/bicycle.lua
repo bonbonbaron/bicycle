@@ -224,9 +224,24 @@ ffi.cdef([[
   void addBgLayerEx( const char* bgStr, int type, int parallaxPct, int parallaxPctY, int vx, int vy, int x, int y );
   void addFgEntity( Entity entity );
   void newImage( Entity entity, const char* imgStr );
+  int renderMode();
+  bool setModel( Entity entity, const char* bmeshPath );
+  void setModelAction( Entity entity, const char* action );
+  bool addStaticModel( const char* bmeshPath );
+  bool newPixelImage( Entity entity, const char* paths );
+  bool addBgLayerPixels( const char* tilesetPath, const int* tiles, int nw, int nh, int tileW, int tileH,
+                         int type, int parallaxPct, int parallaxPctY, int vx, int vy, int x, int y );
   void setPos( Entity entity, Position pos );
   void addCollider( Entity entity, unsigned layer, unsigned type, int x, int y, int w, int h );
   void setVelocity( Entity entity, int vx, int vy );
+  void motionLinear( Entity entity, float speed, bool pingPong );
+  void motionWaypoint( Entity entity, float x, float y );
+  void motionOrbit( Entity entity, Entity center, float cx, float cy, float rx, float ry, float degPerSec, float phaseDeg );
+  void motionCombo( Entity entity, float rx, float ry, float degPerSec, float phaseDeg, float speed, bool pingPong );
+  void motionFollow( Entity entity, Entity target, float offX, float offY, float rate, float bobRows, float bobHz, bool mirror, float deadX, float deadY );
+  Entity cameraEntity();
+  void motionStop( Entity entity );
+  int motionType( Entity entity );
   void newAnimStrip( Entity entity, const char* stripName, bool repeat );
   void addAnimFrame( Entity entity, const char* stripName, unsigned durationMs, int x, int y, int w, int h );
   bool setAnim( Entity entity, const char* stripName );
@@ -250,6 +265,7 @@ ffi.cdef([[
   int getSfxChannel();
   int addHudBar( const char* label, int max, int len, int x, int y );
   void setHudBar( int id, int val );
+  bool setHudBarSprites( int id, const char* framePath, const char* fillPath );
   void setHidden( Entity entity, bool hidden );
 
   Entity pop() {
@@ -261,7 +277,53 @@ ffi.cdef([[
   TimerId createTimer( const unsigned timeMs, Entity entity, const unsigned timeoutType, const bool repeat, const TimeoutAddr addr );
 
   int rollDice( const int min, const int max );
+
+  const char* assetRead( const char* path, size_t* len );
+  bool assetExists( const char* path );
+  bool assetPacked();
+  const char* assetList( const char* dir );
 ]])
+
+-- Game assets come from <game>/assets.bpak when it's there (inflated by the engine), else from loose files.
+Asset = {}
+-- Outside the engine (e.g. plain luajit running a headless test) there's no ffi.C.assetRead: use files.
+local inEngine = pcall( function() return ffi.C.assetRead end )
+function Asset.read( path )
+  if not inEngine then
+    local f = io.open( path, "rb" )
+    if not f then return nil end
+    local s = f:read( "*a" )
+    f:close()
+    return s
+  end
+  local len = ffi.new( "size_t[1]" )
+  local p = ffi.C.assetRead( path, len )
+  if p == nil then return nil end
+  return ffi.string( p, len[0] )
+end
+function Asset.exists( path )
+  if not inEngine then
+    local f = io.open( path, "rb" )
+    if f then f:close() end
+    return f ~= nil
+  end
+  return ffi.C.assetExists( path )
+end
+-- Runs a Lua asset (a genome table, tilemap, ...) and returns its result.
+function Asset.dofile( path )
+  local code = Asset.read( path )
+  if not code then return nil, "no asset '"..path.."'" end
+  local chunk, err = loadstring( code, "@"..path )
+  if not chunk then return nil, err end
+  return chunk()
+end
+-- Paths of the files in a folder: from the pack, or nil when there's no pack (list the folder yourself).
+function Asset.list( dir )
+  if not inEngine or not ffi.C.assetPacked() then return nil end
+  local out = {}
+  for line in ffi.string( ffi.C.assetList( dir ) ):gmatch( "[^\n]+" ) do table.insert( out, line ) end
+  return out
+end
 
 -- Set BICYCLE_DEBUG_LOG=<file> to have games log events (dbglog) for testing; otherwise a no-op.
 local debugLogFile = os.getenv( "BICYCLE_DEBUG_LOG" ) and io.open( os.getenv( "BICYCLE_DEBUG_LOG" ), "w" )
@@ -293,6 +355,27 @@ function unregister( id )
   end
   entities[id] = nil
 end
+
+-- Tracking, for any entity and the camera alike (Kinematics FOLLOW_LERP; the camera is just a kinematic body):
+--   opts = { mode = "lerp" | "hard", rate = 8, offset = { x, y }, deadzone = { x, y }, mirror = false,
+--            bob = 0, bobHz = 1 }
+-- mode "hard" snaps to target + offset every frame; "lerp" eases: pos += (goal - pos) * (1 - exp(-rate * dt)).
+-- deadzone (cells each side) lets the target roam that far before the follower moves. Call again to switch modes.
+function track( follower, target, opts )
+  opts = opts or {}
+  local off, dz = opts.offset or { 0, 0 }, opts.deadzone or { 0, 0 }
+  local rate = opts.mode == "hard" and 0 or ( opts.rate or opts.smoothing or 8 )
+  ffi.C.motionFollow( follower, target, off[1], off[2], rate, opts.bob or 0, opts.bobHz or 1,
+                      opts.mirror and true or false, dz[1], dz[2] )
+end
+
+-- The scene camera. By default it hard-tracks the focused entity with a dead zone (the scene's margins);
+-- Camera.track( entity, opts ) takes the same opts as track(), e.g.
+--   Camera.track( hero.id, { mode = "lerp", rate = 6, deadzone = { 8, 3 } } )
+--   Camera.track( hero.id, { mode = "hard" } )
+Camera = {}
+function Camera.id() return ffi.C.cameraEntity() end
+function Camera.track( target, opts ) track( ffi.C.cameraEntity(), target, opts ) end
 
 function focusOn( entity )
   focus = entity

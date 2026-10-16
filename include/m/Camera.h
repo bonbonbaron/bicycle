@@ -2,7 +2,7 @@
 #include "m/Entity.h"
 #include <vector>
 #include <list>
-#include "v/Window.h"
+#include "v/common/Window.h"
 #include "m/Box.h"
 
 class Camera {
@@ -19,7 +19,7 @@ class Camera {
         entityBox.pos.y >= static_cast<decltype(Position::y)>( camBox.pos.y ) && 
         entityBox.pos.y <= static_cast<decltype(Position::y)>( camBox.pos.y + camBox.size.h ); 
     }
-    void focusOn( const Entity entity );
+    void focusOn( const Entity entity );  // default tracking (hard, dead zone = margins) via Kinematics
     auto getFocus() const -> Entity;
     void setDims( const unsigned h, const unsigned w);
     void setLims( const int y, const int x);
@@ -30,7 +30,6 @@ class Camera {
     auto getLyMargin() const -> int;  // low y margin
     auto getHxMargin() const -> int;  // high x margin
     auto getHyMargin() const -> int;  // high y margin
-    void followFocus();   // tracks the focus when it moves out of the center's margin
     auto getId() const -> Entity;
     /* I choose "draw" instead of "render" since rendering doesn't
      * actually happen till the last part of the game loop. I know,

@@ -3,8 +3,9 @@
 local pilgrim_globalAnim = {
   name = "pilgrim",
   strips = {
-    walk_up = {
-      direction = 0,
+    walk_right = {
+      numReps = 0,
+      numFrames = 2,
       frames = {
         {
           duration = 0.2
@@ -13,11 +14,11 @@ local pilgrim_globalAnim = {
           duration = 0.2
         }
       },
-      numReps = 0,
-      numFrames = 2
+      direction = 0
     },
     walk_left = {
-      direction = 0,
+      numReps = 0,
+      numFrames = 2,
       frames = {
         {
           duration = 0.2
@@ -26,24 +27,11 @@ local pilgrim_globalAnim = {
           duration = 0.2
         }
       },
-      numReps = 0,
-      numFrames = 2
-    },
-    walk_right = {
-      direction = 0,
-      frames = {
-        {
-          duration = 0.2
-        },
-        {
-          duration = 0.2
-        }
-      },
-      numReps = 0,
-      numFrames = 2
+      direction = 0
     },
     walk_down = {
-      direction = 0,
+      numReps = 0,
+      numFrames = 2,
       frames = {
         {
           duration = 0.2
@@ -52,8 +40,20 @@ local pilgrim_globalAnim = {
           duration = 0.2
         }
       },
+      direction = 0
+    },
+    walk_up = {
       numReps = 0,
-      numFrames = 2
+      numFrames = 2,
+      frames = {
+        {
+          duration = 0.2
+        },
+        {
+          duration = 0.2
+        }
+      },
+      direction = 0
     }
   }
 }

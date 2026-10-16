@@ -5,28 +5,28 @@ local goldcoin_coin_anim_src_rects = {
   strips = {
     spin = {
       {
+        w = 3,
         x = 0,
         y = 0,
-        h = 3,
-        w = 3
+        h = 3
       },
       {
+        w = 3,
         x = 3,
         y = 0,
-        h = 3,
-        w = 3
+        h = 3
       },
       {
+        w = 3,
         x = 6,
         y = 0,
-        h = 3,
-        w = 3
+        h = 3
       },
       {
+        w = 3,
         x = 9,
         y = 0,
-        h = 3,
-        w = 3
+        h = 3
       }
     }
   }

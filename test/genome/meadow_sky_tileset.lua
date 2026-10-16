@@ -1,6 +1,9 @@
 --auto-generated table by generate_table.lua
 
 local meadow_sky_tileset = {
+  anim = {},
+  colormap = "meadow_sky_tileset_pixels",
+  pixels = "meadow_sky_tileset_pixels",
   ascii = {
     "        \
         ",
@@ -8,9 +11,7 @@ local meadow_sky_tileset = {
         ",
     "        \
     ..  "
-  },
-  anim = {},
-  colormap = "meadow_sky_tileset_colormap"
+  }
 }
 
 return meadow_sky_tileset

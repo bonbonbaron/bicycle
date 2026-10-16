@@ -29,6 +29,14 @@ end
 function Scene:getBg( path )
   local bg = {}
   checkType(path ,"string")
+  local packed = Asset.list( path:gsub( "/%*%.txt$", "" ) )
+  if packed then
+    for _, fp in ipairs( packed ) do
+      if fp:match( "%.txt$" ) then table.insert( bg, Asset.read( fp ) ) end
+    end
+    if #bg == 0 then error("Found no files in "..path) end
+    return bg
+  end
   handle = self:getFileIter( path )
   -- Process each file found above with callback argument.
   numFiles = 0
@@ -50,9 +58,12 @@ end
 -- This adds the genomes of all the kk
 function Scene:addFg( Genome, fg )
 	checkType( fg, "table" )
+  local spawned = {}
   for _, instance in ipairs( fg ) do
     -- Express the genome of each entity.
     local genome = Genome.new( instance.genome )
+    table.insert( spawned, genome )
+    Genome.byName[instance.genome] = Genome.byName[instance.genome] or genome.id
     ffi.C.addFgEntity( genome.id )
     if instance.pos then
       local pos = ffi.new("Position", 
@@ -74,6 +85,8 @@ function Scene:addFg( Genome, fg )
     register( genome.id, genome.tbl )
     if genome.tbl.onSpawn then genome.tbl:onSpawn() end
   end
+  -- Motions last: a fairy may follow the hero spawned after it.
+  for _, genome in ipairs( spawned ) do Genome.startMotion( genome ) end
 end
 
 -- bg is either an Aseprite background sprite exported by scripts/aseprite/sprite.lua (one tilemap layer per
@@ -115,7 +128,22 @@ function Scene.new( tbl )
   -- Push window to bicycle's internal stack of window
   Window.register(id, instance)
   instance:readLayers(Genome)
+  instance:loadScenery3d(Genome)
   return instance
+end
+
+-- 3D mode: static scenery from scripts/blender/export.py's scene3d.lua (ground, props). Characters in it are placed
+-- by their genomes' model genes instead.
+function Scene:loadScenery3d(Genome)
+  if Genome.Sprite.renderMode() ~= "3d" then return end
+  local dir = "./"..gameName.."/genome/"
+  if not Asset.exists( dir.."models/scene3d.lua" ) then return end
+  local scenery = Asset.dofile( dir.."models/scene3d.lua" )
+  for _, obj in ipairs( scenery.objects ) do
+    if obj.role ~= "character" and not ffi.C.addStaticModel( dir..obj.mesh..".bmesh" ) then
+      error( "Couldn't load 3D scenery '"..obj.mesh.."' (build the 'assets' target)." )
+    end
+  end
 end
 
 -- TODO function Scene::remove(), good for item menus in RPGs

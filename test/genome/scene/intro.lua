@@ -11,7 +11,13 @@ intro.fg = {
     { genome = "coin", pos = {64, 43} },
     { genome = "coin", pos = {140, 42} },
     { genome = "villager", pos = {2, 38} },
-    { genome = "hero", pos = {40, 38}, focus = true }
+    { genome = "hero", pos = {40, 38}, focus = true },
+    -- Motion demos (see the motion gene in scripts/Genome.lua): a fairy following the hero (follow), a butterfly
+    -- circling the villager (orbital), one looping while drifting across (combo), a patrolling beetle (linear).
+    { genome = "fairy", pos = {30, 33} },
+    { genome = "butterfly", pos = {10, 34} },
+    { genome = "moth", pos = {100, 30} },
+    { genome = "beetle", pos = {150, 45} }
   }
 }
 -- Music and sound effects (see tools/audio/README.md for making these from FL Studio, LMMS or midish).

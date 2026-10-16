@@ -4,7 +4,8 @@ local Hud = require('Hud')
 require('Dialogue')
 -- The player: an animated Aseprite character (see scripts/aseprite/sprite.lua) who walks with WASD,
 -- is blocked by solid things, gets hurt by enemies (health bar up top), and talks to NPCs with E or Space.
-local hero = { sprite="pilgrim", initAnim="walk_down", coll={ type="hero" } }
+-- model: in 3D mode the hero is the Blender character test/genome/models/pilgrim3d (scripts/blender/make_scene.py).
+local hero = { sprite="pilgrim", model="pilgrim3d", initAnim="walk_down", coll={ type="hero" } }
 
 local STEP = 256  -- one cell in fixed-point (FIXEDPT_DEC_BITS = 8)
 local DIRS = {
@@ -32,6 +33,13 @@ function hero:onSpawn()
   self.hp = Hud.bar( "HP", MAX_HEALTH )
   self.invulnerable = 0
   ffi.C.createTimer( TICK_MS, self.id, TICK, true, ffi.C.TO_BRIDGE )
+  -- The camera is a kinematic body tracking us (Camera.track in scripts/bicycle.lua). It glides after us with a
+  -- dead zone; BICYCLE_CAMERA=hard makes it hard-track instead (snap, no dead zone).
+  if os.getenv( "BICYCLE_CAMERA" ) == "hard" then
+    Camera.track( self.id, { mode = "hard" } )
+  else
+    Camera.track( self.id, { mode = "lerp", rate = 5, deadzone = { 10, 3 } } )
+  end
 end
 
 -- While touching something solid (e.g. it walked into us), refuse moves toward its center.

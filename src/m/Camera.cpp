@@ -1,42 +1,15 @@
 #include "m/Camera.h"
-#include "v/Window.h"
+#include "v/common/Window.h"
 #include <algorithm>
 #include "m/World.h"
+#include "v/common/Renderer.h"
+#include "c/Kinematics.h"
 
 
-/* TODO: consider using these functions:
- * int add_wchstr(const cchar_t *wchstr);
- * int add_wchnstr(const cchar_t *wchstr, int n);
- * int wadd_wchstr(WINDOW * win, const cchar_t *wchstr);
- * int wadd_wchnstr(WINDOW * win, const cchar_t *wchstr, int n);
- *
- * int mvadd_wchstr(int y, int x, const cchar_t *wchstr);
- * int mvadd_wchnstr(int y, int x, const cchar_t *wchstr, int n);
- * int mvwadd_wchstr(WINDOW *win, int y, int x, const cchar_t *wchstr);
- * int mvwadd_wchnstr(WINDOW *win, int y, int x, const cchar_t *wchstr, int n);
- *
- *
- * These functions copy the (null-terminated) array of complex characters wchstr into the window image structure starting at the current cursor position.  The four  functions
- * with  n  as  the last argument copy at most n elements, but no more than will fit on the line.  If n=-1 then the whole array is copied, to the maximum number of characters
- * that will fit on the line.
- *
- * The window cursor is not advanced.  These functions work faster than waddnstr.  On the other hand:
- *
- * •   they do not perform checking (such as for the newline, backspace, or carriage return characters),
- *
- * •   they do not advance the current cursor position,
- *
- * •   they do not expand other control characters to ^-escapes, and
- *
- * •   they truncate the string if it crosses the right margin, rather than wrapping it around to the new line.
- *
- * These functions end successfully on encountering a null cchar_t, or when they have filled the current line.  If a complex character cannot completely fit at the end of the
- * current line, the remaining columns are filled with the background character and rendition.
- */
 Camera::Camera() : _id( newEntityId() ) {}
 
 Camera::Camera( const int x, const int y, const int margin ) : _id( newEntityId() ), _margin(margin) {
-  World::set<Box>( _id, { { x, y, 0 }, { static_cast<unsigned>(COLS << FIXEDPT_DEC_BITS), static_cast<unsigned>(LINES << FIXEDPT_DEC_BITS), 0 } } );
+  World::set<Box>( _id, { { x, y, 0 }, { static_cast<unsigned>(gfx::cols() << FIXEDPT_DEC_BITS), static_cast<unsigned>(gfx::lines() << FIXEDPT_DEC_BITS), 0 } } );
 }
 
 void Camera::pan( const int dy, const int dx ) {
@@ -47,37 +20,6 @@ void Camera::pan( const int dy, const int dx ) {
   box.pos.y = std::clamp<int>( box.pos.y, 0, _maxY );
 }
 
-// Pans just enough to keep the whole focused-on entity at least _margin inside the field of view
-// (within the limits set by setLims()). Each axis is followed on its own:
-// * If the view is too small for both margins plus the entity, the margin shrinks to fit, and an entity
-//   taller (or wider) than the view is centered. Otherwise the low and high margins can't both be met,
-//   and the camera would pan to one, then back to the other, every frame (a shaking screen).
-// * The camera only ever moves toward the side the entity crossed, so it never undoes its own pan.
-static auto followAxis( const int camPos, const int camLen, const int margin, const int lo, const int hi ) -> int {
-  const int entityLen = hi - lo;
-  if ( entityLen >= camLen ) {
-    return lo + entityLen / 2 - camLen / 2;  // too big to fit: center it
-  }
-  const int m = std::min( margin, ( camLen - entityLen ) / 2 );
-  if ( lo < camPos + m ) {
-    return lo - m;
-  }
-  if ( hi > camPos + camLen - m ) {
-    return hi - camLen + m;
-  }
-  return camPos;
-}
-
-void Camera::followFocus() {
-  const auto& focusBox = World::get<Box>( getFocus() );
-  const auto& camBox = World::get<Box>( _id );
-  const int x = followAxis( camBox.pos.x, static_cast<int>( camBox.size.w ), _margin,
-                            focusBox.pos.x, focusBox.pos.x + static_cast<int>( focusBox.size.w ) );
-  const int y = followAxis( camBox.pos.y, static_cast<int>( camBox.size.h ), _margin,
-                            focusBox.pos.y, focusBox.pos.y + static_cast<int>( focusBox.size.h ) );
-  pan( y - camBox.pos.y, x - camBox.pos.x );
-}
-
 // TODO this assumes single-character symbols. Handle multi-char later.
 auto Camera::canSee( const Entity entity ) const -> bool {
   const auto& entityBox = World::get<Box>( entity );  // entity->body.getPosition();
@@ -85,8 +27,19 @@ auto Camera::canSee( const Entity entity ) const -> bool {
   return _canSee( camBox, entityBox );
 }
 
+// The camera doesn't move itself: it's a kinematic body tracking its focus through Kinematics' FOLLOW_LERP, like
+// any follower. The default is the old behavior: hard tracking with a dead zone that keeps the focus _margin cells
+// inside the view. Lua picks the mode (Camera.track in scripts/bicycle.lua: mode = "hard" or "lerp", rate,
+// offset, deadzone) and can switch at run time.
 void Camera::focusOn( const Entity entity ) {
   _focus = entity;
+  const auto& cam = World::get<Box>( _id );
+  const auto& tgt = World::get<Box>( entity );
+  constexpr float ONE = 1 << FIXEDPT_DEC_BITS;
+  const float m = _margin / ONE;
+  const float deadX = std::max( 0.f, ( cam.size.w - tgt.size.w ) / ( 2 * ONE ) - m );
+  const float deadY = std::max( 0.f, ( cam.size.h - tgt.size.h ) / ( 2 * ONE ) - m );
+  Kinematics::getInstance().follow( _id, entity, 0, 0, 0, 0, 0, false, deadX, deadY );
 }
 
 auto Camera::getFocus() const -> Entity {
@@ -144,31 +97,5 @@ void Camera::draw( const Entity entity, Window& tgt ) {
   if ( ! camBox.overlaps( entityBox ) ) {  // TODO let camera track what it sees via onCollision(), not Scene
     return;
   }
-  const auto& entityImg = World::get<Image>( entity );
-  // Animated entities draw only their current frame: the src rect (in character cells) of their image.
-  // A zero-width rect means "draw the whole image".
-  const auto& srcRect = World::get<Rect>( entity );
-  const bool hasSrcRect = srcRect.w > 0;
-  auto croppedBox = camBox.crop( entityBox ) >> FIXEDPT_DEC_BITS;  // portion of entityBox in FOV
-  auto entityPosWrtCamera = ( entityBox.pos - camBox.pos ) >> FIXEDPT_DEC_BITS;
-  // If the image's top row is out of FOV, then get the first row to draw.
-  // imgRowIdx is the row of the image itself we're drawing.
-  unsigned imgRowIdx = std::abs( std::min( 0, entityPosWrtCamera.y ) ) + ( hasSrcRect ? srcRect.y : 0 );
-  const int clipLeft = std::abs( std::min( entityPosWrtCamera.x, 0 ) );
-  for ( unsigned croppedBoxRowIdx{}; croppedBoxRowIdx < croppedBox.size.h; ++croppedBoxRowIdx, ++imgRowIdx ) {
-    if ( imgRowIdx >= entityImg.lineLimits.size() ) {
-      break;
-    }
-    const auto& lineLims = entityImg.lineLimits.at( imgRowIdx );
-    int rowStart = hasSrcRect ? srcRect.x : 0;
-    int rowLen = hasSrcRect ? std::min( srcRect.w, lineLims.len - srcRect.x ) : lineLims.len;
-    int stringLength = std::min( static_cast<int>( croppedBox.size.w ), rowLen - clipLeft );
-    if ( stringLength <= 0 ) {
-      continue;
-    }
-    auto rowStr = std::string( entityImg.string, lineLims.start + rowStart + clipLeft, stringLength );
-    // croppedBox is in world cells; the window is in screen cells.
-    tgt.mvprint( croppedBox.pos.y - ( camBox.pos.y >> FIXEDPT_DEC_BITS ) + croppedBoxRowIdx,
-                 croppedBox.pos.x - ( camBox.pos.x >> FIXEDPT_DEC_BITS ), rowStr );  // layerRow + 1 to skip the stop border 
-  }
+  gfx::renderer().drawEntity( tgt.getHandle(), entity, camBox );
 }

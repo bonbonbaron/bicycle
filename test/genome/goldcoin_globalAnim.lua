@@ -4,8 +4,6 @@ local goldcoin_globalAnim = {
   name = "goldcoin",
   strips = {
     spin = {
-      numFrames = 4,
-      direction = 0,
       frames = {
         {
           duration = 0.15
@@ -20,7 +18,9 @@ local goldcoin_globalAnim = {
           duration = 0.15
         }
       },
-      numReps = 0
+      direction = 0,
+      numReps = 0,
+      numFrames = 4
     }
   }
 }

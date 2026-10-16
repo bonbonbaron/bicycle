@@ -1,7 +1,18 @@
 # bicycle
 
-A terminal game engine: ncurses (PDCurses on Windows) graphics, LuaJIT game scripts, fluidsynth music and
-sound effects. The engine is one executable, `o`, that runs a game folder: `./o test` runs `test/main.lua`.
+A game engine with three render modes, LuaJIT game scripts and fluidsynth music and sound effects. The engine is
+one executable that runs a game folder: `./o test` runs `test/main.lua`.
+
+| `BICYCLE_RENDER` | executable | draws with | art |
+|---|---|---|---|
+| `ASCII` (default) | `o` | curses in a terminal (ncurses, PDCurses on Windows) | ASCII exports of Aseprite sprites, text images |
+| `2D` | `o-2d` | SDL3 window, software framebuffer | pixel (`.bimg`) exports of the same Aseprite sprites |
+| `3D` | `o-3d` | SDL3 + OpenGL 3.3 core | Blender meshes (`model` gene), sprites as billboards, 2D overlay |
+
+The game code is the same in every mode: everything is laid out in character cells (a sprite pixel is 2x1 cells,
+as in the ASCII export), so positions, collisions, the camera, the HUD and dialogue don't change. See
+`include/v/common/Renderer.h` for the interface each mode implements (`src/v/ascii`, `src/v/2d`, `src/v/3d`, with
+`src/v/sdl` shared by the pixel modes).
 
 ## Building
 
@@ -13,6 +24,18 @@ You only need CMake (3.21+), a C/C++ compiler and an internet connection; git is
 cmake -B build && cmake --build build
 ./o test            # o.exe test on Windows
 ```
+
+Pick the render mode at configure time, one build folder per mode:
+
+```sh
+cmake -B build -DBICYCLE_RENDER=ASCII && cmake --build build && ./o test
+cmake -B build/2d -DBICYCLE_RENDER=2D && cmake --build build/2d && ./o-2d test
+cmake -B build/3d -DBICYCLE_RENDER=3D && cmake --build build/3d && ./o-3d test
+```
+
+The pixel modes fetch SDL3 (static). On Linux they need the X11 and/or Wayland development headers
+(`libx11-dev libxext-dev`, `libwayland-dev`) and, for 3D, an OpenGL 3.3 driver (Mesa's llvmpipe works). Window
+size: `BICYCLE_WINDOW_SIZE=1280x720` (a cell is 8x16 screen pixels). Arrow keys work like WASD.
 
 The first configure takes a minute or two (it builds the dependencies into `build/_deps`); later builds don't
 repeat it. The executable lands in the repository root because games and `scripts/` are found relative to the
@@ -56,6 +79,17 @@ o test
 * `BICYCLE_FETCH_NCURSES` (OFF): on Linux/macOS, build ncurses instead of using the system one.
 * `BICYCLE_DOWNLOAD_GM_SF2` (ON): download GeneralUser GS (32 MB) to `sf2/default-GM.sf2`, the music fallback.
 * `BICYCLE_DEPS_DIR` (`build/_deps`): where downloads and dependency builds go.
+* `BICYCLE_RENDER` (`ASCII`): `ASCII`, `2D` or `3D`.
+* `BICYCLE_GAMES` (`test`): game folders whose assets the `assets` target packs.
+* `BICYCLE_RELEASE_ASSETS` (OFF): pack assets every build and load them from the pack (see Assets).
+* `BICYCLE_RELEASE` (OFF): a shippable build with **zero file I/O at run time**: the game, the engine's Lua
+  scripts and fonts are linked into the executable (see "Release builds: everything from memory"). Implies
+  `BICYCLE_RELEASE_ASSETS`. Needs GCC/clang (MinGW, llvm-mingw/CLANG64 or Linux), not MSVC.
+* `BICYCLE_EMBED_GM_SF2` (OFF): with `BICYCLE_RELEASE`, also embed `sf2/default-GM.sf2` (+30 MB); otherwise a
+  release build has no General MIDI fallback, only the game's own SoundFonts.
+* `BICYCLE_TERMINFO_FALLBACKS`: with `BICYCLE_RELEASE` (ASCII, Linux/macOS), the terminals whose terminfo is
+  compiled into ncurses (default: xterm(-256color), screen, tmux, linux, vt100, rxvt-unicode, st, alacritty,
+  kitty, foot, wezterm; whichever this machine's terminfo has).
 
 ### Music
 
@@ -83,9 +117,214 @@ cmake -B build/clang64 -G Ninja -DCMAKE_TOOLCHAIN_FILE=cmake/mingw-w64.cmake \
       -DMINGW_CC=x86_64-w64-mingw32-clang -DMINGW_CXX=x86_64-w64-mingw32-clang++ && cmake --build build/clang64
 ```
 
-The resulting `o.exe` runs under Wine.
+Add `-DBICYCLE_RENDER=2D` or `3D` for `o-2d.exe` / `o-3d.exe`. The resulting executables run under Wine.
+
+## Assets
+
+### Dev workflow vs finalizing a game
+
+**Dev (the default)**: the engine reads loose, uncompressed files straight from the game folder: Lua and genomes,
+Aseprite `.bimg` exports, `.mid`/`.sf2`, and meshes as the `.obj`/`.mtl` the Blender exporter writes (parsed at load,
+`src/data/Obj.cpp`). Edit a file and rerun `./o test`: there is no pack and no compile step, and no pack is mounted
+even if an old `assets.bpak` is lying around.
+
+**Release / finalizing**: configure with `-DBICYCLE_RELEASE_ASSETS=ON`; then every build runs the `assets` target and
+the engine mounts `<game>/assets.bpak` and reads through it. `cmake --build build --target package` packs a game
+in either mode. Both paths read into the same memory pools (see below); only the source of the bytes differs.
+
+### Packing and compression
+
+The `assets`/`package` target (`tools/pack`, a host tool, also when cross-compiling) compresses each game folder's
+`main.lua` and `genome/**` into `<game>/assets.bpak`. A release build mounts the pack at start-up and reads
+everything through it (`include/data/Pack.h`): Lua modules (a `package.loaders` searcher), Aseprite exports, MIDI,
+SoundFonts, images and meshes. Files missing from the pack are read from disk, and `BICYCLE_LOOSE_ASSETS=1`
+ignores the pack.
+
+| entry | stored as | decoded with |
+|---|---|---|
+| `.lua`, `.txt`, `.mid`, `.sf2`, ... | zlib (miniz at level 10 when packing) | jollybean's `tinfl` (`src/data/tinfl.c`) |
+| `.bimg` (indexed) | jollybean's strip codec (deduplicated runs of N pixels, bit-packed indices, deflated), or deflate if smaller | `src/data/Strip.cpp` |
+| `.obj` (Blender) | `.bmesh`: Edgebreaker connectivity, quantized + parallelogram-predicted positions, octahedral normals, delta UVs, all deflated | `src/data/Mesh.cpp`, `src/data/Edgebreaker.cpp` |
+
+Game SoundFonts are handed to fluidsynth from memory (a custom SoundFont loader whose file callbacks read a
+buffer; names start with `bicycle-mem://`), and MIDI files with `fluid_player_add_mem`, so neither touches the
+disk. The 32 MB General MIDI fallback (`sf2/default-GM.sf2`) stays a plain file outside the pack in dev and
+`BICYCLE_RELEASE_ASSETS` builds: it's shared by every game and barely compresses (SoundFont samples are PCM). A
+`BICYCLE_RELEASE` build embeds it only with `BICYCLE_EMBED_GM_SF2`.
+
+`ctest` (or `build/bicycle-tests test`) round-trips every codec and every pack entry, including the Blender meshes.
+
+### Release builds: everything from memory
+
+`-DBICYCLE_RELEASE=ON` makes an executable that reads no files at all once `main()` starts:
+
+```sh
+cmake -B build-rel -G Ninja -DCMAKE_BUILD_TYPE=Release -DBICYCLE_RELEASE=ON [-DBICYCLE_RENDER=2D|3D] && cmake --build build-rel
+./o            # runs the embedded game (the first of BICYCLE_GAMES); `./o test` also works, nothing else is needed
+ctest --test-dir build-rel -R release-zero-io   # proves it with strace (below)
+```
+
+**What's embedded.** The build packs the game (`main.lua`, `genome/**`: genomes, Aseprite exports, tilemaps, MIDI,
+SoundFonts, Blender meshes and skins) together with `scripts/*.lua` (as `scripts/<name>.lua`) and the UI fonts
+(`<game>/fonts/*.ttf` if the game has any, else `fonts/*.ttf`, as `fonts/<name>.ttf`), plus with
+`BICYCLE_EMBED_GM_SF2` the GM SoundFont as `sf2/default-GM.sf2`, into `build-rel/embedded-<game>.bpak` (same
+compression as above). `src/data/EmbeddedPack.c` links it in with `.incbin` (ELF and COFF, so Linux, MinGW and
+llvm-mingw alike), and the engine mounts those bytes in place: no copy, no file. Shaders are string literals in
+`src/v/3d/Renderer3D.cpp`. The 2D/3D pixel modes' bitmap fallback font is compiled in (`Font8x8.h`). The `test` game
+embeds 1.1 MB.
+
+**How each subsystem loads** (`BICYCLE_RELEASE` is a compile-time switch; the file paths are compiled out):
+
+* Asset reads (`assets::read/exists/list`, `include/data/Pack.h`): only the embedded pack; `readFile` and the
+  loose-file fallback are compiled out (no `<fstream>`).
+* Lua: `package.loaders` is preload + the pack searcher (`require("Genome")` finds `scripts/Genome.lua`, a game's
+  `require("./test/genome/hero")` its genome); Lua's file searchers are removed and `package.path`/`cpath` are empty.
+  `io.open`, `io.popen`, `os.remove/rename/execute`, `package.loadlib` and `loadfile` return nil + "no file I/O";
+  `dofile`, `io.lines/input/output`, `os.tmpname` raise. `io.write`/`io.stderr` still work. Scripts load assets with
+  `Asset.read/dofile/list` (`scripts/bicycle.lua`), which go through the pack.
+* Audio: SoundFonts are inflated into the AUDIO pool and loaded through fluidsynth's SoundFont loader with memory
+  callbacks (`fluid_sfloader_set_callbacks`; `bicycle-mem://` names); the callbacks' `fopen` branch is compiled out.
+  MIDI goes through `fluid_player_add_mem`. The GM fallback comes only from the pack. `BICYCLE_AUDIO_FILE` and
+  `BICYCLE_PROFILE` (they write files) are compiled out.
+* Fonts: `UiFont` reads `fonts/ui.ttf` through the pack. Screenshots (`BICYCLE_SCREENSHOT`) are compiled out.
+* ASCII mode: ncurses is built from source with `--disable-database --with-fallbacks=...`, so terminal descriptions
+  are compiled in and no terminfo file is read (`TERM` must be one of `BICYCLE_TERMINFO_FALLBACKS`). Windows uses
+  PDCurses, which reads no files. `setlocale` asks only for `LC_CTYPE` (UTF-8).
+* 2D/3D on Linux: `MESA_SHADER_CACHE_DISABLE=true` is set before SDL starts (unless already set), so mesa doesn't read
+  or write `~/.cache/mesa_shader_cache`.
+
+**The check.** `tests/release_io_test.sh` (CTest `release-zero-io`, Linux, needs `strace`, and `xvfb-run` for
+2D/3D without a display) copies the executable into an empty temporary folder, runs it headless for 120 frames
+(`BICYCLE_MAX_FRAMES`) under `strace -f -e trace=open,openat,openat2,creat,stat,lstat,newfstatat,statx,access,
+faccessat(2),readlink(at)`, and looks at every path touched after `main()` starts (marked by a `prctl(PR_GET_NAME)`
+in `src/main.cpp`; the dynamic loader's opens come before). It fails on anything that isn't the operating system's:
+any relative path, the game folder, `scripts/`, `fonts/`, `sf2/`, a `.bpak`, config or save files. What remains,
+and is allowed, is the OS's own doing:
+
+| mode | remaining opens | why |
+|---|---|---|
+| all | `/dev/snd/*`, `/usr/share/alsa/**`, `/etc/alsa/conf.d/*`, `~/.asoundrc` (probe) | fluidsynth's ALSA driver: alsa-lib reads its config and probes sound cards |
+| all | `bicycle-mem://test/genome/music/meadow.sf2` (stat, ENOENT) | fluidsynth stats a SoundFont name before calling our loader; not a file, nothing read |
+| ASCII | `/usr/lib/locale/C.utf8/LC_CTYPE`, `locale.alias`, `gconv-modules.cache` | `setlocale(LC_CTYPE, "")` for UTF-8 output |
+| 2D/3D | `/lib/x86_64-linux-gnu/lib{GL,GLX_mesa,gallium,LLVM,drm,X*,xcb-*,wayland-*,decor}...`, `/etc/ld.so.cache` | SDL and libglvnd `dlopen` the window system and GL driver at run time |
+| 2D/3D | `/usr/lib/locale/**`, `/usr/share/X11/locale/**`, `~/.XCompose`, `~/.compose-cache`, `/var/cache/libx11/compose`, `~/.Xdefaults*`, `~/.Xauthority` | X11: SDL's `XOpenIM` (keyboard input method, compose tables), Xlib resources and auth |
+| 2D/3D | `/usr/share/icons/**/cursors/*`, `~/.icons/**`, `/usr/share/pixmaps/**` | libXcursor loading the cursor theme for SDL's system cursors |
+| 2D/3D | `/usr/share/drirc.d/*`, `/etc/drirc`, `~/.drirc`, `/dev/dri/*`, `/dev/udmabuf`, `/sys/devices/system/cpu/*`, `/proc/self/exe` | mesa: driver config (matched against the executable's name), GPU devices, CPU count |
+
+On Windows the same build (PDCurses, WinMM/DirectSound, WGL) reads no files of its own either; the OS loads its
+DLLs. The `strace` check is Linux-only.
+
+### 2D art: Aseprite
+
+`scripts/aseprite/sprite.lua` exports an `.aseprite` file to `test/genome/` (see `scripts/aseprite/README.txt`):
+
+```sh
+aseprite -b test/aseprite/pilgrim.aseprite --script scripts/aseprite/sprite.lua
+```
+
+`BICYCLE_EXPORT=ascii|pixels|both` (default `both`) picks the outputs. ASCII writes `<layer>_colormap.lua` (ASCII
+art) and per-tile ASCII; pixels writes `<layer>_pixels.bimg` (an indexed frame strip, frame f at x = (f-1) * canvas
+width, index 0 transparent) and `<layer>_tileset_pixels.bimg`, and records each layer's palette in
+`<layer>_palette.lua`. Animation src rects, tags, tilemaps, background modes and collision data are shared by both.
+The pixel modes use the `.bimg` files when a sprite has them, and a genome can name different art for them with
+`sprite2d` (e.g. the horse keeps its hand-drawn ASCII `img` and uses `horse_sprite` in 2D/3D).
+
+### 3D art: Blender
+
+See `scripts/blender/README.md`: `make_scene.py` authors the test scene headless, `export.py` exports it
+(`blender -b scene.blend --python scripts/blender/export.py -- test/genome/models`), and the pack turns the OBJs
+into `.bmesh`. Genomes pick a mesh with `model = "<object>"`.
+
+## Motion and tracking (Kinematics)
+
+Kinematics drives four motion types (`include/m/Motion.h`; the math is in `include/c/MotionMath.h` and is
+unit-tested by `tests/motion_test.cpp`). Units are cells (a sprite pixel is 2x1 cells) and timing is framerate
+independent.
+
+* `linear`: walk waypoints at `speed` cells/s, looping or ping-ponging.
+* `orbital`: circle or ellipse around a point or an entity (`radius` in rows, so rx = 2*radius; `rx`/`ry` to override;
+  `speed` in deg/s; `phase`).
+* `combo`: an orbit whose center travels a waypoint path (`travel` cells/s).
+* `follow`: `pos += (target+offset-pos)*(1-exp(-rate*dt))`, with an optional dead zone, offset mirroring and idle
+  bob. `mode="hard"` (rate 0) snaps every frame.
+
+A genome declares one with the `motion` gene; motions start once every entity in the scene has spawned:
+
+```lua
+motion = { type = "follow", target = "hero", mode = "lerp", rate = 3.5, offset = {9, -5}, bob = 0.6, bobHz = 1.1 }
+motion = { type = "orbital", around = "villager", radius = 5, speed = 100 }
+motion = { type = "combo", radius = 3, speed = 200, travel = 5, path = {{0,0},{50,0}}, pingpong = true }
+motion = { type = "linear", speed = 6, path = {{0,0},{36,0},{36,3},{0,3}} }
+```
+
+At runtime, `track(follower, target, opts)` makes any entity a follower, with
+`opts = {mode="lerp"|"hard", rate=8, offset={x,y}, deadzone={x,y}, mirror, bob, bobHz}`. Calling it again switches
+mode and keeps the current position.
+
+### The camera is a kinematic body
+
+The camera has no follow logic of its own. It is an entity that Kinematics moves with the same follow motion, clamped
+to the world bounds. Its position is sub-cell (fixed point). `Camera.track` takes the same options as `track`:
+
+```lua
+Camera.track(hero.id, { mode = "lerp", rate = 5, deadzone = {10, 3} })  -- smooth
+Camera.track(hero.id, { mode = "hard" })                                -- snap to the hero each frame
+```
+
+The 2D renderer offsets each layer and sprite by the camera's fractional cell in screen pixels, so scrolling moves
+in 1-px steps even when a logical pixel is 16 px wide. The framebuffer is drawn on the CPU, so there are no seams,
+and the UI stays fixed. 3D reads the float position. ASCII snaps to whole cells. In the test game,
+`BICYCLE_CAMERA=hard` picks hard tracking.
+
+## UI per render mode
+
+`src/v/common` (Window, Dialogue, TextMenu, Bar) lays UI out in cells and calls the renderer; each mode draws it
+its own way behind `gfx::Renderer` (`drawBar`, `drawMenuCursor`, `setPanel` + `clearWindow`/`drawBorder`). ASCII
+keeps curses boxes and the text bar. 2D (`src/v/2d`) draws flat pixel-art panels and a segmented bar; 3D
+(`src/v/3d`) draws translucent gradient panels and a glossy pill bar in the overlay. Both color the bar by
+fraction (green, then yellow/amber, then red), take optional bar sprites (`hp:sprites( frame, fill )` in
+`scripts/Hud.lua`), and render text with TrueType (`fonts/ui.ttf`, stb_truetype). In the pixel modes, ASCII-art
+images that have no pixel version are drawn as solid cell blocks, not characters.
+
+## Texture atlas (2D and 3D)
+
+Every sprite and tileset image is registered as it loads and packed into one atlas (`src/v/sdl/SpriteAtlas.cpp`)
+with jollybean's planner (`src/data/Atlas.cpp`, ported from `xRender.c`: sort by largest side, binary tree of
+right/lower placements, grow right or down). The atlas is re-planned once after a batch of loads, not per frame;
+its ARGB pixels live in GRAPHIC. 2D reads sprite pixels from it; 3D uploads it as one texture and draws all
+billboards in a single batched draw call. Mesh textures (which tile with GL_REPEAT) keep their own textures.
+`BICYCLE_ATLAS_INFO=1` prints the atlas size on each rebuild.
+
+## Skeletal animation (3D)
+
+Rigged models export a `.bskin` next to their mesh (see `scripts/blender/README.md`); the 3D renderer skins them on
+the GPU and `anim:set(tag)` chooses the action (`walk_left` -> `walk`). Unrigged models still turn and bob.
+
+## Memory pools
+
+All engine memory comes from one arena cut into bump-allocated pools (`include/data/Mem.h`, after jollybean's
+`mem.c`): PERMANENT (asset pack), GENERAL (every `new` in the engine, std containers), TEXT (the LuaJIT heap and
+scripts), GRAPHIC (images, meshes, textures, framebuffers, GL staging), AUDIO (SoundFonts, MIDI) and TEMPORARY
+(scratch, reset every frame and after each image load). `mem::Allocator` / `mem::Vector` / `mem::String` /
+`mem::Resource` (pmr) put std containers in a pool. Sizes: `-DBICYCLE_MEM_<POOL>_MB=` or the same environment
+variable; overflowing a pool is fatal and names it. `BICYCLE_MEM_STATS=1` prints high-water marks at exit.
+
+Limits: LuaJIT takes the custom allocator only in GC64 builds (the default on x64/arm64, which the fetched LuaJIT
+is); a non-GC64 build falls back to LuaJIT's own allocator with a warning. fluidsynth copies SoundFont samples into
+its own malloc'd memory, so only the sf2/mid bytes are in AUDIO. Third-party C code (SDL, fluidsynth, GL drivers)
+still uses malloc. fluidsynth's cpp11 thread code is patched at fetch time (new vs free mismatch).
 
 ## Environment variables
 
-`BICYCLE_AUDIO_DRIVER`, `BICYCLE_AUDIO_FILE`, `BICYCLE_GM_SF2`, `BICYCLE_MUTE_MUSIC`, `BICYCLE_PROFILE` (audio
+* `BICYCLE_MODEL_ACTION=<action>`: 3D, pin every rigged model to one action.
+
+`BICYCLE_MAX_FRAMES=<n>`: quit after n frames (headless tests).
+
+`BICYCLE_SCRIPTED_INPUT="w@20-34/2,d@36-170/2"`: press a key on frames 20..34, every 2nd frame (dev only).
+
+`BICYCLE_LOOSE_ASSETS`, `BICYCLE_WINDOW_SIZE`, `BICYCLE_SCREENSHOT=<file.bmp>` (`%d` = frame number; in
+ASCII the file is a text dump of the screen) (+ `BICYCLE_SCREENSHOT_FRAME`, default 90, or a list in
+`BICYCLE_SCREENSHOT_FRAMES=40,41,42`, and `BICYCLE_EXIT_AFTER_SCREENSHOT=1`) and `BICYCLE_GL_INFO` for the pixel modes;
+
+and `BICYCLE_AUDIO_DRIVER`, `BICYCLE_AUDIO_FILE`, `BICYCLE_GM_SF2`, `BICYCLE_MUTE_MUSIC`, `BICYCLE_PROFILE` (audio
 start-up timings) and `BICYCLE_DEBUG_LOG` (Lua `dbglog`): see `include/c/MidiPlayer.h` and `tools/audio/README.md`.

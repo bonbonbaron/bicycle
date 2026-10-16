@@ -1,6 +1,9 @@
 --auto-generated table by generate_table.lua
 
 local meadow_ground_tileset = {
+  anim = {},
+  colormap = "meadow_ground_tileset_pixels",
+  pixels = "meadow_ground_tileset_pixels",
   ascii = {
     "        \
         ",
@@ -10,9 +13,7 @@ MMMMMMMM",
   ||||  ",
     "        \
   ooOO  "
-  },
-  anim = {},
-  colormap = "meadow_ground_tileset_colormap"
+  }
 }
 
 return meadow_ground_tileset
