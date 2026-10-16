@@ -270,13 +270,27 @@ ffi.cdef([[
 
 -- Game assets come from <game>/assets.bpak when it's there (inflated by the engine), else from loose files.
 Asset = {}
+-- Outside the engine (e.g. plain luajit running a headless test) there's no ffi.C.assetRead: use files.
+local inEngine = pcall( function() return ffi.C.assetRead end )
 function Asset.read( path )
+  if not inEngine then
+    local f = io.open( path, "rb" )
+    if not f then return nil end
+    local s = f:read( "*a" )
+    f:close()
+    return s
+  end
   local len = ffi.new( "size_t[1]" )
   local p = ffi.C.assetRead( path, len )
   if p == nil then return nil end
   return ffi.string( p, len[0] )
 end
 function Asset.exists( path )
+  if not inEngine then
+    local f = io.open( path, "rb" )
+    if f then f:close() end
+    return f ~= nil
+  end
   return ffi.C.assetExists( path )
 end
 -- Runs a Lua asset (a genome table, tilemap, ...) and returns its result.
@@ -289,7 +303,7 @@ function Asset.dofile( path )
 end
 -- Paths of the files in a folder: from the pack, or nil when there's no pack (list the folder yourself).
 function Asset.list( dir )
-  if not ffi.C.assetPacked() then return nil end
+  if not inEngine or not ffi.C.assetPacked() then return nil end
   local out = {}
   for line in ffi.string( ffi.C.assetList( dir ) ):gmatch( "[^\n]+" ) do table.insert( out, line ) end
   return out
