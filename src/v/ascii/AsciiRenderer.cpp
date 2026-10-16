@@ -1,5 +1,6 @@
 // ASCII mode: the terminal through curses. This is the engine's original renderer, moved behind gfx::Renderer.
 #include "v/ascii/AsciiRenderer.h"
+#include "v/common/Capture.h"
 #include "curses_compat.h"
 #include "c/SshInputListener.h"
 #include "m/World.h"
@@ -195,6 +196,19 @@ void AsciiRenderer::presentWindow( WinHandle win ) {
 
 void AsciiRenderer::endFrame() {
   doupdate();  // displays results of the window painting
+#ifndef BICYCLE_RELEASE
+  // BICYCLE_SCREENSHOT(_FRAMES) (include/v/common/Capture.h): the screen's text.
+  if ( auto path = capture::pathFor( _frames ) ) {
+    if ( FILE* f = std::fopen( path->c_str(), "w" ) ) {
+      std::string line( COLS + 1, '\0' );
+      for ( int y = 0; y < LINES; ++y ) {
+        mvwinnstr( curscr, y, 0, line.data(), COLS );
+        std::fprintf( f, "%s\n", line.c_str() );
+      }
+      std::fclose( f );
+    }
+  }
+#endif
   if ( _inFrame ) {
     const long long ns = std::chrono::steady_clock::now().time_since_epoch().count() - _frameStart;
     _renderNs += ns;
@@ -249,7 +263,12 @@ void AsciiRenderer::drawLayer( WinHandle win, const Image& img, int offX, int of
 }
 
 // Prints the part of the entity's image (or its current animation frame) that the camera sees.
-void AsciiRenderer::drawEntity( WinHandle win, Entity entity, const Box& camBox ) {
+void AsciiRenderer::drawEntity( WinHandle win, Entity entity, const Box& smoothCam ) {
+  // Terminals draw whole cells: snap the camera down to its cell (as Scene does for the layers), so the world and
+  // the sprites always round the same way and nothing jitters while the camera glides.
+  Box camBox = smoothCam;
+  camBox.pos.x &= ~( ( 1 << FIXEDPT_DEC_BITS ) - 1 );
+  camBox.pos.y &= ~( ( 1 << FIXEDPT_DEC_BITS ) - 1 );
   const auto& entityBox = World::get<Box>( entity );
   const auto& entityImg = World::get<Image>( entity );
   const auto& srcRect = World::get<Rect>( entity );

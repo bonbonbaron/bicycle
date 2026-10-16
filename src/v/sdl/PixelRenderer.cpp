@@ -1,5 +1,6 @@
 // Shared by the 2D and 3D renderers: SDL3 window and keyboard, and a software framebuffer drawn in cells.
 #include "v/sdl/PixelRenderer.h"
+#include "v/common/Capture.h"
 #include "v/sdl/Font8x8.h"
 #include "v/common/Image.h"
 #include "v/common/ColorPalette.h"
@@ -381,30 +382,25 @@ void PixelRenderer::setAttr( WinHandle win, int attr, bool on ) {
   else WIN( win )->attr &= ~attr;
 }
 
-// BICYCLE_SCREENSHOT=<file.bmp> saves frame BICYCLE_SCREENSHOT_FRAME (default 90); BICYCLE_EXIT_AFTER_SCREENSHOT=1
-// then quits. For headless runs (Xvfb) and docs.
+// BICYCLE_SCREENSHOT / BICYCLE_SCREENSHOT_FRAMES (include/v/common/Capture.h) save frames as .bmp;
+// BICYCLE_EXIT_AFTER_SCREENSHOT=1 quits after the last one. For headless runs (Xvfb) and docs.
 auto PixelRenderer::screenshotDue() const -> bool {
-#ifdef BICYCLE_RELEASE
-  return false;  // release builds write no files
-#endif
-  static const char* path = std::getenv( "BICYCLE_SCREENSHOT" );
-  static const int when = envInt( "BICYCLE_SCREENSHOT_FRAME", 90 );
-  return path && *path && _frame == when;
+  return capture::pathFor( _frame ).has_value();
 }
 
 void PixelRenderer::saveScreenshotIfDue() {
-  if ( !screenshotDue() ) return;
 #ifndef BICYCLE_RELEASE
-  const char* path = std::getenv( "BICYCLE_SCREENSHOT" );
+  const auto path = capture::pathFor( _frame );
+  if ( !path ) return;
   gfx::Pixels shot;
   captureFrame( shot );
   if ( shot.size() != _fb.size() ) return;
   SDL_Surface* s = SDL_CreateSurfaceFrom( _fbW, _fbH, SDL_PIXELFORMAT_ARGB8888, shot.data(), _fbW * 4 );
   if ( s ) {
-    if ( !SDL_SaveBMP( s, path ) ) std::fprintf( stderr, "screenshot failed: %s\n", SDL_GetError() );
+    if ( !SDL_SaveBMP( s, path->c_str() ) ) std::fprintf( stderr, "screenshot failed: %s\n", SDL_GetError() );
     SDL_DestroySurface( s );
   }
-  if ( envInt( "BICYCLE_EXIT_AFTER_SCREENSHOT", 0 ) ) _quit = true;
+  if ( envInt( "BICYCLE_EXIT_AFTER_SCREENSHOT", 0 ) && _frame >= capture::lastFrame() ) _quit = true;
 #endif
 }
 
@@ -456,10 +452,13 @@ void PixelRenderer::drawLayer( WinHandle win, const Image& img, int offX, int of
   // Pixels come from the texture atlas (already ARGB).
   const BImg& p = *img.pixels;
   const auto at = _atlas.entry( img.pixels );
-  const int ox = w->x * CELL_W, oy = w->y * CELL_H;
+  // Smooth scrolling: the whole layer moves up/left by the camera's sub-cell remainder in screen pixels, so one
+  // more row and pixel column are drawn to fill the edge. Every image pixel is still a whole solid rect of the
+  // framebuffer (nearest, no filtering), so tiles stay crisp and can't open seams.
+  const int ox = w->x * CELL_W - _subX, oy = w->y * CELL_H - _subY;
   const int px0 = offX >= 0 ? offX / 2 : -( ( -offX + 1 ) / 2 );  // floor( offX / 2 )
-  const int px1 = ( offX + winW + 1 ) / 2 + 1;
-  for ( int r = 0; r < winH; ++r ) {
+  const int px1 = ( offX + winW + 1 ) / 2 + 2;
+  for ( int r = 0; r < winH + ( _subY ? 1 : 0 ); ++r ) {
     int iy = r + offY;
     if ( wrap ) iy = wrapIdx( iy, p.h );
     else if ( iy < 0 || iy >= p.h ) continue;
@@ -480,8 +479,14 @@ void PixelRenderer::drawEntity( WinHandle win, Entity entity, const Box& camBox 
   const auto& img = World::get<Image>( entity );
   const auto& src = World::get<Rect>( entity );
   const bool hasSrc = src.w > 0;
-  const int ex = ( box.pos.x - camBox.pos.x ) >> FIXEDPT_DEC_BITS;  // entity's top-left in window cells
-  const int ey = ( box.pos.y - camBox.pos.y ) >> FIXEDPT_DEC_BITS;
+  // The camera's whole cell and its remainder, the same split the scene's layers get (Scene::render), so
+  // sprites and the ground move together to the screen pixel.
+  constexpr int FRAC = ( 1 << FIXEDPT_DEC_BITS ) - 1;
+  const int camX = camBox.pos.x & ~FRAC, camY = camBox.pos.y & ~FRAC;
+  const int ex = ( box.pos.x - camX ) >> FIXEDPT_DEC_BITS;  // entity's top-left in window cells (text images)
+  const int ey = ( box.pos.y - camY ) >> FIXEDPT_DEC_BITS;
+  const int exPx = ( ( box.pos.x - camX ) * CELL_W >> FIXEDPT_DEC_BITS ) - ( ( camBox.pos.x & FRAC ) * CELL_W >> FIXEDPT_DEC_BITS );
+  const int eyPx = ( ( box.pos.y - camY ) * CELL_H >> FIXEDPT_DEC_BITS ) - ( ( camBox.pos.y & FRAC ) * CELL_H >> FIXEDPT_DEC_BITS );
   const int sx = hasSrc ? src.x : 0, sy = hasSrc ? src.y : 0;
   const int sw = hasSrc ? src.w : img.size.w >> FIXEDPT_DEC_BITS;
   const int sh = hasSrc ? src.h : img.size.h >> FIXEDPT_DEC_BITS;
@@ -499,7 +504,7 @@ void PixelRenderer::drawEntity( WinHandle win, Entity entity, const Box& camBox 
     for ( int c = 0; c < sw / 2; ++c ) {
       const int ix = sx / 2 + c;
       if ( ix < 0 || ix >= p.w ) continue;
-      fillRect( w, ox + ( ex + 2 * c ) * CELL_W, oy + ( ey + r ) * CELL_H, 2 * CELL_W, CELL_H, _atlas.at( at.x + ix, at.y + iy ) );
+      fillRect( w, ox + exPx + 2 * c * CELL_W, oy + eyPx + r * CELL_H, 2 * CELL_W, CELL_H, _atlas.at( at.x + ix, at.y + iy ) );
     }
   }
 }

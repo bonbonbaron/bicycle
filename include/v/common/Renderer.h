@@ -84,6 +84,9 @@ class Renderer {
     virtual void drawEntity( WinHandle win, Entity entity, const Box& camBox ) = 0;
     // Brackets one scene's layers and entities (the 3D renderer draws its world here).
     virtual void beginScene( WinHandle win, const Box& camBox ) {}
+    // The next drawLayer's offsets are whole cells; this is the remainder in 1/256 cell (0..255 each) for
+    // renderers that can draw between cells (pixel modes shift by it in screen pixels; ASCII snaps).
+    virtual void setLayerSubcell( int fx, int fy ) {}
     virtual void endScene( WinHandle win ) {}
     // 3D mode: an entity drawn as a mesh instead of its sprite, and static scenery (other modes ignore both).
     // Paths are asset paths of .bmesh files (see include/data/Mesh.h).

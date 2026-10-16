@@ -4,6 +4,7 @@
 // in cell coordinates. A cell is CELL_W x CELL_H screen pixels, so an image pixel (2x1 cells) is 16x16.
 // Subclasses put the framebuffer on screen: 2D blits it with SDL_Renderer; 3D draws its GL world first and
 // composites the framebuffer over it as the 2D overlay.
+#include "fixed.h"
 #include "v/common/Renderer.h"
 #include <cstdint>
 #include <memory>
@@ -49,6 +50,10 @@ class PixelRenderer : public Renderer {
 
     void drawLayer( WinHandle win, const Image& img, int offX, int offY, bool wrap, int winW, int winH ) override;
     void drawEntity( WinHandle win, Entity entity, const Box& camBox ) override;
+    void setLayerSubcell( int fx, int fy ) override {
+      _subX = fx * CELL_W >> FIXEDPT_DEC_BITS;  // screen pixels: the camera's sub-cell position
+      _subY = fy * CELL_H >> FIXEDPT_DEC_BITS;
+    }
     void preloadImage( const std::shared_ptr<const BImg>& img ) override { _atlas.add( img ); }
 
   protected:
@@ -78,6 +83,7 @@ class PixelRenderer : public Renderer {
 
     // Pixel helpers, in screen pixels, clipped to win (null = whole screen). ARGB; alpha 0 skips.
     void fillRect( const Win* win, int x, int y, int w, int h, uint32_t argb );
+    int _subX{}, _subY{};  // see setLayerSubcell
     void glyph( const Win* win, int px, int py, unsigned char c, uint32_t fg, uint32_t bg );
     // Alpha-blended drawing (straight alpha, so the 3D overlay composites right).
     void clip( const Win* w, int& x0, int& y0, int& x1, int& y1 ) const;  // to w (null = screen) and the screen

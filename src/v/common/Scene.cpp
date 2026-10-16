@@ -1,4 +1,5 @@
 #include "v/common/Scene.h"
+#include "c/Kinematics.h"
 #include "m/World.h"
 #include "v/common/Renderer.h"
 #include <algorithm>
@@ -95,8 +96,12 @@ void Scene::updateCameraLimits() {
     }
   }
   const auto& camBox = World::get<Box>( _camera.getId() );
-  _camera.setLims( std::max( 0, worldH - static_cast<int>( camBox.size.h ) ),
-                   std::max( 0, worldW - static_cast<int>( camBox.size.w ) ) );
+  const int maxY = std::max( 0, worldH - static_cast<int>( camBox.size.h ) );
+  const int maxX = std::max( 0, worldW - static_cast<int>( camBox.size.w ) );
+  _camera.setLims( maxY, maxX );
+  // The camera is moved by Kinematics (it tracks its focus like any follower); keep it inside the world.
+  constexpr float ONE = 1 << FIXEDPT_DEC_BITS;
+  Kinematics::getInstance().setBounds( _camera.getId(), 0, 0, maxX / ONE, maxY / ONE );
 }
 
 void Scene::renderFg( const Layer& layer ) {
@@ -110,36 +115,41 @@ void Scene::renderFg( const Layer& layer ) {
 
 void Scene::render() {
   updateCameraLimits();
-  _camera.followFocus();
+  // The camera's position is fixed point (1/256 cell), moved smoothly by Kinematics. Layers are drawn at whole
+  // cells (floor) plus a sub-cell remainder that pixel renderers turn into a screen-pixel shift (setLayerSubcell);
+  // ASCII ignores it, so everything snaps to the same floored cell and nothing jitters against anything else.
   const auto& camPos = World::get<Box>( _camera.getId() ).pos;
-  const int camX = camPos.x >> FIXEDPT_DEC_BITS;
-  const int camY = camPos.y >> FIXEDPT_DEC_BITS;
   auto& r = gfx::renderer();
   const int w = getWidth();
   const int h = getHeight();
   r.beginScene( getHandle(), World::get<Box>( _camera.getId() ) );
+  constexpr int FRAC = ( 1 << FIXEDPT_DEC_BITS ) - 1;
+  // Draws a layer whose top-left window cell shows image position (fx, fy) (fixed point).
+  auto draw = [&]( const Layer& layer, const int fx, const int fy, const bool wrap ) {
+    r.setLayerSubcell( fx & FRAC, fy & FRAC );
+    r.drawLayer( getHandle(), World::get<Image>( layer.id ), fx >> FIXEDPT_DEC_BITS, fy >> FIXEDPT_DEC_BITS, wrap, w, h );
+    r.setLayerSubcell( 0, 0 );
+  };
   for ( auto& layer : _grid.getLayers() ) {
     const auto& pos = World::get<Box>( layer.id ).pos;
-    const int x = pos.x >> FIXEDPT_DEC_BITS;
-    const int y = pos.y >> FIXEDPT_DEC_BITS;
-    const int px = camX * layer.parallaxPct / 100;
-    const int py = camY * layer.parallaxPctY / 100;
+    const int px = static_cast<int>( static_cast<long long>( camPos.x ) * layer.parallaxPct / 100 );
+    const int py = static_cast<int>( static_cast<long long>( camPos.y ) * layer.parallaxPctY / 100 );
     switch ( layer.type ) {
       case LayerType::FIXED:     // Part of the world: the camera scrolls over it
-        r.drawLayer( getHandle(), World::get<Image>( layer.id ), camX - x, camY - y, false, w, h );
+        draw( layer, camPos.x - pos.x, camPos.y - pos.y, false );
         break;
       case LayerType::GLUED:     // Moves with the camera, i.e. stays put on screen (skies, HUD art)
-        r.drawLayer( getHandle(), World::get<Image>( layer.id ), -x, -y, false, w, h );
+        draw( layer, -pos.x, -pos.y, false );
         break;
       case LayerType::PARALLAX:  // Scrolls at parallaxPct of the camera's speed
-        r.drawLayer( getHandle(), World::get<Image>( layer.id ), px - x, py - y, false, w, h );
+        draw( layer, px - pos.x, py - pos.y, false );
         break;
       case LayerType::LOOP:      // Like PARALLAX, but repeats endlessly past its edges
-        r.drawLayer( getHandle(), World::get<Image>( layer.id ), px - x, py - y, true, w, h );
+        draw( layer, px - pos.x, py - pos.y, true );
         break;
       case LayerType::AUTOLOOP:  // Drifts at a constant velocity and repeats endlessly
         layer.drift += layer.vel;
-        r.drawLayer( getHandle(), World::get<Image>( layer.id ), px - x + ( layer.drift.x >> FIXEDPT_DEC_BITS ), py - y + ( layer.drift.y >> FIXEDPT_DEC_BITS ), true, w, h );
+        draw( layer, px - pos.x + layer.drift.x, py - pos.y + layer.drift.y, true );
         break;
     }
     renderFg( layer );

@@ -99,6 +99,7 @@ class Scene : public Window {
     void onTermResize() override;
     auto panelKind() const -> gfx::Panel override { return gfx::Panel::Scene; }
     void setFocus( Entity entity );
+    auto cameraId() const -> Entity { return _camera.getId(); }
 
     auto getBackLayer() -> std::optional<Layer>;
     auto getGrid() -> Grid&;
