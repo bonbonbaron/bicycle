@@ -243,9 +243,10 @@ ffi.cdef([[
   Entity cameraEntity();
   void motionStop( Entity entity );
   int motionType( Entity entity );
-  void newAnimStrip( Entity entity, const char* stripName, bool repeat );
-  void addAnimFrame( Entity entity, const char* stripName, unsigned durationMs, int x, int y, int w, int h );
-  bool setAnim( Entity entity, const char* stripName );
+  void newAnimStrip( Entity entity, uint8_t stripId, bool repeat );
+  bool isReleaseBuild();
+  void addAnimFrame( Entity entity, uint8_t stripId, unsigned durationMs, int x, int y, int w, int h );
+  bool setAnim( Entity entity, uint8_t stripId );
   void stopAnim( Entity entity );
   unsigned getAnimFrameIdx( Entity entity );
   void focusCamOn( Entity entity );

@@ -74,12 +74,8 @@ auto Grid::getFocusedLayerIdx() -> unsigned {
 }
 
 auto Grid::getLayer( Entity entity ) -> std::optional<unsigned> {
-  std::optional<unsigned> layerIdx{};
-  const auto& pair = _entityToLayerMap.find( entity );
-  if ( pair != _entityToLayerMap.end() ) {
-    layerIdx = pair->second;
-  }
-  return layerIdx;
+  if ( const unsigned* idx = _entityToLayerMap.find( entity ) ) return *idx;
+  return std::nullopt;
 }
 
 
@@ -128,7 +124,7 @@ void Scene::updateCameraLimits() {
 
 void Scene::renderFg( const Layer& layer ) {
   for ( const auto& entity : layer.fg ) {
-    if ( auto it = _hidden.find( entity ); it != _hidden.end() && it->second ) {
+    if ( const bool* h = _hidden.find( entity ); h && *h ) {
       continue;
     }
     _camera.draw( entity, *this );

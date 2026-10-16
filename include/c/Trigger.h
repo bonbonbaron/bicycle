@@ -1,5 +1,4 @@
 #pragma once
-#include <unordered_map>
 #include "c/Input.h"
 #include "c/Timeout.h"
 #include "c/Collision.h"

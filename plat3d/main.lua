@@ -73,7 +73,7 @@ function hero:onCollision( other, type )
     c:remove()
     collected = collected + 1
     hud:set( collected )
-    W.sound( Sound.sounds.coin, 115, x, y, z )
+    W.sound( Sound.key( "coin" ), 115, x, y, z )
   end
 end
 function hero:onInput( key )
@@ -104,7 +104,7 @@ function onFrame( dt )
   if Input.pressed( "jump" ) and hero:grounded() then
     hero:jump()
     local x, y, z = hero:pos()
-    W.sound( Sound.sounds.jump, 90, x, y, z )
+    W.sound( Sound.key( "jump" ), 90, x, y, z )
   end
   local x, y, z = hero:pos()
   if y < -15 then

@@ -3,7 +3,8 @@
 #include <array>
 #include <memory>
 #include <string>
-#include <unordered_map>
+#include <cstdint>
+#include "data/Map.h"
 
 #include "m/Entity.h"
 #include "m/Rect.h"
@@ -15,13 +16,13 @@ class Animator : public Controllable {
   public:
     static auto getInstance() -> Animator&;
     void tick( const Entity entity );
-    auto set( const Entity entity, const std::string& stripName ) -> bool;
+    auto set( const Entity entity, const uint8_t stripId ) -> bool;  // ids::Anim (gen/ids.h)
     void start( const Entity entity ) override;
     void stop( const Entity entity ) override;
     void pause( const Entity entity ) override;
     void unpause( const Entity entity ) override;
-    void newStrip( const Entity entity, const std::string& stripName, const bool repeat );
-    void addFrame( const Entity entity, const std::string& stripName, const unsigned durationMs, const Rect& srcRect );
+    void newStrip( const Entity entity, const uint8_t stripId, const bool repeat );
+    void addFrame( const Entity entity, const uint8_t stripId, const unsigned durationMs, const Rect& srcRect );
     auto getFrameIdx( const Entity entity ) const -> unsigned;
     void forget( const Entity entity );  // drops a despawned entity's strips (its timers stop with Timer::stopEntity)
 
@@ -45,9 +46,8 @@ class Animator : public Controllable {
       std::vector<AnimFrame> frames{};
     };
 
-    struct Animation : std::unordered_map<std::string, std::shared_ptr<AnimStrip>> {
-      Animation() = default;
-    };
+    // An entity's strips by animation tag id (ids::Anim): a popcount-indexed map, no hashing or strings.
+    using Animation = bicycle::map<std::shared_ptr<AnimStrip>>;
 
     struct AnimState {
       Animation animation{};

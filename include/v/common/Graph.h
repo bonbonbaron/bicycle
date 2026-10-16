@@ -1,7 +1,8 @@
 #pragma once
 
 #include <string>
-#include <unordered_map>
+#include <cstdint>
+#include "data/Map.h"
 #include <memory>
 #include <mutex>
 #include <functional>
@@ -14,7 +15,8 @@ static std::mutex _nodeMut{};  // YAML-copying structures prevents uncopyable mu
 
 // Classes 
 
-// Edges are mapped by name, so there's no need for a name field.
+// Edges are mapped by edge id (ids::Edge in gen/ids.h: names from edges = { <name> = ... } tables), so there's
+// no need for a name field.
 class Edge {
   public:
     void getEndpoint();
@@ -35,14 +37,15 @@ namespace bicycle {  // prevent clash with YAML::Node
       auto getName() const -> const std::string&;
       void setDesc( const std::string& );
       auto getDesc() const -> const std::string&;
-      void setEdges( const std::unordered_map<std::string, Edge>& edges );
-      auto getEdges() const -> const std::unordered_map<std::string, Edge>&;
+      using Edges = bicycle::map<Edge>;  // by ids::Edge
+      void setEdges( const Edges& edges );
+      auto getEdges() const -> const Edges&;
       void setRootEntity( const Entity& entity );
       void run();
     private:
       std::string _name;
       std::string _desc;
-      std::unordered_map<std::string, Edge> _edges{};
+      Edges _edges{};
       Entity _rootEntity;  // this entity usually encapsulates other entities; think of it as a scene
   };  // class Node
 }  // namespace bicycle

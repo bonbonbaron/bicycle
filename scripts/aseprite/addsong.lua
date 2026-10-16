@@ -47,6 +47,7 @@ if params.list or params.song or isBatch then
   assert(contains(TRANSITIONS, tr), "addsong: transition must be crossfade, cut or keep")
   print("addsong: " .. L.sceneFile(game, scene) .. ": " ..
         L.setMusic(game, scene, { song = params.song, soundfont = sf, transition = tr }))
+  require("refreshids")()  -- gen/ids.lua knows the new spawn/door now (README, "IDs")
   return
 end
 
@@ -88,3 +89,4 @@ if not data.scene or not data.song then
 end
 local line = L.setMusic(data.game, data.scene, { song = data.song, soundfont = data.soundfont, transition = data.transition })
 app.alert(data.scene .. ": " .. line)
+require("refreshids")()

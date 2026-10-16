@@ -29,7 +29,7 @@
 #include <cstring>
 #include <map>
 #include <memory>
-#include <unordered_map>
+#include "m/EntitySlots.h"
 
 #ifdef _WIN32
 #define BGL_API __stdcall
@@ -404,7 +404,7 @@ class Renderer3D final : public PixelRenderer {
 
     auto setModel( Entity entity, const std::string& path ) -> bool override {
       auto m = loadMesh( path );
-      if ( m ) _models[entity] = m;
+      if ( m ) _models.set( entity, m );
       return m != nullptr;
     }
 
@@ -432,6 +432,8 @@ class Renderer3D final : public PixelRenderer {
     void onSceneUnloaded() override {
       PixelRenderer::onSceneUnloaded();
       _statics.clear();
+      _models.pruneStale();  // ids freed without forgetEntity: let their meshes go too
+      _motion.pruneStale();
       for ( auto it = _meshes.begin(); it != _meshes.end(); ) {
         if ( it->second.use_count() > 1 ) {
           ++it;
@@ -777,7 +779,7 @@ class Renderer3D final : public PixelRenderer {
       for ( const auto& b : _drawn ) {
         const float x = b.x / CELLS_PER_UNIT_X;
         const float y = std::max( 0.0f, ground - b.bottom ) / ROWS_PER_UNIT_Y;
-        if ( auto it = _models.find( b.entity ); it != _models.end() ) {
+        if ( auto* model = _models.find( b.entity ) ) {
           // Face the way it last moved; bob while walking.
           auto& st = _motion[b.entity];
           if ( st.seen && x < st.x - 1e-4f ) st.facing = 3.14159265f;
@@ -787,7 +789,7 @@ class Renderer3D final : public PixelRenderer {
           st.x = x;
           st.seen = true;
           st.still = moving ? 0 : st.still + 1;
-          const GpuMesh& gm = *it->second;
+          const GpuMesh& gm = **model;
           if ( gm.skin ) {
             // Skeletal animation: the action anim:set() chose (setModelAction). "walk" plays while it actually
             // moves; after ~0.3 s standing still it shows the idle action instead (the 2D strips have no idle).
@@ -901,9 +903,9 @@ class Renderer3D final : public PixelRenderer {
       _items.clear();
       for ( const auto& st : _statics ) _items.push_back( { st.get(), m3::identity(), false, nullptr } );
       size_t nPosed = 0;
-      for ( auto& [entity, mesh] : _models ) {
+      _models.forEach( [&]( Entity entity, std::shared_ptr<GpuMesh>& mesh ) {
         const auto& t = w3.transform( entity );
-        if ( !t.on || !t.visible ) continue;
+        if ( !t.on || !t.visible ) return;
         Item it{ mesh.get(), modelMatrix( t ), false, nullptr };
         auto& st = _motion[entity];
         const float dx = t.pos.x - st.x, dz = t.pos.z - st.z3;
@@ -929,7 +931,7 @@ class Renderer3D final : public PixelRenderer {
           it.bones = &bones;
         }
         _items.push_back( it );
-      }
+      } );
       auto worldSphere = [&]( const Item& it, m3::Vec3& c, float& r ) {
         c = m3::transformPoint( it.model, it.mesh->center );
         const float sx = m3::length( { it.model[0], it.model[1], it.model[2] } ), sy = m3::length( { it.model[4], it.model[5], it.model[6] } ),
@@ -1002,7 +1004,7 @@ class Renderer3D final : public PixelRenderer {
       const m3::Vec3 right = m3::flatRight( cam.yaw );
       for ( Entity e = 1; e < NUM_SUPPORTED_ENTITIES; ++e ) {
         const auto& t = w3.transform( e );
-        if ( !t.on || !t.visible || _models.count( e ) || e == w3.cameraEntity() ) continue;
+        if ( !t.on || !t.visible || _models.contains( e ) || e == w3.cameraEntity() ) continue;
         const auto& img = World::get<Image>( e );
         if ( !img.pixels ) continue;
         Rect src = World::get<Rect>( e );
@@ -1101,7 +1103,7 @@ class Renderer3D final : public PixelRenderer {
     Win* _sceneWin{};
     std::vector<Billboard> _drawn;
     std::map<std::string, std::shared_ptr<GpuMesh>> _meshes;
-    std::unordered_map<Entity, std::shared_ptr<GpuMesh>> _models;
+    EntitySlots<std::shared_ptr<GpuMesh>> _models;  // flat, by entity id (generation-checked)
     std::vector<std::shared_ptr<GpuMesh>> _statics;
     mem::Vector<float, mem::GRAPHIC> _bbVerts;  // this frame's billboard quads (GL upload staging)
     GLuint _atlasTex{};
@@ -1113,7 +1115,7 @@ class Renderer3D final : public PixelRenderer {
     // walk: frames moving in a row; still: frames standing; action: the model's action (setModelAction), and
     // when it started, in seconds.
     struct Motion { float x{}; float facing{}; int walk{}; int still{}; bool seen{}; std::string action{ "idle" }; double since{}; float z3{}; std::string playing; };
-    std::unordered_map<Entity, Motion> _motion;
+    EntitySlots<Motion> _motion;
     gfx::Pixels _capture;
     long _tick{};
 };

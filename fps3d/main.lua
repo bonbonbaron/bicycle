@@ -70,7 +70,7 @@ local function shoot()
   local ex, ey, ez = W.Camera.eye()
   local f = W.Camera.forward()
   local hit = W.raycast( { ex, ey, ez }, f, 100, player.id )
-  W.sound( Sound.sounds.shot, 100, ex, ey, ez )
+  W.sound( Sound.key( "shot" ), 100, ex, ey, ez )
   recoil = 1
   if not hit then return end
   local s = sparks[nextSpark]
@@ -84,7 +84,7 @@ local function shoot()
     ffi.C.bodySet( t.id, 0, 0, 0, 0, 0, false )  -- no longer shootable while down
     score = score + 1
     ffi.C.setHudBar( hud, score )
-    W.sound( Sound.sounds.hit, 120, hit.x, hit.y, hit.z )
+    W.sound( Sound.key( "hit" ), 120, hit.x, hit.y, hit.z )
   end
 end
 
@@ -120,7 +120,7 @@ function onFrame( dt )
         t.down, t.fall = 0, 0
         ffi.C.bodySet( t.id, 2, 0.45, 2.0, 0, 0, false )
         local x, y, z = t:pos()
-        W.sound( Sound.sounds.ping, 80, x, y + 1, z )
+        W.sound( Sound.key( "ping" ), 80, x, y + 1, z )
       end
       pose( t )
     end

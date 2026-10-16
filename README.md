@@ -430,6 +430,50 @@ the pack. True-3D games (plat3d) use scenes too: see docs/true-3d.md, "Scene cha
 The test game: walk the hero (WASD) right into the cottage door in the meadow; inside, walk left out of the
 doorway. The fairy follows both ways; the coin on the cottage floor stays gone once picked up.
 
+## IDs (build-time string interning) and small maps
+
+Names that scripts and data use at run time (animation tags, scenes, spawns, doors, songs, SoundFonts, sound
+effects, colors, collision types, graph edges, genomes) get small integer ids at build time:
+`tools/ids/genids.lua` scans every game's `genome/` tree, `main.lua` and `scripts/*.lua` and writes
+
+* `gen/ids.h`: `enum class ids::Anim : uint8_t { DEFAULT = 0, crawl = 1, ..., COUNT }` (and `Scene`, `Spawn`, `Door`,
+  `Song`, `Soundfont`, `Sound`, `Color`, `Coll`, `Edge`, `Genome`), with `ids::animNames[]` / `ids::animCount`;
+* `gen/ids.lua`: `ids.anim.walk_up == 10`, `ids.names.anim[10] == "walk_up"` (`require("gen.ids")`).
+
+`gen/` is generated (git-ignored). Nobody edits an id list: CMake runs the generator (on LuaJIT's host `minilua`,
+built with LuaJIT, so nothing extra is installed on Linux, Windows CLANG64 or a cross build) whenever any of its
+inputs changes, and the globs re-run CMake when files are added or removed. The Aseprite scripts (`sprite.lua`,
+`adddoor.lua`, `addsong.lua`) regenerate it too right after they write (`scripts/aseprite/refreshids.lua`, using
+Aseprite's own Lua), so new tags, scenes and spawns are known before the next build. By hand:
+
+```sh
+build/_deps/src/luajit/src/host/minilua tools/ids/genids.lua --root . --out gen --list build/ids-inputs.txt [--strict]
+```
+
+The generator also checks references: a door to a missing scene or spawn, a scene's song/SoundFont that isn't
+in `genome/music/`, a literal `Scene.go("...")`, `Sound.play("...")`/`Sound.key("...")` naming nothing, an
+`initAnim` that isn't one of its sprite's tags, unknown collision types. Dev builds print these as warnings; release
+builds (`BICYCLE_RELEASE`, `BICYCLE_RELEASE_ASSETS`) run it with `--strict`, the packs depend on it, and a typo fails
+the build. Release embeds `gen/ids.lua` in the pack.
+
+Scripts keep writing names: `anim:set( "walk_up" )`, `Scene.go( "house", { spawn = "entry" } )`,
+`Sound.play( "coin" )`. `scripts/Ids.lua` resolves each once, at load (`Ids.get`; a name that's no tag/scene/spawn/sound
+anywhere is an error that lists the known ones), and the engine works with ids from there: the Animator's strips are
+a `bicycle::map` by tag id, doors resolve their target scene and spawn ids when they're armed, scenes are cached by
+scene id with their spawns by spawn id, and sound effects are keyed by sound id. Names an asset brings that are
+newer than `gen/ids.lua` (dev only) get the next free id with a "rebuild" warning.
+
+**`bicycle::map<V, Pool>`** (`include/data/Map.h`) is the map for those ids: a port of jollybean's popcount-indexed
+map (via mapbench's map2.c): a 256-bit presence bitfield plus prefix counts, values dense in key order in a
+`mem` pool (template parameter or constructor, like `mem::Vector<T, POOL>`), lookups one bit test + one popcount,
+ascending inserts append, overwrites in place, lazy x2 growth or exact capacity, non-trivial values allowed.
+`-DBICYCLE_MAP_POPCNT_LUT` uses a byte table for CPUs without popcount. `ctest -R map`.
+
+Per-entity data uses **`EntitySlots<T, Pool>`** (`include/m/EntitySlots.h`) instead of `unordered_map<Entity, T>`: a
+flat pool-backed array by entity id whose slots remember the entity's generation (bumped by `delEntityId`), so a
+recycled id never sees the previous owner's data (Scene's entity -> layer and hidden flags, the 3D renderer's models
+and motion state).
+
 ## Memory pools
 
 All engine memory comes from one arena cut into bump-allocated pools (`include/data/Mem.h`, after jollybean's

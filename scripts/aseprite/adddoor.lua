@@ -102,6 +102,7 @@ if params.list or params.to or isBatch then
   for _, s in ipairs(L.scenes(game)) do if s == d.to then ok = true end end
   assert(ok, "adddoor: " .. game .. " has no scene '" .. d.to .. "'")
   apply(game, scene, d, params.return_spawn)
+  require("refreshids")()  -- gen/ids.lua knows the new spawn/door now (README, "IDs")
   return
 end
 
@@ -155,3 +156,4 @@ local d = { to = data.to, spawn = data.spawn, x = data.x, y = data.y, w = data.w
             transition = data.transition ~= "fade" and data.transition or nil }
 apply(data.game, data.scene, d, data.return_spawn and data.return_name or nil)
 app.alert("Door to " .. data.to .. " (" .. (data.spawn or "default") .. ") added to " .. data.scene .. ".")
+require("refreshids")()

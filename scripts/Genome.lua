@@ -14,6 +14,7 @@ Gene.new = function( type, val )
   return instance
 end
 
+local Ids = require("Ids")  -- names -> build-time ids (README, "IDs")
 local Layout = require("GenomeLayout")  -- where each kind of genome file lives (README, "Genome layout")
 
 function Gene.getAssetDir(geneType)
@@ -436,11 +437,12 @@ Animation.__index = Animation
 -- src rect and duration. Expects the entity's image to be Sprite.toStrip()'s image.
 Animation.new = function( entity, character, rects )
   for stripName, strip in pairs( character.strips ) do
-    ffi.C.newAnimStrip( entity, stripName, strip.numReps == 0 )
+    local id = Ids.define( "anim", stripName )  -- tags come from the art: resolved once, here
+    ffi.C.newAnimStrip( entity, id, strip.numReps == 0 )
     for _, seqIdx in ipairs( strip.sequence ) do
       local frame = strip.frames[seqIdx]
       local rect = rects[frame.frameIdx]
-      ffi.C.addAnimFrame( entity, stripName, frame.durationMs, rect.x, rect.y, rect.w, rect.h )
+      ffi.C.addAnimFrame( entity, id, frame.durationMs, rect.x, rect.y, rect.w, rect.h )
     end
   end
   local instance = { entity = entity, character = character }
@@ -456,7 +458,8 @@ function Animation:set( stripName )
   if Animation.rigged[self.entity] and type( stripName ) == "string" then
     ffi.C.setModelAction( self.entity, stripName:match( "^[^_]+" ) or stripName )
   end
-  return self:has( stripName ) and ffi.C.setAnim( self.entity, stripName )
+  local id = Ids.get( "anim", stripName )  -- not an animation tag anywhere: a clear error (a typo)
+  return self:has( stripName ) and ffi.C.setAnim( self.entity, id )
 end
 
 function Animation:has( stripName )
@@ -472,6 +475,7 @@ function Animation:frameIdx()
 end
 
 -- Collision types games can refer to by name in coll genes; onCollision( other, type ) receives the number.
+-- The generator (tools/ids/genids.lua) reads this table: the ids in gen/ids.lua/ids.h (ids::Coll) are these values.
 local COLL = { hero = 1, solid = 2, coin = 3, enemy = 4, npc = 5, door = 6, fire = 7 }
 
 Gene["GeneLoader"] = {

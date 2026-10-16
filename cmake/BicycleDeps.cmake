@@ -278,6 +278,13 @@ function( bicycle_luajit )
       bicycle_run( "building LuaJIT" "${BICYCLE_MAKE}" -C "${src}/src" ${margs} libluajit.a )
     endif()
   endif()
+  # LuaJIT's build makes minilua, a plain Lua 5.1 for the build machine (also when cross-compiling): build-time
+  # Lua tools (tools/ids/genids.lua) run on it, so they need nothing installed.
+  file( GLOB hostLua "${src}/src/host/minilua" "${src}/src/host/minilua.exe" "${src}/src/minilua.exe" )
+  if ( hostLua )
+    list( GET hostLua 0 hostLua )
+    set( BICYCLE_LUA_HOST "${hostLua}" CACHE INTERNAL "Lua for build-time tools" )
+  endif()
   add_library( bicycle_luajit INTERFACE )
   target_include_directories( bicycle_luajit INTERFACE "${src}/src" )
   target_link_libraries( bicycle_luajit INTERFACE "${lib}" )

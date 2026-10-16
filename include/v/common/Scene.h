@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 #include <optional>
-#include <unordered_map>
+#include "m/EntitySlots.h"
 
 #include "m/Camera.h"
 #include "m/Box.h"
@@ -85,7 +85,7 @@ class Grid {
     auto getLayer( Entity entity ) -> std::optional<unsigned>;
   private:
     std::vector<Layer> _layers{};
-    std::unordered_map<Entity, unsigned> _entityToLayerMap{};
+    EntitySlots<unsigned> _entityToLayerMap{};  // flat, by entity id (generation-checked)
     unsigned _focusedLayerIdx{};  // Whatever entity the camera focuses on, all other layers move in parallax wrt that layer.
 };
 
@@ -117,6 +117,6 @@ class Scene : public Window {
     void renderFg( const Layer& layer );
     void updateCameraLimits();
     std::vector<Bar> _hud{};
-    std::unordered_map<Entity, bool> _hidden{};
+    EntitySlots<bool> _hidden{};
     void renderHud();
 };

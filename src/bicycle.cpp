@@ -375,17 +375,27 @@ namespace bicycle {
     // ANIMATION
     // Strips are built once per entity: newAnimStrip(), then addAnimFrame() for each frame in play order.
     // Src rects are in character cells within the entity's image (all frames side by side).
-    void newAnimStrip( Entity entity, const char* stripName, bool repeat ) {
-      Animator::getInstance().newStrip( entity, stripName, repeat );
+    // Strips are keyed by animation tag id (ids.anim in gen/ids.lua; Lua resolves names once, scripts/Ids.lua).
+    void newAnimStrip( Entity entity, uint8_t stripId, bool repeat ) {
+      Animator::getInstance().newStrip( entity, stripId, repeat );
     }
 
-    void addAnimFrame( Entity entity, const char* stripName, unsigned durationMs, int x, int y, int w, int h ) {
-      Animator::getInstance().addFrame( entity, stripName, durationMs, Rect( x, y, w, h ) );
+    void addAnimFrame( Entity entity, uint8_t stripId, unsigned durationMs, int x, int y, int w, int h ) {
+      Animator::getInstance().addFrame( entity, stripId, durationMs, Rect( x, y, w, h ) );
     }
 
-    // Switches to and starts a strip; returns false if it's already playing or doesn't exist.
-    bool setAnim( Entity entity, const char* stripName ) {
-      return Animator::getInstance().set( entity, stripName );
+    // Switches to and starts a strip; returns false if it's already playing or the entity doesn't have it.
+    bool setAnim( Entity entity, uint8_t stripId ) {
+      return Animator::getInstance().set( entity, stripId );
+    }
+
+    // Release builds treat the generated ids as complete (scripts/Ids.lua).
+    bool isReleaseBuild() {
+#ifdef BICYCLE_RELEASE_ASSETS
+      return true;
+#else
+      return false;
+#endif
     }
 
     void stopAnim( Entity entity ) {

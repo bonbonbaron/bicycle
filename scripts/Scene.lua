@@ -269,12 +269,29 @@ function Scene.stateOf( file )
   return SceneState[file]
 end
 
+-- Scene tables by scene id (gen/ids.lua; README, "IDs"): the name is resolved once, in Scene.go.
+local Ids = require( "Ids" )
+local byId = {}
 local function sceneTable( name )
+  local id = Ids.find( "scene", name )
+  if id and byId[id] then return byId[id] end
   local ok, tbl = pcall( require, "./"..gameName.."/genome/scene/"..name )
-  if not ok or type( tbl ) ~= "table" then error( "Scene.go: no scene '"..tostring( name ).."' (genome/scene/"..tostring( name )..".lua): "..tostring( tbl ), 0 ) end
+  if not ok or type( tbl ) ~= "table" then
+    if not id then Ids.get( "scene", name ) end  -- unknown name: the error lists the scenes there are
+    error( "Scene.go: no scene '"..tostring( name ).."' (genome/scene/"..tostring( name )..".lua): "..tostring( tbl ), 0 )
+  end
+  id = id or Ids.define( "scene", name )
   tbl.file = name
+  tbl.sceneId = id
+  -- Its spawns by spawn id (names resolved once per scene).
+  tbl.spawnById = {}
+  for _, list in ipairs( { tbl.spawns or {}, type( tbl.world3d ) == "table" and tbl.world3d.spawns or {} } ) do
+    for sname, pos in pairs( list ) do tbl.spawnById[Ids.define( "spawn", sname )] = pos end
+  end
+  byId[id] = tbl
   return tbl
 end
+Scene.sceneTable = sceneTable
 
 function Scene.go( name, opts )
   checkType( name, "string" )
@@ -284,7 +301,9 @@ function Scene.go( name, opts )
     return false
   end
   if S.pending and not opts.replace then return false end
-  sceneTable( name )  -- fail now, in the caller, if it doesn't exist
+  Ids.get( "scene", name )  -- a name that's no scene at all: fail now, in the caller, listing the scenes
+  if opts.spawn then Ids.get( "spawn", opts.spawn ) end
+  sceneTable( name )
   S.pending = { name = name, opts = opts }
   return true
 end
@@ -346,7 +365,8 @@ local function boxOf( id ) return ffi.C.World_getBoxes().arr[id] end
 
 local function spawnPoint( tbl, spawnName )
   local spawns = tbl.spawns or {}
-  if spawnName and spawns[spawnName] then return spawns[spawnName] end
+  local sid = spawnName and Ids.find( "spawn", spawnName )
+  if sid and tbl.spawnById and tbl.spawnById[sid] then return tbl.spawnById[sid] end
   if spawnName then
     local msg = "Scene.go: scene '"..tbl.file.."' has no spawn point '"..spawnName.."'"
     if not ffi.C.assetPacked() then error( msg, 0 ) end
@@ -481,6 +501,11 @@ end
 -- Doors (the door gene in Genome.lua): the zone's collision callbacks.
 function Scene.armDoor( tbl )
   local HERO = 1  -- Genome.COLL.hero
+  -- Resolve the target once, at load: a typo'd scene or spawn is an error now, not when someone walks in.
+  if tbl.door then
+    tbl.door.sceneId = Ids.get( "scene", tbl.door.to )
+    if tbl.door.spawn then tbl.door.spawnId = Ids.get( "spawn", tbl.door.spawn ) end
+  end
   tbl.onCollision = function( self, other, collType )
     if collType ~= HERO or self.despawned then return end
     if Scene.frameNo - Scene.enteredFrame < DOOR_GRACE_FRAMES then self.waiting = true return end

@@ -486,3 +486,6 @@ if colorMode == ColorMode.RGB or colorMode == ColorMode.INDEXED then
 	-- TODO
 	g.serialize_table(spriteName, luaSprite, DEBUG)
 end
+
+-- New tags/sprites: refresh gen/ids.lua now (the build does it too; README, "IDs").
+require("refreshids")()

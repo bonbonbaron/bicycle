@@ -57,16 +57,27 @@ function Sound.load( music, sfx, keepSong )
       ffi.C.selectProgram( ffi.C.getSfxChannel(), id, sfx.bank or 0, sfx.program or 0 )
     end
     for name, key in pairs( sfx.sounds or {} ) do
-      Sound.sounds[name] = key
+      Sound.sounds[require( "Ids" ).define( "sound", name )] = key  -- by sound id (README, "IDs")
     end
   end
 end
 
 -- Plays a named sound effect (or a raw MIDI key) on the SFX channel.
 function Sound.play( name, vel )
-  local key = Sound.sounds[name] or ( type( name ) == "number" and name )
-  if not key then error( "Unknown sound effect '"..tostring( name ).."'." ) end
+  local key
+  if type( name ) == "number" then
+    key = name  -- a raw MIDI key
+  else
+    key = Sound.sounds[require( "Ids" ).get( "sound", name )]  -- unknown names error, listing the known ones
+    if not key then error( "Sound effect '"..tostring( name ).."' isn't in this scene's sfx.sounds.", 2 ) end
+  end
   ffi.C.playSoundFX( key, vel or 110 )
+end
+
+-- The MIDI key of a named sound effect (e.g. for W.sound in 3D), or nil.
+function Sound.key( name )
+  local id = require( "Ids" ).find( "sound", name )
+  return id and Sound.sounds[id]
 end
 
 function Sound.stopMusic()

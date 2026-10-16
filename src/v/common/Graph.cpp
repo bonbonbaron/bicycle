@@ -42,11 +42,11 @@ auto Node::getDesc() const -> const std::string& {
   return _desc;
 }
 
-void Node::setEdges( const std::map<std::string, Edge>& edges ) {
+void Node::setEdges( const Edges& edges ) {
   _edges = edges;
 }
 
-auto Node::getEdges() const -> const std::map<std::string, Edge>& {
+auto Node::getEdges() const -> const Edges& {
   return _edges;
 }
 
