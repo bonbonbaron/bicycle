@@ -14,6 +14,8 @@
 #include "data/Pack.h"
 #include "data/BImg.h"
 #include <sstream>
+#include <chrono>
+#include <array>
 #include <cctype>
 #include <cstdio>
 #include "c/Input.h"
@@ -527,6 +529,8 @@ namespace bicycle {
       }
     }
     unsigned scriptedButtons{};
+    const bool frameStats = std::getenv( "BICYCLE_FRAME_STATS" ) && *std::getenv( "BICYCLE_FRAME_STATS" ) == '1';
+    std::array<double, 3> acc{};
 
     while ( wm.size() > 0 ) {
       if ( maxFrames > 0 && frames >= maxFrames ) break;
@@ -561,12 +565,27 @@ namespace bicycle {
       if ( gfx::renderer().quitRequested() ) {
         break;
       }
-      Kinematics::getInstance().run();
+      using clk = std::chrono::steady_clock;
+      const auto t0 = clk::now();
+      Kinematics::getInstance().run();  // 2D motions, then the 3D layer (physics, camera rig)
       CollisionDetector::check();
+      const auto t1 = clk::now();
       // Process inputs
       trigger.send();
+      const auto t2 = clk::now();
       // Outputs
       wm.render();   // TODO make this internally only change dirty windows
+      const auto t3 = clk::now();
+      // BICYCLE_FRAME_STATS=1: where a frame's time goes (ms, averaged over 90 frames): motion + physics, Lua
+      // (events + onFrame), rendering (including the GL work and the swap).
+      if ( frameStats ) {
+        auto ms = []( clk::duration d ) { return std::chrono::duration<double, std::milli>( d ).count(); };
+        acc[0] += ms( t1 - t0 ); acc[1] += ms( t2 - t1 ); acc[2] += ms( t3 - t2 );
+        if ( frames % 90 == 0 ) {
+          std::fprintf( stderr, "frame: physics %.2f ms, lua %.2f ms, render %.2f ms (avg of 90)\n", acc[0] / 90, acc[1] / 90, acc[2] / 90 );
+          acc = {};
+        }
+      }
 
       mem::memRst( mem::TEMPORARY );  // scratch never outlives a frame
       Timer::sleepFrame();  // burn off excess frame time

@@ -156,6 +156,10 @@ if ( NOT CMAKE_CROSSCOMPILING )
   # True 3D: math (include/m/Math3D.h), level collision, character physics and raycasts (src/c/Physics3D.cpp).
   add_executable( bicycle-3d-tests tests/math3d_test.cpp src/c/Physics3D.cpp )
   target_link_libraries( bicycle-3d-tests PRIVATE bicycle_data )
+  if ( BICYCLE_RELEASE )  # release bicycle_data reads only the embedded pack
+    target_sources( bicycle-3d-tests PRIVATE src/data/EmbeddedPack.c )
+    add_dependencies( bicycle-3d-tests embedded-pack )
+  endif()
   add_test( NAME math3d COMMAND bicycle-3d-tests )
   set_tests_properties( codecs PROPERTIES FIXTURES_REQUIRED packed )
 endif()

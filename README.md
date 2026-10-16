@@ -339,3 +339,9 @@ ASCII the file is a text dump of the screen) (+ `BICYCLE_SCREENSHOT_FRAME`, defa
 
 and `BICYCLE_AUDIO_DRIVER`, `BICYCLE_AUDIO_FILE`, `BICYCLE_GM_SF2`, `BICYCLE_MUTE_MUSIC`, `BICYCLE_PROFILE` (audio
 start-up timings) and `BICYCLE_DEBUG_LOG` (Lua `dbglog`): see `include/c/MidiPlayer.h` and `tools/audio/README.md`.
+
+## True 3D
+
+The 3D build can run genuinely 3D games (third-person platformers, first-person shooters): 3D transforms and
+character physics, a level collision mesh from Blender, raycasts, camera rigs driven by Kinematics, mouse look and
+gamepads, shadows and fog. See [docs/true-3d.md](docs/true-3d.md); demos: `./o-3d plat3d`, `./o-3d fps3d`.

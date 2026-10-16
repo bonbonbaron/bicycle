@@ -30,7 +30,7 @@ Input.enableGamepad()
 Input.captureMouse( true )
 
 -- The hero: a capsule character drawn as the rigged pilgrim (Blender model faces +X: modelYaw 90 -> faces -Z).
-local hero = W.Body.new{ kind = "character", x = 0, y = 0.5, z = 8, radius = 0.35, height = 1.6, collType = 1,
+local hero = W.Body.new{ kind = "character", x = 4.5, y = 0.5, z = 9, radius = 0.35, height = 1.6, collType = 1,
                          model = "pilgrim3d", modelYaw = 90, jumpSpeed = 10, gravity = 28, accel = 70, airAccel = 22 }
 local RUN = 7
 local coins, collected = {}, 0
@@ -97,7 +97,7 @@ function onFrame( dt )
     W.sound( Sound.sounds.jump, 90, x, y, z )
   end
   local x, y, z = hero:pos()
-  if y < -15 then hero:setPos( 0, 1, 8 ) hero:setVel( 0, 0, 0 ) end
+  if y < -15 then hero:setPos( 4.5, 1, 9 ) hero:setVel( 0, 0, 0 ) end
   if os.getenv( "BICYCLE_DEMO_LOG" ) then
     frameNo = ( frameNo or 0 ) + 1
     if frameNo % 15 == 0 then
