@@ -165,8 +165,13 @@ function W.Body:setVel( x, y, z ) C.bodySetVel( self.id, x, y, z ) end
 function W.Body:grounded() return C.bodyGrounded( self.id ) end
 function W.Body:justLanded() return C.bodyJustLanded( self.id ) end
 function W.Body:show( v ) C.xfSetVisible( self.id, v ) end
+-- Gone at once (no collisions, not drawn; queued events to/from it voided), its id freed at the end of the frame.
+W.dying = {}
 function W.Body:remove()
+  if self.removed then return end
+  self.removed = true
   C.xfRemove( self.id )
+  table.insert( W.dying, self.id )
   unregister( self.id )
   W.persistent[self.id] = nil
   for i, b in ipairs( W.live ) do if b == self then table.remove( W.live, i ) break end end

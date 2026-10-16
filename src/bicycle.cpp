@@ -476,6 +476,7 @@ namespace bicycle {
     // Everything the engine keeps for an entity, dropped: timers, animation, motion (and followers of it),
     // collisions, its 3D model, its components; then its id is free again.
     void despawnEntity( Entity entity ) {
+      Trigger::forgetEntity( entity );  // queued collisions/timeouts to or from it: never delivered
       Timer::getInstance().stopEntity( entity );
       Animator::getInstance().forget( entity );
       Kinematics::getInstance().forget( entity );

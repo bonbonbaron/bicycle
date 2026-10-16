@@ -73,6 +73,7 @@ function hero:onCollision( other, type )
     c:remove()
     collected = collected + 1
     hud:set( collected )
+    if AUTO then io.stderr:write( "plat3d coin "..collected.."\n" ) end
     W.sound( Sound.sounds.coin, 115, x, y, z )
   end
 end
@@ -82,6 +83,7 @@ end
 register( hero.id, hero )
 focusOn( hero.id )
 
+AUTO = tonumber( os.getenv( "PLAT3D_AUTOCOLLECT" ) or "" )
 local yaw = 0  -- the hero's facing (degrees), turned smoothly toward the run direction
 function onFrame( dt )
   if Input.pressed( "release" ) then Input.captureMouse( false ) end
@@ -105,6 +107,13 @@ function onFrame( dt )
     hero:jump()
     local x, y, z = hero:pos()
     W.sound( Sound.sounds.jump, 90, x, y, z )
+  end
+  -- PLAT3D_AUTOCOLLECT=N (tests/coin_collect_test.sh): every N frames, put the hero on a coin still out there.
+  if AUTO then
+    autoFrame = ( autoFrame or 0 ) + 1
+    if autoFrame % AUTO == 0 and not Scene.busy() then
+      for _, c in pairs( coins ) do local cx, cy, cz = c:pos() hero:setPos( cx, cy - 0.4, cz ) break end
+    end
   end
   local x, y, z = hero:pos()
   if y < -15 then

@@ -269,6 +269,13 @@ if ( NOT CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_NAME STREQUAL "Linux" )
   elseif ( lifecycleGame STREQUAL "plat3d" AND BICYCLE_RENDER STREQUAL "3D" )
     set( lifecyclePair "courtyard:bonus" )
   endif()
+  # plat3d's coins (tests/coin_collect_test.sh): removing a body inside its collision dispatch. 3D dev builds run
+  # loose files; a release build needs plat3d packed.
+  if ( BICYCLE_RENDER STREQUAL "3D" AND ( NOT BICYCLE_RELEASE OR lifecycleGame STREQUAL "plat3d" ) )
+    add_test( NAME coin-collect COMMAND sh "${CMAKE_SOURCE_DIR}/tests/coin_collect_test.sh" "$<TARGET_FILE:o>"
+              WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}" )
+    set_tests_properties( coin-collect PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 400 )
+  endif()
   if ( lifecyclePair )
     add_test( NAME scene-lifecycle COMMAND sh "${CMAKE_SOURCE_DIR}/tests/scene_lifecycle_test.sh" "$<TARGET_FILE:o>" ${modeLowerLc} 20
               ${lifecycleGame} ${lifecyclePair} WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}" )

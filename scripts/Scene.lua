@@ -526,6 +526,11 @@ end
 local function frame()
   Scene.frameNo = Scene.frameNo + 1
   flushRemovals()
+  local W = package.loaded["World3D"]
+  if W and type( W ) == "table" and W.dying and #W.dying > 0 then  -- bodies removed this frame: free their ids
+    for _, id in ipairs( W.dying ) do ffi.C.despawnEntity( id ) end
+    W.dying = {}
+  end
   if S.cycle then S.cycle() end
   if not S.trans and S.pending then
     local p = S.pending

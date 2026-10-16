@@ -223,6 +223,21 @@ void Trigger::sendCollision( const Collision& collision ) {
   bridge.collisions.add( collision );
 }
 
+void Trigger::forgetEntity( Entity entity ) {
+  if ( entity == 0 ) return;
+  for ( unsigned i = 0; i < bridge.collisions.len; ++i ) {
+    auto& c = bridge.collisions.arr[i];
+    if ( c.lhs == entity || c.rhs == entity ) c.lhs = 0;
+  }
+  for ( unsigned i = 0; i < bridge.uncollisions.len; ++i ) {
+    auto& c = bridge.uncollisions.arr[i];
+    if ( c.lhs == entity || c.rhs == entity ) c.lhs = 0;
+  }
+  for ( unsigned i = 0; i < bridge.timeouts.len; ++i ) {
+    if ( bridge.timeouts.arr[i].entity == entity ) bridge.timeouts.arr[i].entity = 0;
+  }
+}
+
 void Trigger::sendUncollision( const Collision& uncollision ) {
   bridge.uncollisions.add( uncollision );
 }
