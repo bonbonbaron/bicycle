@@ -119,4 +119,11 @@ local tm = { numTilesWide = 2, numTilesHigh = 1, tileW = 1, tileH = 2, tiles = {
              tileset = { ascii = { "  \n  ", "##\n##" } } }
 check( Sprite.tilemapToAscii( tm ) == "##  \n##  ", "tilemap should render from ASCII tiles" )
 
+-- 6. Demo coin (test/aseprite/goldcoin.aseprite): a tiny one-tag animated character, separate from the coin genome.
+local goldcoin = Sprite.load( "goldcoin" )
+describe( goldcoin )
+check( goldcoin.kind == Sprite.CHARACTER and #goldcoin.character.frames == 4, "goldcoin should be a 4-frame character" )
+check( goldcoin.character.strips.spin and #goldcoin.character.strips.spin.frames == 4, "goldcoin should have a 4-frame spin strip" )
+check( Genome.COLL and Genome.COLL.hero and Genome.COLL.solid and Genome.COLL.coin, "Genome.COLL should name collider types" )
+
 print( "ALL GENOME SPRITE TESTS PASSED" )
