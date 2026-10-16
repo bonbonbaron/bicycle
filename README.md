@@ -185,6 +185,11 @@ its ARGB pixels live in GRAPHIC. 2D reads sprite pixels from it; 3D uploads it a
 billboards in a single batched draw call. Mesh textures (which tile with GL_REPEAT) keep their own textures.
 `BICYCLE_ATLAS_INFO=1` prints the atlas size on each rebuild.
 
+## Skeletal animation (3D)
+
+Rigged models export a `.bskin` next to their mesh (see `scripts/blender/README.md`); the 3D renderer skins them on
+the GPU and `anim:set(tag)` chooses the action (`walk_left` -> `walk`). Unrigged models still turn and bob.
+
 ## Memory pools
 
 All engine memory comes from one arena cut into bump-allocated pools (`include/data/Mem.h`, after jollybean's
@@ -200,6 +205,8 @@ its own malloc'd memory, so only the sf2/mid bytes are in AUDIO. Third-party C c
 still uses malloc. fluidsynth's cpp11 thread code is patched at fetch time (new vs free mismatch).
 
 ## Environment variables
+
+* `BICYCLE_MODEL_ACTION=<action>`: 3D, pin every rigged model to one action.
 
 `BICYCLE_LOOSE_ASSETS`, `BICYCLE_WINDOW_SIZE`, `BICYCLE_SCREENSHOT=<file.bmp>` (+ `BICYCLE_SCREENSHOT_FRAME`,
 default 90, and `BICYCLE_EXIT_AFTER_SCREENSHOT=1`) and `BICYCLE_GL_INFO` for the pixel modes;

@@ -10,6 +10,7 @@
 #include "v/common/Image.h"
 #include "data/Mesh.h"
 #include "data/Obj.h"
+#include "data/Skin.h"
 #include "data/BImg.h"
 #include "data/Pack.h"
 #include "m/World.h"
@@ -20,6 +21,7 @@
 #include <array>
 #include <cmath>
 #include <algorithm>
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -170,13 +172,25 @@ const char* VS = R"(#version 330 core
 layout(location = 0) in vec3 aPos;
 layout(location = 1) in vec3 aNrm;
 layout(location = 2) in vec2 aUv;
+layout(location = 3) in vec4 aJoints;   // skinned meshes: joint indices
+layout(location = 4) in vec4 aWeights;  // and weights (sum 1)
 uniform mat4 uMvp;
 uniform mat4 uModel;
+uniform int uSkinned;
+uniform mat4 uBones[32];  // skin::MAX_JOINTS
 out vec3 vN;
 out vec2 vUv;
 void main() {
-  gl_Position = uMvp * vec4(aPos, 1.0);
-  vN = mat3(uModel) * aNrm;
+  vec4 p = vec4(aPos, 1.0);
+  vec3 n = aNrm;
+  if (uSkinned == 1) {  // GPU skinning: blend the 4 joints' skinning matrices
+    mat4 s = aWeights.x * uBones[int(aJoints.x)] + aWeights.y * uBones[int(aJoints.y)]
+           + aWeights.z * uBones[int(aJoints.z)] + aWeights.w * uBones[int(aJoints.w)];
+    p = s * p;
+    n = mat3(s) * n;
+  }
+  gl_Position = uMvp * p;
+  vN = mat3(uModel) * n;
   vUv = aUv;
 })";
 
@@ -213,6 +227,7 @@ void main() { o = texture(tex, vUv); })";
 
 struct GpuMesh {
   GLuint vao{}, vbo{};
+  std::shared_ptr<const Skin> skin;  // skinned meshes: skeleton + actions (.bskin)
   struct Range { int first{}, count{}; std::array<float, 4> rgba{}; GLuint tex{}; };
   std::vector<Range> ranges;  // one per material
 };
@@ -318,6 +333,15 @@ class Renderer3D final : public PixelRenderer {
       return m != nullptr;
     }
 
+    // anim:set(tag) -> the model's action (Genome.lua maps the 2D strip tag to an action name).
+    void setModelAction( Entity entity, const std::string& action ) override {
+      auto& st = _motion[entity];
+      if ( st.action != action ) {
+        st.action = action;
+        st.since = now();
+      }
+    }
+
     auto addStaticModel( const std::string& path ) -> bool override {
       auto m = loadMesh( path );
       if ( m ) _statics.push_back( m );
@@ -413,6 +437,16 @@ class Renderer3D final : public PixelRenderer {
       gl.EnableVertexAttribArray( 2 );
     }
 
+    // Meshes: pos3 nrm3 uv2 joints4 weights4.
+    static void meshLayout() {
+      constexpr GLsizei S = 16 * sizeof( float );
+      for ( GLuint a = 0; a < 5; ++a ) {
+        static const int n[5] = { 3, 3, 2, 4, 4 }, off[5] = { 0, 3, 6, 8, 12 };
+        gl.VertexAttribPointer( a, n[a], GL_FLOAT, 0, S, reinterpret_cast<void*>( off[a] * sizeof( float ) ) );
+        gl.EnableVertexAttribArray( a );
+      }
+    }
+
     static void texParams( GLuint tex, GLenum wrap ) {
       gl.BindTexture( GL_TEXTURE_2D, tex );
       gl.TexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
@@ -493,13 +527,29 @@ class Renderer3D final : public PixelRenderer {
         std::fprintf( stderr, "bicycle 3D: can't load mesh %s (no .bmesh in the pack and no loose .obj)\n", path.c_str() );
         return nullptr;
       }
-      // Expand to one vertex per corner (normals and uvs are per corner), grouped by material.
+      // Skinned? The .bskin next to it: in the pack (quantized) or the exporter's loose float file. Packed meshes
+      // carry their joints/weights; a loose OBJ gets them from the .bskin's per-OBJ-vertex table.
       auto g = std::make_shared<GpuMesh>();
+      if ( path.size() > 6 ) {
+        auto sb = assets::read( path.substr( 0, path.size() - 6 ) + ".bskin", mem::TEMPORARY );
+        auto sk = sb ? skin::decode( *sb ) : std::nullopt;
+        if ( sk ) {
+          if ( m->joints.empty() && !applySkinVertices( *m, *sk ) ) {
+            std::fprintf( stderr, "bicycle 3D: %s's .bskin doesn't match its vertices\n", path.c_str() );
+          }
+          sk->vJoints.clear();
+          sk->vWeights.clear();
+          g->skin = std::make_shared<const Skin>( std::move( *sk ) );
+        }
+      }
+      const bool skinned = g->skin && m->joints.size() == 4 * m->nVerts();
+      if ( !skinned ) g->skin = nullptr;
+      // Expand to one vertex per corner (normals and uvs are per corner), grouped by material.
       mem::Vector<float, mem::GRAPHIC> verts;
       const size_t nMat = std::max<size_t>( 1, m->materials.size() );
       for ( size_t mat = 0; mat < nMat; ++mat ) {
         GpuMesh::Range r;
-        r.first = static_cast<int>( verts.size() / 8 );
+        r.first = static_cast<int>( verts.size() / 16 );
         for ( size_t t = 0; t < m->nTris(); ++t ) {
           if ( ( m->triMat.empty() ? 0 : m->triMat[t] ) != mat ) continue;
           for ( int c = 0; c < 3; ++c ) {
@@ -509,9 +559,16 @@ class Renderer3D final : public PixelRenderer {
             else verts.insert( verts.end(), { m->normals[3 * corner], m->normals[3 * corner + 1], m->normals[3 * corner + 2] } );
             if ( m->uvs.empty() ) verts.insert( verts.end(), { 0, 0 } );
             else verts.insert( verts.end(), { m->uvs[2 * corner], m->uvs[2 * corner + 1] } );
+            if ( skinned ) {
+              for ( int k = 0; k < 4; ++k ) verts.push_back( m->joints[4 * v + k] );
+              for ( int k = 0; k < 4; ++k ) verts.push_back( m->weights[4 * v + k] / 255.0f );
+            }
+            else {
+              verts.insert( verts.end(), { 0, 0, 0, 0, 1, 0, 0, 0 } );
+            }
           }
         }
-        r.count = static_cast<int>( verts.size() / 8 ) - r.first;
+        r.count = static_cast<int>( verts.size() / 16 ) - r.first;
         if ( mat < m->materials.size() ) {
           const auto& mm = m->materials[mat];
           r.rgba = mm.rgba;
@@ -531,13 +588,17 @@ class Renderer3D final : public PixelRenderer {
       gl.BindVertexArray( g->vao );
       gl.BindBuffer( GL_ARRAY_BUFFER, g->vbo );
       gl.BufferData( GL_ARRAY_BUFFER, verts.size() * sizeof( float ), verts.data(), GL_STATIC_DRAW );
-      vertexLayout();
+      meshLayout();
       _meshes[path] = g;
       return g;
     }
 
-    void drawMesh( const GpuMesh& m, const Mat4& viewProj, const Mat4& model ) {
+    void drawMesh( const GpuMesh& m, const Mat4& viewProj, const Mat4& model, const float* bones = nullptr ) {
       const Mat4 mvp = mul( viewProj, model );
+      gl.Uniform1i( gl.GetUniformLocation( _prog, "uSkinned" ), bones && m.skin ? 1 : 0 );
+      if ( bones && m.skin ) {
+        gl.UniformMatrix4fv( gl.GetUniformLocation( _prog, "uBones" ), static_cast<GLsizei>( m.skin->joints.size() ), 0, bones );
+      }
       gl.UniformMatrix4fv( gl.GetUniformLocation( _prog, "uMvp" ), 1, 0, mvp.data() );
       gl.UniformMatrix4fv( gl.GetUniformLocation( _prog, "uModel" ), 1, 0, model.data() );
       gl.Uniform1i( gl.GetUniformLocation( _prog, "uLit" ), 1 );
@@ -584,8 +645,27 @@ class Renderer3D final : public PixelRenderer {
           st.walk = moving ? st.walk + 1 : 0;
           st.x = x;
           st.seen = true;
-          const float bob = moving ? 0.06f * std::fabs( std::sin( st.walk * 0.5f ) ) : 0.0f;
-          drawMesh( *it->second, viewProj, mul( translate( x, y + bob, 0.3f ), rotateY( st.facing ) ) );
+          st.still = moving ? 0 : st.still + 1;
+          const GpuMesh& gm = *it->second;
+          if ( gm.skin ) {
+            // Skeletal animation: the action anim:set() chose (setModelAction). "walk" plays while it actually
+            // moves; after ~0.3 s standing still it shows the idle action instead (the 2D strips have no idle).
+            std::string act = st.action;
+            if ( act == "walk" && st.still > 9 ) act = "idle";
+            static const char* forced = std::getenv( "BICYCLE_MODEL_ACTION" );  // screenshots/tests: pin an action
+            if ( forced && *forced ) act = forced;
+            const SkinAction* a = gm.skin->action( act );
+            if ( !a && !gm.skin->actions.empty() ) a = &gm.skin->actions.front();
+            float bones[16 * skin::MAX_JOINTS];
+            if ( a ) skin::pose( *gm.skin, *a, static_cast<float>( now() - st.since ), bones );
+            else skin::restPose( *gm.skin, bones );
+            drawMesh( gm, viewProj, mul( translate( x, y, 0.3f ), rotateY( st.facing ) ), bones );
+            ++_stats.skinnedDraws;
+          }
+          else {
+            const float bob = moving ? 0.06f * std::fabs( std::sin( st.walk * 0.5f ) ) : 0.0f;  // unrigged: bob
+            drawMesh( gm, viewProj, mul( translate( x, y + bob, 0.3f ), rotateY( st.facing ) ) );
+          }
           continue;
         }
         if ( !b.pixels ) continue;  // text art has no 3D form
@@ -626,6 +706,7 @@ class Renderer3D final : public PixelRenderer {
         gl.Uniform4fv( gl.GetUniformLocation( _prog, "uColor" ), 1, white );
         gl.Uniform1i( gl.GetUniformLocation( _prog, "uTex" ), 1 );
         gl.Uniform1i( gl.GetUniformLocation( _prog, "uLit" ), 0 );
+        gl.Uniform1i( gl.GetUniformLocation( _prog, "uSkinned" ), 0 );
         gl.BindTexture( GL_TEXTURE_2D, _atlasTex );
         gl.DrawArrays( GL_TRIANGLES, 0, static_cast<GLsizei>( _bbVerts.size() / 8 ) );
         ++_stats.billboardDraws;
@@ -671,8 +752,13 @@ class Renderer3D final : public PixelRenderer {
     mem::Vector<float, mem::GRAPHIC> _bbVerts;  // this frame's billboard quads (GL upload staging)
     GLuint _atlasTex{};
     uint32_t _atlasTexVersion{};
-    struct { size_t billboardDraws{}, billboards{}; } _stats;
-    struct Motion { float x{}; float facing{}; int walk{}; bool seen{}; };
+    struct { size_t billboardDraws{}, billboards{}, skinnedDraws{}; } _stats;
+    static auto now() -> double {
+      return std::chrono::duration<double>( std::chrono::steady_clock::now().time_since_epoch() ).count();
+    }
+    // walk: frames moving in a row; still: frames standing; action: the model's action (setModelAction), and
+    // when it started, in seconds.
+    struct Motion { float x{}; float facing{}; int walk{}; int still{}; bool seen{}; std::string action{ "idle" }; double since{}; };
     std::unordered_map<Entity, Motion> _motion;
     gfx::Pixels _capture;
     long _tick{};

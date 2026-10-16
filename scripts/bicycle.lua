@@ -226,6 +226,7 @@ ffi.cdef([[
   void newImage( Entity entity, const char* imgStr );
   int renderMode();
   bool setModel( Entity entity, const char* bmeshPath );
+  void setModelAction( Entity entity, const char* action );
   bool addStaticModel( const char* bmeshPath );
   bool newPixelImage( Entity entity, const char* paths );
   bool addBgLayerPixels( const char* tilesetPath, const int* tiles, int nw, int nh, int tileW, int tileH,

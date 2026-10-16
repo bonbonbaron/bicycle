@@ -408,7 +408,13 @@ Animation.new = function( entity, character, rects )
 end
 
 -- Switch strips (e.g. "walk_left"). Returns false if it's already playing or doesn't exist.
+-- In 3D a rigged model plays the action named by the strip's tag: the part before the first "_" ("walk_left" ->
+-- "walk", "idle" -> "idle"); the renderer shows "idle" when a walking entity stands still.
+Animation.rigged = {}  -- entity -> true for entities drawn with a model
 function Animation:set( stripName )
+  if Animation.rigged[self.entity] and type( stripName ) == "string" then
+    ffi.C.setModelAction( self.entity, stripName:match( "^[^_]+" ) or stripName )
+  end
   return self:has( stripName ) and ffi.C.setAnim( self.entity, stripName )
 end
 
@@ -489,6 +495,7 @@ Gene["GeneLoader"] = {
     if not ffi.C.setModel( entity, "./"..gameName.."/genome/models/"..gene.val..".bmesh" ) then
       error( "Couldn't load model '"..gene.val.."' (meshes come from the asset pack: build the 'assets' target)." )
     end
+    Animation.rigged[entity] = true
   end,
   sprite2d = 0,  -- read by Genome.new: the sprite pixel modes use instead of img/sprite (ASCII keeps its own art)
   onSpawn = 0,  -- do nothing; called by Scene once the entity is placed

@@ -237,6 +237,11 @@ namespace bicycle {
       return gfx::renderer().setModel( entity, bmeshPath );
     }
 
+    // 3D mode: the action a rigged model plays (Animation:set maps strip tags to actions).
+    void setModelAction( Entity entity, const char* action ) {
+      gfx::renderer().setModelAction( entity, action );
+    }
+
     // 3D mode: static scenery (ground, props) exported from Blender with its world transform baked in.
     bool addStaticModel( const char* bmeshPath ) {
       return gfx::renderer().addStaticModel( bmeshPath );
