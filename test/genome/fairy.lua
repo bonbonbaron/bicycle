@@ -3,6 +3,7 @@
 -- Art: test/aseprite/make_fairy.lua (pixels + ASCII export; 3D draws her as a camera-facing billboard).
 local fairy = {
   sprite = "fairy_sprite", initAnim = "flutter",
+  persist = true,  -- she follows the hero through doors, keeping her offset
   motion = { type = "follow", target = "hero", mode = "lerp", rate = 3.5, offset = { 9, -5 }, bob = 0.6, bobHz = 1.1 },
 }
 return fairy
