@@ -3,7 +3,9 @@
 #include <cstdio>
 #include <cstring>
 #include <cstdlib>
+#ifndef BICYCLE_RELEASE
 #include <fstream>
+#endif
 #include <iterator>
 #include "c/MidiPlayer.h"
 #include "data/Pack.h"
@@ -34,8 +36,12 @@ namespace {
       auto it = memFiles.find( name );
       return it == memFiles.end() ? nullptr : new SfHandle{ nullptr, it->second, 0 };
     }
+#ifdef BICYCLE_RELEASE
+    return nullptr;  // release: SoundFonts only come from memory (the embedded pack)
+#else
     FILE* fp = std::fopen( filename, "rb" );
     return fp ? new SfHandle{ fp, nullptr, 0 } : nullptr;
+#endif
   }
 
   int sfRead( void* buf, fluid_long_long_t count, void* handle ) {
@@ -86,6 +92,9 @@ namespace {
 
 // BICYCLE_PROFILE=<file> appends how long each audio start-up step took (ms), to find what slows start-up.
 static void profile( const char* what ) {
+#ifdef BICYCLE_RELEASE
+  (void)what;  // release builds write no files
+#else
   static FILE* f = std::getenv( "BICYCLE_PROFILE" ) ? std::fopen( std::getenv( "BICYCLE_PROFILE" ), "a" ) : nullptr;
   if ( !f ) {
     return;
@@ -96,8 +105,10 @@ static void profile( const char* what ) {
   std::fprintf( f, "audio %-40s %8.1f ms\n", what, std::chrono::duration<double, std::milli>( now - last ).count() );
   std::fflush( f );
   last = now;
+#endif
 }
 
+#ifndef BICYCLE_RELEASE
 static auto fileExists( const std::string& fp ) -> bool {
   return std::ifstream( fp ).good();
 }
@@ -119,12 +130,14 @@ static void addWavHeader( const std::string& path, const unsigned rate ) {
   std::ofstream out( path, std::ios::binary | std::ios::trunc );
   out << h << data;
 }
+#endif
 
 MidiPlayer::MidiPlayer() {
   profile( "start" );
   // Settings
   _settingsP = new_fluid_settings();
   // fluidsynth supports the following audio drivers: alsa, file, jack, oss, pulseaudio, sdl2 
+#ifndef BICYCLE_RELEASE  // writing the audio to a file is a dev tool
   if ( const char* file = std::getenv( "BICYCLE_AUDIO_FILE" ) ) {
     fluid_settings_setstr( _settingsP, "audio.driver", "file" );
     fluid_settings_setstr( _settingsP, "audio.file.name", file );
@@ -137,7 +150,9 @@ MidiPlayer::MidiPlayer() {
       _rawFile = file;
     }
   }
-  else if ( const char* driver = std::getenv( "BICYCLE_AUDIO_DRIVER" ) ) {
+  else
+#endif
+  if ( const char* driver = std::getenv( "BICYCLE_AUDIO_DRIVER" ) ) {
     fluid_settings_setstr( _settingsP, "audio.driver", driver );
   }
   fluid_settings_setint( _settingsP, "player.reset-synth", 0 );
@@ -163,6 +178,10 @@ MidiPlayer::MidiPlayer() {
   profile( _aDriverP ? "audio driver + player" : "audio driver (none) + player" );
 
   // General MIDI fallback goes on the bottom of the SoundFont stack.
+#ifdef BICYCLE_RELEASE
+  // Release: only if it was embedded (-DBICYCLE_EMBED_GM_SF2=ON); never from disk.
+  if ( assets::exists( "sf2/default-GM.sf2" ) && loadSoundfont( "sf2/default-GM.sf2" ) >= 0 ) profile( "GM fallback (embedded)" );
+#else
   const char* gm = std::getenv( "BICYCLE_GM_SF2" );
   // ./sf2/default-GM.sf2 is where to put one on Windows (or anywhere without a system-wide SoundFont).
   for ( const std::string& fp : { std::string( gm ? gm : "" ), std::string( "./sf2/default-GM.sf2" ),
@@ -173,6 +192,7 @@ MidiPlayer::MidiPlayer() {
       break;
     }
   }
+#endif
 }
 
 MidiPlayer::~MidiPlayer() {
@@ -180,9 +200,11 @@ MidiPlayer::~MidiPlayer() {
   if ( _settingsP ) fluid_settings_getnum( _settingsP, "synth.sample-rate", &rate );
   if ( _aDriverP ) delete_fluid_audio_driver( _aDriverP );
   if ( _playerP ) delete_fluid_player( _playerP );
+#ifndef BICYCLE_RELEASE
   if ( !_rawFile.empty() ) {
     addWavHeader( _rawFile, static_cast<unsigned>( rate ) );
   }
+#endif
   if ( _synthP ) delete_fluid_synth( _synthP );
   if ( _settingsP ) delete_fluid_settings( _settingsP );
 }

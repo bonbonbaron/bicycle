@@ -82,6 +82,14 @@ o test
 * `BICYCLE_RENDER` (`ASCII`): `ASCII`, `2D` or `3D`.
 * `BICYCLE_GAMES` (`test`): game folders whose assets the `assets` target packs.
 * `BICYCLE_RELEASE_ASSETS` (OFF): pack assets every build and load them from the pack (see Assets).
+* `BICYCLE_RELEASE` (OFF): a shippable build with **zero file I/O at run time**: the game, the engine's Lua
+  scripts and fonts are linked into the executable (see "Release builds: everything from memory"). Implies
+  `BICYCLE_RELEASE_ASSETS`. Needs GCC/clang (MinGW, llvm-mingw/CLANG64 or Linux), not MSVC.
+* `BICYCLE_EMBED_GM_SF2` (OFF): with `BICYCLE_RELEASE`, also embed `sf2/default-GM.sf2` (+30 MB); otherwise a
+  release build has no General MIDI fallback, only the game's own SoundFonts.
+* `BICYCLE_TERMINFO_FALLBACKS`: with `BICYCLE_RELEASE` (ASCII, Linux/macOS), the terminals whose terminfo is
+  compiled into ncurses (default: xterm(-256color), screen, tmux, linux, vt100, rxvt-unicode, st, alacritty,
+  kitty, foot, wezterm; whichever this machine's terminfo has).
 
 ### Music
 
@@ -140,10 +148,71 @@ ignores the pack.
 
 Game SoundFonts are handed to fluidsynth from memory (a custom SoundFont loader whose file callbacks read a
 buffer; names start with `bicycle-mem://`), and MIDI files with `fluid_player_add_mem`, so neither touches the
-disk. The 32 MB General MIDI fallback (`sf2/default-GM.sf2`) stays a plain file outside the pack: it's shared by
-every game and barely compresses (SoundFont samples are PCM).
+disk. The 32 MB General MIDI fallback (`sf2/default-GM.sf2`) stays a plain file outside the pack in dev and
+`BICYCLE_RELEASE_ASSETS` builds: it's shared by every game and barely compresses (SoundFont samples are PCM). A
+`BICYCLE_RELEASE` build embeds it only with `BICYCLE_EMBED_GM_SF2`.
 
 `ctest` (or `build/bicycle-tests test`) round-trips every codec and every pack entry, including the Blender meshes.
+
+### Release builds: everything from memory
+
+`-DBICYCLE_RELEASE=ON` makes an executable that reads no files at all once `main()` starts:
+
+```sh
+cmake -B build-rel -G Ninja -DCMAKE_BUILD_TYPE=Release -DBICYCLE_RELEASE=ON [-DBICYCLE_RENDER=2D|3D] && cmake --build build-rel
+./o            # runs the embedded game (the first of BICYCLE_GAMES); `./o test` also works, nothing else is needed
+ctest --test-dir build-rel -R release-zero-io   # proves it with strace (below)
+```
+
+**What's embedded.** The build packs the game (`main.lua`, `genome/**`: genomes, Aseprite exports, tilemaps, MIDI,
+SoundFonts, Blender meshes and skins) together with `scripts/*.lua` (as `scripts/<name>.lua`) and the UI fonts
+(`<game>/fonts/*.ttf` if the game has any, else `fonts/*.ttf`, as `fonts/<name>.ttf`), plus with
+`BICYCLE_EMBED_GM_SF2` the GM SoundFont as `sf2/default-GM.sf2`, into `build-rel/embedded-<game>.bpak` (same
+compression as above). `src/data/EmbeddedPack.c` links it in with `.incbin` (ELF and COFF, so Linux, MinGW and
+llvm-mingw alike), and the engine mounts those bytes in place: no copy, no file. Shaders are string literals in
+`src/v/3d/Renderer3D.cpp`. The 2D/3D pixel modes' bitmap fallback font is compiled in (`Font8x8.h`). The `test` game
+embeds 1.1 MB.
+
+**How each subsystem loads** (`BICYCLE_RELEASE` is a compile-time switch; the file paths are compiled out):
+
+* Asset reads (`assets::read/exists/list`, `include/data/Pack.h`): only the embedded pack; `readFile` and the
+  loose-file fallback are compiled out (no `<fstream>`).
+* Lua: `package.loaders` is preload + the pack searcher (`require("Genome")` finds `scripts/Genome.lua`, a game's
+  `require("./test/genome/hero")` its genome); Lua's file searchers are removed and `package.path`/`cpath` are empty.
+  `io.open`, `io.popen`, `os.remove/rename/execute`, `package.loadlib` and `loadfile` return nil + "no file I/O";
+  `dofile`, `io.lines/input/output`, `os.tmpname` raise. `io.write`/`io.stderr` still work. Scripts load assets with
+  `Asset.read/dofile/list` (`scripts/bicycle.lua`), which go through the pack.
+* Audio: SoundFonts are inflated into the AUDIO pool and loaded through fluidsynth's SoundFont loader with memory
+  callbacks (`fluid_sfloader_set_callbacks`; `bicycle-mem://` names); the callbacks' `fopen` branch is compiled out.
+  MIDI goes through `fluid_player_add_mem`. The GM fallback comes only from the pack. `BICYCLE_AUDIO_FILE` and
+  `BICYCLE_PROFILE` (they write files) are compiled out.
+* Fonts: `UiFont` reads `fonts/ui.ttf` through the pack. Screenshots (`BICYCLE_SCREENSHOT`) are compiled out.
+* ASCII mode: ncurses is built from source with `--disable-database --with-fallbacks=...`, so terminal descriptions
+  are compiled in and no terminfo file is read (`TERM` must be one of `BICYCLE_TERMINFO_FALLBACKS`). Windows uses
+  PDCurses, which reads no files. `setlocale` asks only for `LC_CTYPE` (UTF-8).
+* 2D/3D on Linux: `MESA_SHADER_CACHE_DISABLE=true` is set before SDL starts (unless already set), so mesa doesn't read
+  or write `~/.cache/mesa_shader_cache`.
+
+**The check.** `tests/release_io_test.sh` (CTest `release-zero-io`, Linux, needs `strace`, and `xvfb-run` for
+2D/3D without a display) copies the executable into an empty temporary folder, runs it headless for 120 frames
+(`BICYCLE_MAX_FRAMES`) under `strace -f -e trace=open,openat,openat2,creat,stat,lstat,newfstatat,statx,access,
+faccessat(2),readlink(at)`, and looks at every path touched after `main()` starts (marked by a `prctl(PR_GET_NAME)`
+in `src/main.cpp`; the dynamic loader's opens come before). It fails on anything that isn't the operating system's:
+any relative path, the game folder, `scripts/`, `fonts/`, `sf2/`, a `.bpak`, config or save files. What remains,
+and is allowed, is the OS's own doing:
+
+| mode | remaining opens | why |
+|---|---|---|
+| all | `/dev/snd/*`, `/usr/share/alsa/**`, `/etc/alsa/conf.d/*`, `~/.asoundrc` (probe) | fluidsynth's ALSA driver: alsa-lib reads its config and probes sound cards |
+| all | `bicycle-mem://test/genome/music/meadow.sf2` (stat, ENOENT) | fluidsynth stats a SoundFont name before calling our loader; not a file, nothing read |
+| ASCII | `/usr/lib/locale/C.utf8/LC_CTYPE`, `locale.alias`, `gconv-modules.cache` | `setlocale(LC_CTYPE, "")` for UTF-8 output |
+| 2D/3D | `/lib/x86_64-linux-gnu/lib{GL,GLX_mesa,gallium,LLVM,drm,X*,xcb-*,wayland-*,decor}...`, `/etc/ld.so.cache` | SDL and libglvnd `dlopen` the window system and GL driver at run time |
+| 2D/3D | `/usr/lib/locale/**`, `/usr/share/X11/locale/**`, `~/.XCompose`, `~/.compose-cache`, `/var/cache/libx11/compose`, `~/.Xdefaults*`, `~/.Xauthority` | X11: SDL's `XOpenIM` (keyboard input method, compose tables), Xlib resources and auth |
+| 2D/3D | `/usr/share/icons/**/cursors/*`, `~/.icons/**`, `/usr/share/pixmaps/**` | libXcursor loading the cursor theme for SDL's system cursors |
+| 2D/3D | `/usr/share/drirc.d/*`, `/etc/drirc`, `~/.drirc`, `/dev/dri/*`, `/dev/udmabuf`, `/sys/devices/system/cpu/*`, `/proc/self/exe` | mesa: driver config (matched against the executable's name), GPU devices, CPU count |
+
+On Windows the same build (PDCurses, WinMM/DirectSound, WGL) reads no files of its own either; the OS loads its
+DLLs. The `strace` check is Linux-only.
 
 ### 2D art: Aseprite
 
@@ -207,6 +276,8 @@ still uses malloc. fluidsynth's cpp11 thread code is patched at fetch time (new 
 ## Environment variables
 
 * `BICYCLE_MODEL_ACTION=<action>`: 3D, pin every rigged model to one action.
+
+`BICYCLE_MAX_FRAMES=<n>`: quit after n frames (headless tests).
 
 `BICYCLE_LOOSE_ASSETS`, `BICYCLE_WINDOW_SIZE`, `BICYCLE_SCREENSHOT=<file.bmp>` (+ `BICYCLE_SCREENSHOT_FRAME`,
 default 90, and `BICYCLE_EXIT_AFTER_SCREENSHOT=1`) and `BICYCLE_GL_INFO` for the pixel modes;

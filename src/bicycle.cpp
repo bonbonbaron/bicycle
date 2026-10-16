@@ -32,6 +32,14 @@ namespace bicycle {
   }
 
   void init( const std::string& gameName ) {
+    // Release builds mount the pack linked into the executable (BICYCLE_RELEASE) or <game>/assets.bpak
+    // (BICYCLE_RELEASE_ASSETS); see include/data/Pack.h. Dev builds read loose files only. First, so the renderer
+    // can load its fonts from it.
+#ifdef BICYCLE_RELEASE
+    if ( !assets::mount( gameName ) ) die( "bicycle: the embedded asset pack is corrupt" );
+#elif defined( BICYCLE_RELEASE_ASSETS )
+    assets::mount( gameName );
+#endif
     gfx::renderer().init( gameName );
     auto& trig = Trigger::getInstance();
     trig.init( gameName );
@@ -452,8 +460,12 @@ namespace bicycle {
   int run() {
     auto& wm = WindowManager::getInstance();
     auto& trigger = Trigger::getInstance();
+    // BICYCLE_MAX_FRAMES=<n>: quit after n frames (headless tests, e.g. tests/release_io_test.sh).
+    long maxFrames = 0, frames = 0;
+    if ( const char* s = std::getenv( "BICYCLE_MAX_FRAMES" ) ) maxFrames = std::atol( s );
 
     while ( wm.size() > 0 ) {
+      if ( maxFrames > 0 && frames++ >= maxFrames ) break;
       // Inputs
       Timer::run();
       gfx::renderer().pollInput();

@@ -50,6 +50,12 @@ auto PixelRenderer::windowFlags() const -> uint64_t {
 }
 
 void PixelRenderer::init( const std::string& gameName ) {
+#if defined( BICYCLE_RELEASE ) && defined( __linux__ )
+  // Release builds keep the OS libraries' own file traffic down too (unless the user set these): no mesa shader
+  // cache in ~/.cache (the shaders are compiled from the strings in the executable each run; that takes
+  // milliseconds).
+  setenv( "MESA_SHADER_CACHE_DISABLE", "true", 0 );
+#endif
   if ( !SDL_Init( SDL_INIT_VIDEO | SDL_INIT_EVENTS ) ) {
     std::fprintf( stderr, "SDL_Init failed: %s\n", SDL_GetError() );
     std::exit( 1 );
@@ -378,6 +384,9 @@ void PixelRenderer::setAttr( WinHandle win, int attr, bool on ) {
 // BICYCLE_SCREENSHOT=<file.bmp> saves frame BICYCLE_SCREENSHOT_FRAME (default 90); BICYCLE_EXIT_AFTER_SCREENSHOT=1
 // then quits. For headless runs (Xvfb) and docs.
 auto PixelRenderer::screenshotDue() const -> bool {
+#ifdef BICYCLE_RELEASE
+  return false;  // release builds write no files
+#endif
   static const char* path = std::getenv( "BICYCLE_SCREENSHOT" );
   static const int when = envInt( "BICYCLE_SCREENSHOT_FRAME", 90 );
   return path && *path && _frame == when;
@@ -385,6 +394,7 @@ auto PixelRenderer::screenshotDue() const -> bool {
 
 void PixelRenderer::saveScreenshotIfDue() {
   if ( !screenshotDue() ) return;
+#ifndef BICYCLE_RELEASE
   const char* path = std::getenv( "BICYCLE_SCREENSHOT" );
   gfx::Pixels shot;
   captureFrame( shot );
@@ -395,6 +405,7 @@ void PixelRenderer::saveScreenshotIfDue() {
     SDL_DestroySurface( s );
   }
   if ( envInt( "BICYCLE_EXIT_AFTER_SCREENSHOT", 0 ) ) _quit = true;
+#endif
 }
 
 void PixelRenderer::endFrame() {
