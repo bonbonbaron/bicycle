@@ -1,5 +1,5 @@
 require('bicycle')
-local TextBox = require('TextBox')
+require('Dialogue')
 -- An old villager (Aseprite sprite "elder", idling) who blocks the way and talks when the hero presses E next to him.
 local villager = {
   sprite="elder", initAnim="idle", coll={ type="npc" },
@@ -12,7 +12,7 @@ local villager = {
 }
 
 function villager:onSpawn()
-  TextBox.addSpeaker( self )
+  Dialogue.addSpeaker( self )
 end
 
 function villager:onInput(input) end

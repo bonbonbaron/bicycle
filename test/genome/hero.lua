@@ -1,7 +1,7 @@
 require('bicycle')
 local Sound = require('Sound')
 local Hud = require('Hud')
-local TextBox = require('TextBox')
+require('Dialogue')
 -- The player: an animated Aseprite character (see scripts/aseprite/sprite.lua) who walks with WASD,
 -- is blocked by solid things, gets hurt by enemies (health bar up top), and talks to NPCs with E or Space.
 local hero = { sprite="pilgrim", initAnim="walk_down", coll={ type="hero" } }
@@ -50,7 +50,7 @@ end
 function hero:speakerInReach()
   local me = box( self.id )
   local reach = TALK_REACH * STEP
-  for _, npc in ipairs( TextBox.speakers ) do
+  for _, npc in ipairs( Dialogue.speakers ) do
     local b = box( npc.id )
     local gapX = math.max( b.pos.x - ( me.pos.x + me.size.w ), me.pos.x - ( b.pos.x + b.size.w ) )
     local gapY = math.max( b.pos.y - ( me.pos.y + me.size.h ), me.pos.y - ( b.pos.y + b.size.h ) )
@@ -64,20 +64,13 @@ function hero:onInput(input)
     ffi.C.popWindow()
     return
   end
-  local talkKey = input == ffi.C.E or input == ffi.C.Space
-  if TextBox.isOpen() then  -- frozen while talking (or reading the game-over message)
-    if talkKey then
-      Sound.play( "blip" )
-      TextBox.advance()
-    end
-    return
-  end
-  if talkKey then
+  -- While a Dialogue is up it has the input focus, so we don't move (or get here at all).
+  if input == ffi.C.E or input == ffi.C.Space then
     local npc = self:speakerInReach()
     if npc then
       Sound.play( "blip" )
       dbglog( "talk to %s", npc.name )
-      TextBox.open( npc.name, npc.lines, function() dbglog( "talk done" ) end )
+      Dialogue.new( npc.name..":\n"..table.concat( npc.lines, "\n\n" ), nil, nil, nil, nil, function() dbglog( "talk done" ) end )
     end
     return
   end
@@ -111,8 +104,8 @@ function hero:hurt( by )
   dbglog( "hero hurt: health %d", self.health )
   if self.health <= 0 then
     dbglog( "game over" )
-    TextBox.open( nil, { "You collapse in the tall grass...", "...and wake at the edge of the meadow, rested. Press E to try again." },
-      function() self:respawn() end )
+    Dialogue.new( "You collapse in the tall grass...\n\n...and wake at the edge of the meadow, rested. Press E to try again.",
+      nil, nil, nil, nil, function() self:respawn() end )
   end
 end
 
