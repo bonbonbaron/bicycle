@@ -1,4 +1,5 @@
 #pragma once
+#include "v/Bar.h"
 #include <string>
 #include <vector>
 #include <cursesw.h>
@@ -101,10 +102,23 @@ class Scene : public Window {
     auto getBackLayer() -> std::optional<Layer>;
     auto getGrid() -> Grid&;
 
+    // HUD: meters glued to the screen, drawn over every layer.
+    auto addHudBar( const std::string& label, const int max, const int len, const int x, const int y ) -> int;
+    auto getHudBar( const int id ) -> Bar*;
+    // Text box glued to the bottom of the screen, drawn over everything. One string per row; empty hides it.
+    void setTextBox( const std::vector<std::string>& lines );
+    auto getTextBoxWidth() const -> int;  // usable characters per row
+    void setHidden( const Entity entity, const bool hidden );  // e.g. to flash a character
+
   private:
     Grid _grid{};    // This has layers of BGs and FGs.
     Camera _camera{};  // TODO  when we have minimaps, the input needs to go to a window BELOW the top of WindowManager's stack.
     void renderFg( const Layer& layer );
     void renderBg( const Layer& layer, const int offX, const int offY, const bool wrap );
     void updateCameraLimits();
+    std::vector<Bar> _hud{};
+    std::unordered_map<Entity, bool> _hidden{};
+    std::vector<std::string> _textBox{};
+    void renderHud();
+    void renderTextBox();
 };

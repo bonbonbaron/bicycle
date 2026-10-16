@@ -172,6 +172,55 @@ namespace bicycle {
       Kinematics::getInstance().setVelocity( entity, vel );
     }
 
+    // HUD
+    static auto currScene() -> std::shared_ptr<Scene> {
+      return dynamic_pointer_cast<Scene>( WindowManager::getInstance().back() );
+    }
+
+    // A meter glued to the current scene at screen cell (x, y), starting full; returns its id (-1 if no scene).
+    int addHudBar( const char* label, int max, int len, int x, int y ) {
+      auto scene = currScene();
+      return scene ? scene->addHudBar( label, max, len, x, y ) : -1;
+    }
+
+    void setHudBar( int id, int val ) {
+      auto scene = currScene();
+      if ( Bar* bar = scene ? scene->getHudBar( id ) : nullptr ) {
+        bar->setValue( val );
+      }
+    }
+
+    // Text box glued to the bottom of the current scene: one row per '\n'-separated line; "" hides it.
+    void setTextBox( const char* text ) {
+      auto scene = currScene();
+      if ( ! scene ) {
+        return;
+      }
+      std::vector<std::string> lines{};
+      std::string s( text ? text : "" );
+      for ( size_t start = 0; ! s.empty() && start <= s.size(); ) {
+        size_t end = s.find( '\n', start );
+        if ( end == std::string::npos ) {
+          end = s.size();
+        }
+        lines.push_back( s.substr( start, end - start ) );
+        start = end + 1;
+      }
+      scene->setTextBox( lines );
+    }
+
+    void setHidden( Entity entity, bool hidden ) {
+      auto scene = currScene();
+      if ( scene ) {
+        scene->setHidden( entity, hidden );
+      }
+    }
+
+    int getTextBoxWidth() {
+      auto scene = currScene();
+      return scene ? scene->getTextBoxWidth() : 40;
+    }
+
     Entity popWindow() {
       return pop();
     }
