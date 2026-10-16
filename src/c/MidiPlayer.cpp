@@ -1,5 +1,10 @@
+#include "c/StartupStats.h"
+#include <string>
+#include <algorithm>
 #include "data/Mem.h"
+#include <algorithm>
 #include <chrono>
+#include "Constants.h"
 #include <cstdio>
 #include <cstring>
 #include <cstdlib>
@@ -92,6 +97,7 @@ namespace {
 
 // BICYCLE_PROFILE=<file> appends how long each audio start-up step took (ms), to find what slows start-up.
 static void profile( const char* what ) {
+  startup::mark( ( std::string( "  audio: " ) + what ).c_str() );
 #ifdef BICYCLE_RELEASE
   (void)what;  // release builds write no files
 #else
@@ -177,22 +183,114 @@ MidiPlayer::MidiPlayer() {
   _playerP = new_fluid_player( _synthP );
   profile( _aDriverP ? "audio driver + player" : "audio driver (none) + player" );
 
-  // General MIDI fallback goes on the bottom of the SoundFont stack.
+  // General MIDI fallback: on demand (ensureGm), unless BICYCLE_EAGER_GM=1.
+  if ( const char* e = std::getenv( "BICYCLE_EAGER_GM" ) ; e && *e == '1' ) ensureGm( "BICYCLE_EAGER_GM" );
+}
+
+// Loads the GM SoundFont once, then reloads the game's SoundFonts (from memory: milliseconds) so they stay on top.
+void MidiPlayer::ensureGm( const char* why ) {
+  if ( _gmTried ) return;
+  _gmTried = true;
+  int gmId = FLUID_FAILED;
 #ifdef BICYCLE_RELEASE
   // Release: only if it was embedded (-DBICYCLE_EMBED_GM_SF2=ON); never from disk.
-  if ( assets::exists( "sf2/default-GM.sf2" ) && loadSoundfont( "sf2/default-GM.sf2" ) >= 0 ) profile( "GM fallback (embedded)" );
+  if ( assets::exists( "sf2/default-GM.sf2" ) ) {
+    if ( auto data = assets::read( "sf2/default-GM.sf2", mem::AUDIO ) ) {
+      const std::string name = MEM_PREFIX + std::string( "sf2/default-GM.sf2" );
+      {
+        std::unique_lock<std::mutex> l( memMtx );
+        memFiles[name] = std::make_shared<const mem::Blob>( std::move( *data ) );
+      }
+      gmId = fluid_synth_sfload( _synthP, name.c_str(), 1 );
+    }
+  }
+  std::string used = "embedded";
 #else
   const char* gm = std::getenv( "BICYCLE_GM_SF2" );
+  std::string used;
   // ./sf2/default-GM.sf2 is where to put one on Windows (or anywhere without a system-wide SoundFont).
   for ( const std::string& fp : { std::string( gm ? gm : "" ), std::string( "./sf2/default-GM.sf2" ),
         std::string( "/usr/share/sounds/sf2/default-GM.sf2" ),
         std::string( "/usr/share/sounds/sf2/TimGM6mb.sf2" ), std::string( "/usr/share/sounds/sf2/FluidR3_GM.sf2" ) } ) {
-    if ( !fp.empty() && fileExists( fp ) && fluid_synth_sfload( _synthP, fp.c_str(), 1 ) != FLUID_FAILED ) {
-      profile( ( "GM fallback " + fp ).c_str() );
+    if ( !fp.empty() && fileExists( fp ) && ( gmId = fluid_synth_sfload( _synthP, fp.c_str(), 1 ) ) != FLUID_FAILED ) {
+      used = fp;
       break;
     }
   }
 #endif
+  if ( gmId == FLUID_FAILED ) return;
+  // Restack: each game SoundFont again on top, in its original order.
+  for ( auto& f : _gameFonts ) {
+    const int fresh = fluid_synth_sfload( _synthP, f.name.c_str(), 0 );
+    if ( fresh == FLUID_FAILED ) continue;
+    fluid_synth_sfunload( _synthP, f.id, 0 );
+    for ( auto& m : _idMap ) if ( m.second == f.id ) m.second = fresh;
+    f.id = fresh;
+  }
+  fluid_synth_program_reset( _synthP );
+  for ( int chan = 0; chan < 16; ++chan ) {
+    if ( _sel[chan].sfont >= 0 ) fluid_synth_program_select( _synthP, chan, currentId( _sel[chan].sfont ), _sel[chan].bank, _sel[chan].program );
+  }
+  profile( ( std::string( "GM fallback " ) + used + " (for " + why + ")" ).c_str() );
+}
+
+auto MidiPlayer::currentId( int luaId ) const -> int {
+  for ( const auto& m : _idMap ) if ( m.first == luaId ) return m.second;
+  return luaId;
+}
+
+auto MidiPlayer::hasPreset( int bank, int program ) const -> bool {
+  for ( const auto& f : _gameFonts ) {
+    fluid_sfont_t* sf = fluid_synth_get_sfont_by_id( _synthP, f.id );
+    if ( sf && fluid_sfont_get_preset( sf, bank, program ) ) return true;
+  }
+  return false;
+}
+
+// The (bank, program) pairs a Standard MIDI File plays notes with: program changes, bank selects (CC0), channel
+// 10 as drums (bank 128), and channels that play without a program change (program 0).
+static void midiPresets( const uint8_t* d, size_t n, std::vector<std::pair<int, int>>& out ) {
+  auto be = [&]( size_t i, int k ) { uint32_t v = 0; for ( int j = 0; j < k; ++j ) v = v << 8 | d[i + j]; return v; };
+  size_t i = 0;
+  if ( n < 14 || std::memcmp( d, "MThd", 4 ) != 0 ) return;
+  i = 8 + be( 4, 4 );
+  int bank[16]{}, prog[16]{};
+  bool used[16]{};
+  auto add = [&]( int c ) {
+    const std::pair<int, int> bp{ c == 9 ? 128 : bank[c], prog[c] };
+    for ( const auto& o : out ) if ( o == bp ) return;
+    out.push_back( bp );
+  };
+  while ( i + 8 <= n ) {
+    const size_t len = be( i + 4, 4 ), start = i + 8, end = std::min( n, start + len );
+    const bool track = std::memcmp( d + i, "MTrk", 4 ) == 0;
+    i = start;
+    uint8_t status = 0;
+    while ( track && i < end ) {
+      while ( i < end && d[i] & 0x80 ) ++i;  // delta time
+      ++i;
+      if ( i >= end ) break;
+      uint8_t b = d[i];
+      if ( b == 0xFF || b == 0xF0 || b == 0xF7 ) {
+        i += b == 0xFF ? 2 : 1;
+        uint32_t l = 0;
+        while ( i < end && d[i] & 0x80 ) l = l << 7 | ( d[i++] & 0x7f );
+        if ( i < end ) l = l << 7 | d[i++];
+        i += l;
+        continue;
+      }
+      if ( b & 0x80 ) { status = b; ++i; }
+      if ( !status ) break;
+      const int c = status & 0x0f, kind = status & 0xf0;
+      const int nData = ( kind == 0xC0 || kind == 0xD0 ) ? 1 : 2;
+      if ( i + nData > end ) break;
+      if ( kind == 0xC0 ) { prog[c] = d[i]; if ( used[c] ) add( c ); }
+      else if ( kind == 0xB0 && d[i] == 0 ) bank[c] = d[i + 1];
+      else if ( kind == 0x90 && d[i + 1] > 0 && !used[c] ) { used[c] = true; add( c ); }
+      i += nData;
+    }
+    i = end;
+  }
 }
 
 MidiPlayer::~MidiPlayer() {
@@ -221,6 +319,13 @@ auto MidiPlayer::loadMidi( const std::string& midiFilepath ) -> bool {
   _playerP = new_fluid_player( _synthP );
   _tick = 0;
   const bool ok = fluid_player_add_mem( _playerP, midi->data(), midi->size() ) == FLUID_OK;
+  if ( !_gmTried ) {
+    std::vector<std::pair<int, int>> presets;
+    midiPresets( reinterpret_cast<const uint8_t*>( midi->data() ), midi->size(), presets );
+    for ( const auto& [bank, program] : presets ) {
+      if ( !hasPreset( bank, program ) ) { ensureGm( ( "song " + midiFilepath ).c_str() ); break; }
+    }
+  }
   profile( ( "MIDI " + midiFilepath ).c_str() );
   return ok;
 }
@@ -235,8 +340,17 @@ void MidiPlayer::stopSoundFX() {
 
 // Sound effects are one-shot samples, so the note doesn't need to be released.
 void MidiPlayer::playSoundFX( const int key, const int vel ) {
+  if ( !_sfxSelected && !_gmTried && !hasPreset( 0, 0 ) ) ensureGm( "sound effect without a SoundFont" );
   fluid_synth_noteoff( _synthP, SFX_CHANNEL, key );  // retrigger cleanly
   fluid_synth_noteon( _synthP, SFX_CHANNEL, key, vel );
+}
+
+void MidiPlayer::playSoundFXPanned( const int key, const int vel, const float pan, const float gain ) {
+  const int v = static_cast<int>( vel * std::clamp( gain, 0.f, 1.f ) + 0.5f );
+  if ( v <= 0 ) return;  // out of earshot
+  const int cc = std::clamp( static_cast<int>( 64 + pan * 63 + 0.5f ), 0, 127 );
+  fluid_synth_cc( _synthP, SFX_CHANNEL, 10, cc );
+  playSoundFX( key, std::min( 127, v ) );
 }
 
 void MidiPlayer::playSound( const int chan, const int key, const int vel ) const {
@@ -281,9 +395,34 @@ auto MidiPlayer::loadSoundfont( const std::string& sfFilepath ) -> int {
   }
   auto id = fluid_synth_sfload( _synthP, name.c_str(), 1 );
   profile( ( "SoundFont " + sfFilepath ).c_str() );
-  return id == FLUID_FAILED ? -1 : id;
+  if ( id == FLUID_FAILED ) return -1;
+  _gameFonts.push_back( { name, id } );
+  _idMap.push_back( { id, id } );
+  return id;
 }
 
 auto MidiPlayer::selectProgram( const int chan, const int sfontId, const int bank, const int program ) -> bool {
-  return fluid_synth_program_select( _synthP, chan, sfontId, bank, program ) == FLUID_OK;
+  if ( chan < 0 || chan >= 16 ) return false;
+  _sel[chan] = { sfontId, bank, program };
+  if ( chan == SFX_CHANNEL ) _sfxSelected = true;
+  return fluid_synth_program_select( _synthP, chan, currentId( sfontId ), bank, program ) == FLUID_OK;
+}
+
+void MidiPlayer::fadeTo( const float level, const unsigned ms ) {
+  if ( !_synthP ) return;
+  if ( _baseGain < 0 ) _baseGain = fluid_synth_get_gain( _synthP );
+  _target = std::clamp( level, 0.0f, 1.0f );
+  const float frames = std::max( 1.0f, ms / static_cast<float>( Constants::MILLISECONDS_PER_FRAME ) );
+  _step = ( _target - _level ) / frames;
+  if ( ms == 0 ) {
+    _level = _target;
+    fluid_synth_set_gain( _synthP, _baseGain * _level );
+  }
+}
+
+void MidiPlayer::tickFade() {
+  if ( !_synthP || _baseGain < 0 || _level == _target ) return;
+  _level += _step;
+  if ( ( _step > 0 && _level >= _target ) || ( _step < 0 && _level <= _target ) || _step == 0 ) _level = _target;
+  fluid_synth_set_gain( _synthP, _baseGain * _level );
 }

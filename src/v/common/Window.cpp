@@ -1,5 +1,6 @@
 #include "v/common/Window.h"
 #include "bicycle.h"
+#include <algorithm>
 #include <cassert>
 
 using gfx::renderer;
@@ -76,6 +77,27 @@ void Window::repaint() {
 
 void Window::mvprint( const int y, const int x, const std::string& s ) const {
   renderer().text( _win, y, x, s );
+}
+
+void Window::place( const int x, const int y, const int w, const int h ) {
+  _x = x;
+  _y = y;
+  _w = std::max( 1, w );
+  _h = std::max( 1, h );
+  renderer().resizeWindow( _win, 1, 1 );  // shrink first so the move can't push it off the screen
+  renderer().moveWindow( _win, _x, _y );
+  renderer().resizeWindow( _win, _w, _h );
+}
+
+// Shows the window at its requested place and size as far as the screen allows, remembering the request, so a
+// window squeezed by a small terminal gets its full size back when the terminal grows.
+void Window::onTermResize() {
+  const int w = std::clamp( _w, 1, std::max( 1, gfx::cols() ) );
+  const int h = std::clamp( _h, 1, std::max( 1, gfx::lines() ) );
+  renderer().resizeWindow( _win, 1, 1 );
+  renderer().moveWindow( _win, std::clamp( _x, 0, std::max( 0, gfx::cols() - w ) ),
+                         std::clamp( _y, 0, std::max( 0, gfx::lines() - h ) ) );
+  renderer().resizeWindow( _win, w, h );
 }
 
 void Window::setX( const int x ) {

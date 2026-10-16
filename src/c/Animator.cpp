@@ -57,17 +57,17 @@ void Animator::startTimer( const Entity entity, AnimState& state ) {
 }
 
 // Switches to (and starts) a strip. Returns false if it's already playing or doesn't exist.
-auto Animator::set( const Entity entity, const std::string& stripName ) -> bool {
+auto Animator::set( const Entity entity, const uint8_t stripId ) -> bool {
   auto& state = _animStates.at( entity );
-  auto strip = state.animation.find( stripName );
-  if ( strip == state.animation.end() || strip->second->frames.empty() ) {
-    return false;  // TODO make some kind of status bar at the bottom to tell user strip isn't found.
+  auto* strip = state.animation.find( stripId );
+  if ( !strip || ( *strip )->frames.empty() ) {
+    return false;  // Lua already rejected names that aren't animation tags at all (scripts/Ids.lua)
   }
-  if ( strip->second == state.currStrip && state.running ) {
+  if ( *strip == state.currStrip && state.running ) {
     return false;
   }
   stop( entity );
-  state.currStrip = strip->second;
+  state.currStrip = *strip;
   start( entity );
   return true;
 }
@@ -104,21 +104,25 @@ void Animator::unpause( const Entity entity ) {
 }
 
 // Strips are built from Lua (see Genome.lua's sprite loader) via newAnimStrip() and addAnimFrame().
-void Animator::newStrip( const Entity entity, const std::string& stripName, const bool repeat ) {
+void Animator::newStrip( const Entity entity, const uint8_t stripId, const bool repeat ) {
   auto& state = _animStates.at( entity );
   auto strip = std::make_shared<AnimStrip>();
   strip->repeat = repeat;
-  state.animation[ stripName ] = strip;
+  state.animation.set( stripId, std::move( strip ) );
 }
 
-void Animator::addFrame( const Entity entity, const std::string& stripName, const unsigned durationMs, const Rect& srcRect ) {
+void Animator::addFrame( const Entity entity, const uint8_t stripId, const unsigned durationMs, const Rect& srcRect ) {
   auto& state = _animStates.at( entity );
-  auto strip = state.animation.find( stripName );
-  assert( strip != state.animation.end() );
-  strip->second->frames.push_back( AnimFrame{ durationMs, srcRect, {} } );
-  strip->second->nFrames = strip->second->frames.size();
+  auto* strip = state.animation.find( stripId );
+  assert( strip );
+  ( *strip )->frames.push_back( AnimFrame{ durationMs, srcRect, {} } );
+  ( *strip )->nFrames = ( *strip )->frames.size();
 }
 
 auto Animator::getFrameIdx( const Entity entity ) const -> unsigned {
   return _animStates.at( entity ).frameIdx;
+}
+
+void Animator::forget( const Entity entity ) {
+  if ( entity < _animStates.size() ) _animStates[entity] = AnimState{};
 }

@@ -13,3 +13,6 @@ o-3d
 o-2d.exe
 o-3d.exe
 build-*/
+gen/
+*.debug
+build-ci-*.log

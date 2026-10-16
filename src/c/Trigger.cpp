@@ -1,3 +1,4 @@
+#include "c/StartupStats.h"
 #include "data/Mem.h"
 #include <cstdio>
 #include "c/Trigger.h"
@@ -148,6 +149,7 @@ void Trigger::init( const std::string& gameName ) {
     L = luaL_newstate();
   }
   luaL_openlibs(L);
+  startup::mark( "lua state" );
   // The asset pack is mounted in bicycle::init, before the renderer (which loads fonts from it).
   lua_getglobal( L, "package" );
   lua_getfield( L, -1, "loaders" );  // LuaJIT (Lua 5.1) calls them loaders
@@ -221,6 +223,21 @@ void Trigger::sendTimeout( const Timeout& timeout ) {
 
 void Trigger::sendCollision( const Collision& collision ) {
   bridge.collisions.add( collision );
+}
+
+void Trigger::forgetEntity( Entity entity ) {
+  if ( entity == 0 ) return;
+  for ( unsigned i = 0; i < bridge.collisions.len; ++i ) {
+    auto& c = bridge.collisions.arr[i];
+    if ( c.lhs == entity || c.rhs == entity ) c.lhs = 0;
+  }
+  for ( unsigned i = 0; i < bridge.uncollisions.len; ++i ) {
+    auto& c = bridge.uncollisions.arr[i];
+    if ( c.lhs == entity || c.rhs == entity ) c.lhs = 0;
+  }
+  for ( unsigned i = 0; i < bridge.timeouts.len; ++i ) {
+    if ( bridge.timeouts.arr[i].entity == entity ) bridge.timeouts.arr[i].entity = 0;
+  }
 }
 
 void Trigger::sendUncollision( const Collision& uncollision ) {

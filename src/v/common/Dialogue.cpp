@@ -24,7 +24,26 @@ Dialogue::Dialogue( const std::string&& s, const int x, const int y, const int w
   init();
 }
 
+void Dialogue::onTermResize() {
+  const int H = _wantH;
+  if ( _bottomAnchored ) {
+    const int h = std::min( H, std::max( 3, gfx::lines() - 1 ) );
+    place( 1, std::max( 0, gfx::lines() - h - 1 ), std::max( WINDOW_PADDING + 1, gfx::cols() - 4 ), h );
+  }
+  else {
+    Window::onTermResize();
+  }
+  lineLimits.clear();  // keeps its capacity
+  delimitLines();
+  initLineNum = std::min( initLineNum, lastPageStart() );
+}
+
 void Dialogue::init() {
+  // Dialogue.new (scripts/Dialogue.lua) spans the bottom: x 1, width cols - 2 (the window keeps w - 2), y + h one
+  // row above the bottom.
+  _wantH = static_cast<int>( getHeight() );
+  _bottomAnchored = requestedX() == 1 && static_cast<int>( getWidth() ) == gfx::cols() - 4 &&
+                    requestedY() + static_cast<int>( getHeight() ) == gfx::lines() - 1;
   // const auto& cp = ColorPalette::getInstance();  // TODO 
   delimitLines();
 }

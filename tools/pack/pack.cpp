@@ -4,7 +4,7 @@
 // "scripts/<x>.lua", fonts/*.ttf as "fonts/<x>.ttf" and optionally the GM SoundFont as "sf2/default-GM.sf2").
 // Packs <game>/main.lua and everything under <game>/genome:
 //   .bimg          indexed: strip-coded (jollybean's strips) or deflated, whichever is smaller; true color: deflated
-//   models/*.obj   Edgebreaker-coded into models/<name>.bmesh (with its .mtl); the .obj/.mtl aren't packed
+//   model/*.obj    Edgebreaker-coded into model/<name>.bmesh (with its .mtl); the .obj/.mtl aren't packed
 //   .png next to a .bimg of the same name (old exports) and .mtl: skipped
 //   anything else  deflated, or stored if deflate doesn't help
 // Prints each entry's method and sizes and totals per file type.
@@ -23,6 +23,8 @@
 #include <filesystem>
 #include <fstream>
 #include <map>
+#include <regex>
+#include <set>
 #include <sstream>
 
 namespace fs = std::filesystem;
@@ -97,10 +99,39 @@ int main( int argc, char** argv ) {
   if ( fs::exists( game / "main.lua" ) ) files.push_back( game / "main.lua" );
   if ( fs::exists( game / "genome" ) ) {
     for ( auto& e : fs::recursive_directory_iterator( game / "genome" ) ) {
-      if ( e.is_regular_file() ) files.push_back( e.path() );
+      if ( e.is_regular_file() && e.path().filename() != ".gitkeep" ) files.push_back( e.path() );  // .gitkeep: empty layout dirs
     }
   }
   std::sort( files.begin(), files.end() );
+  // Scene changes: every scene a door or a Scene.go names must be in the pack (genome/scene/<name>.lua), or a
+  // release build would fail only when the player walks through that door.
+  {
+    std::set<std::string> scenes;
+    for ( auto& f : files ) {
+      const std::string rel = fs::relative( f, game ).generic_string();
+      if ( rel.rfind( "genome/scene/", 0 ) == 0 && f.extension() == ".lua" ) scenes.insert( f.stem().string() );
+    }
+    static const std::regex doorTo( R"(door\s*=\s*\{[^}]*\bto\s*=\s*["']([A-Za-z0-9_]+)["'])" );
+    static const std::regex door3d( R"(W\.door\s*[\({]\s*\{?[^}]*\bto\s*=\s*["']([A-Za-z0-9_]+)["'])" );  // true-3D doors
+    static const std::regex gotoCall( R"(Scene(?:\.go|\.goTo|\.goto|\[\s*["']goto["']\s*\])\s*\(\s*["']([A-Za-z0-9_]+)["'])" );
+    int missing = 0;
+    for ( auto& f : files ) {
+      if ( f.extension() != ".lua" ) continue;
+      const std::string src = readFile( f );
+      for ( const auto* re : { &doorTo, &door3d, &gotoCall } ) {
+        for ( std::sregex_iterator it( src.begin(), src.end(), *re ), end; it != end; ++it ) {
+          const std::string name = ( *it )[1];
+          if ( !scenes.count( name ) ) {
+            std::fprintf( stderr, "bicycle-pack: %s goes to scene '%s', but there's no genome/scene/%s.lua\n",
+                          fs::relative( f, game ).generic_string().c_str(), name.c_str(), name.c_str() );
+            ++missing;
+          }
+        }
+      }
+    }
+    if ( missing ) return 1;
+    std::printf( "scenes: %zu packed, every door/Scene.go target found\n", scenes.size() );
+  }
   std::vector<Packed> packed;
   for ( auto& f : files ) {
     const std::string rel = fs::relative( f, game ).generic_string();

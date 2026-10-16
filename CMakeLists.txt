@@ -12,8 +12,14 @@ set( CMAKE_CXX_STANDARD 20 )
 set( CMAKE_CXX_STANDARD_REQUIRED ON )
 set( CMAKE_EXPORT_COMPILE_COMMANDS ON )
 if ( NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES )
-  set( CMAKE_BUILD_TYPE Debug )  # same as the old Makefile's -g
+  # Optimized with debug info, the debug info split off into o.debug (BICYCLE_SPLIT_DEBUG below): a small, fast
+  # executable that's still debuggable. It used to be Debug, which made o.exe ~16 MB, ~11 MB of it DWARF (a slower
+  # first start: more to read from disk and for antivirus to scan). -DCMAKE_BUILD_TYPE=Debug for -O0 stepping.
+  set( CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "Debug, Release, RelWithDebInfo or MinSizeRel" FORCE )
 endif()
+option( BICYCLE_SPLIT_DEBUG "Move the executable's debug info into o.debug next to it (GCC/clang, not MSVC)" ON )
+option( BICYCLE_LTO "Link-time optimization for the engine (smaller, slower to link)" OFF )
+option( BICYCLE_SIZE "Optimize the engine for size (-Os)" OFF )
 
 # How the game is drawn: ASCII (terminal, curses), 2D (SDL3 pixel graphics) or 3D (SDL3 + OpenGL 3.3).
 set( BICYCLE_RENDER ASCII CACHE STRING "Render mode: ASCII, 2D or 3D" )
@@ -35,6 +41,57 @@ else()
   bicycle_sdl3()
 endif()
 bicycle_luajit()
+# Build-time string interning (README, "IDs"): tools/ids/genids.lua scans every game's genome tree, main.lua and
+# the engine scripts and writes gen/ids.h + gen/ids.lua (names -> small integer ids). It reruns whenever one of
+# them changes (and the globs re-run CMake when files come or go), so nobody edits an id list by hand. Release
+# builds run it with --strict: a door to a missing scene, a missing song or sound, a bad initAnim... fails the build.
+if ( NOT BICYCLE_LUA_HOST )
+  find_program( BICYCLE_LUA_HOST_PROGRAM NAMES luajit lua5.1 lua5.4 lua )
+  if ( NOT BICYCLE_LUA_HOST_PROGRAM )
+    message( FATAL_ERROR "bicycle: no Lua for tools/ids/genids.lua (LuaJIT's minilua wasn't built and no lua/luajit on PATH)" )
+  endif()
+  set( BICYCLE_LUA_HOST "${BICYCLE_LUA_HOST_PROGRAM}" )
+endif()
+file( GLOB repoDirs LIST_DIRECTORIES true "${CMAKE_SOURCE_DIR}/*" )
+set( idsInputs "${CMAKE_SOURCE_DIR}/include/v/common/ColorPalette.h" )
+foreach( d ${repoDirs} )
+  if ( IS_DIRECTORY "${d}/genome" )
+    file( GLOB_RECURSE genomeFiles CONFIGURE_DEPENDS "${d}/genome/*" )
+    list( FILTER genomeFiles EXCLUDE REGEX "/\\.gitkeep$|\\.bmesh$|\\.bskin$" )
+    list( APPEND idsInputs ${genomeFiles} )
+    if ( EXISTS "${d}/main.lua" )
+      list( APPEND idsInputs "${d}/main.lua" )
+    endif()
+  endif()
+endforeach()
+file( GLOB idsScripts CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/scripts/*.lua" )
+list( FILTER idsScripts EXCLUDE REGEX "/ids\\.lua$" )
+list( APPEND idsInputs ${idsScripts} )
+string( REPLACE ";" "\n" idsList "${idsInputs}" )
+file( WRITE "${CMAKE_BINARY_DIR}/ids-inputs.txt.tmp" "${idsList}\n" )
+file( COPY_FILE "${CMAKE_BINARY_DIR}/ids-inputs.txt.tmp" "${CMAKE_BINARY_DIR}/ids-inputs.txt" ONLY_IF_DIFFERENT )
+set( idsStrict )
+if ( BICYCLE_RELEASE OR BICYCLE_RELEASE_ASSETS )
+  set( idsStrict --strict )
+endif()
+set( BICYCLE_IDS_STAMP "${CMAKE_BINARY_DIR}/ids.stamp" )
+add_custom_command( OUTPUT "${BICYCLE_IDS_STAMP}"
+  BYPRODUCTS "${CMAKE_SOURCE_DIR}/gen/ids.h" "${CMAKE_SOURCE_DIR}/gen/ids.lua"
+  COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_SOURCE_DIR}/gen"
+  COMMAND "${BICYCLE_LUA_HOST}" "${CMAKE_SOURCE_DIR}/tools/ids/genids.lua" --root "${CMAKE_SOURCE_DIR}"
+          --out "${CMAKE_SOURCE_DIR}/gen" --list "${CMAKE_BINARY_DIR}/ids-inputs.txt" --stamp "${BICYCLE_IDS_STAMP}" ${idsStrict}
+  DEPENDS ${idsInputs} "${CMAKE_SOURCE_DIR}/tools/ids/genids.lua" "${CMAKE_BINARY_DIR}/ids-inputs.txt"
+  COMMENT "Generating gen/ids.h and gen/ids.lua (string ids)" VERBATIM )
+add_custom_target( ids ALL DEPENDS "${BICYCLE_IDS_STAMP}" )
+# gen/ids.h exists before anything includes it (the first build runs the generator at configure time too).
+if ( NOT EXISTS "${CMAKE_SOURCE_DIR}/gen/ids.h" OR NOT EXISTS "${CMAKE_SOURCE_DIR}/gen/ids.lua" )
+  file( MAKE_DIRECTORY "${CMAKE_SOURCE_DIR}/gen" )
+  execute_process( COMMAND "${BICYCLE_LUA_HOST}" "${CMAKE_SOURCE_DIR}/tools/ids/genids.lua" --root "${CMAKE_SOURCE_DIR}"
+                   --out "${CMAKE_SOURCE_DIR}/gen" --list "${CMAKE_BINARY_DIR}/ids-inputs.txt" RESULT_VARIABLE idsRc )
+  if ( NOT idsRc EQUAL 0 )
+    message( FATAL_ERROR "bicycle: tools/ids/genids.lua failed" )
+  endif()
+endif()
 bicycle_fluidsynth()
 bicycle_gm_soundfont()
 bicycle_miniz()
@@ -46,7 +103,7 @@ add_library( bicycle_data STATIC
   src/data/Edgebreaker.cpp )
 target_include_directories( bicycle_data PUBLIC include )
 # Memory pool sizes in MB (include/data/Mem.h); the same names as environment variables override them at run time.
-foreach( pool_default PERMANENT=16 GENERAL=128 TEXT=64 GRAPHIC=96 AUDIO=96 TEMPORARY=64 )
+foreach( pool_default PERMANENT=16 GENERAL=128 TEXT=64 GRAPHIC=96 AUDIO=96 TEMPORARY=64 SCENE=64 )
   string( REPLACE "=" ";" pd "${pool_default}" )
   list( GET pd 0 pool )
   list( GET pd 1 mb )
@@ -90,7 +147,7 @@ foreach( game ${BICYCLE_GAMES} )
   file( GLOB_RECURSE gameFiles CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/${game}/main.lua" "${CMAKE_SOURCE_DIR}/${game}/genome/*" )
   add_custom_command( OUTPUT "${CMAKE_SOURCE_DIR}/${game}/assets.bpak"
     COMMAND "${BICYCLE_PACKER}" "${CMAKE_SOURCE_DIR}/${game}" "${CMAKE_SOURCE_DIR}/${game}/assets.bpak"
-    DEPENDS ${gameFiles} ${BICYCLE_PACKER_TARGET}
+    DEPENDS ${gameFiles} ${BICYCLE_PACKER_TARGET} "${BICYCLE_IDS_STAMP}"
     COMMENT "Packing ${game}'s assets" VERBATIM )
   list( APPEND packs "${CMAKE_SOURCE_DIR}/${game}/assets.bpak" )
 endforeach()
@@ -119,7 +176,9 @@ if ( BICYCLE_RELEASE )
     get_filename_component( name "${f}" NAME )
     list( APPEND addArgs --add "${f}" "${dir}/${name}" )
   endforeach()
-  set( extraFiles ${engineScripts} ${fontFiles} )
+  # The generated ids (require("gen.ids")): the generator ran --strict first (its stamp is a dependency).
+  list( APPEND addArgs --add "${CMAKE_SOURCE_DIR}/gen/ids.lua" "gen/ids.lua" )
+  set( extraFiles ${engineScripts} ${fontFiles} "${BICYCLE_IDS_STAMP}" )
   if ( BICYCLE_EMBED_GM_SF2 )
     if ( NOT EXISTS "${CMAKE_SOURCE_DIR}/sf2/default-GM.sf2" )
       message( FATAL_ERROR "BICYCLE_EMBED_GM_SF2: no sf2/default-GM.sf2" )
@@ -140,6 +199,10 @@ else()
   add_custom_target( assets DEPENDS ${packs} )
 endif()
 add_custom_target( package DEPENDS ${packs} )
+# A private pack of the test game for the `codecs` ctest (always repacked, so it matches the sources).
+add_custom_target( codecs-pack
+  COMMAND "${BICYCLE_PACKER}" "${CMAKE_SOURCE_DIR}/test" "${CMAKE_BINARY_DIR}/codecs-test.bpak"
+  DEPENDS ${BICYCLE_PACKER_TARGET} ids VERBATIM )
 
 # Headless codec tests: `ctest --test-dir build` (or build/bicycle-tests test).
 if ( NOT CMAKE_CROSSCOMPILING )
@@ -148,11 +211,34 @@ if ( NOT CMAKE_CROSSCOMPILING )
   add_executable( bicycle-tests tests/codec_test.cpp )
   target_link_libraries( bicycle-tests PRIVATE bicycle_pack_codecs )
   enable_testing()
-  # The pack round-trip needs test/assets.bpak, which dev builds don't make: pack it first.
-  add_test( NAME pack-assets COMMAND "${CMAKE_COMMAND}" --build "${CMAKE_BINARY_DIR}" --target package )
+  # The pack round-trip packs the test game afresh into this build directory and checks that pack. Not
+  # test/assets.bpak: it's shared by every build directory and only rebuilt by builds whose BICYCLE_GAMES has
+  # "test", so in a plat3d/fps3d build it was stale after any test/genome edit (the flaky `codecs` failure).
+  set( codecsPack "${CMAKE_BINARY_DIR}/codecs-test.bpak" )
+  add_test( NAME pack-assets COMMAND "${CMAKE_COMMAND}" --build "${CMAKE_BINARY_DIR}" --target package codecs-pack )
   set_tests_properties( pack-assets PROPERTIES FIXTURES_SETUP packed )
-  add_test( NAME codecs COMMAND bicycle-tests test WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}" )
+  add_test( NAME codecs COMMAND bicycle-tests "test=${codecsPack}" WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}" )
   add_test( NAME motion COMMAND bicycle-motion-tests )
+  add_executable( bicycle-mem-scene-tests tests/mem_scene_test.cpp src/data/Mem.cpp )
+  target_include_directories( bicycle-mem-scene-tests PRIVATE include )
+  add_test( NAME mem-scene COMMAND bicycle-mem-scene-tests )
+  # bicycle::map (include/data/Map.h), with a byte-table popcount build too (BICYCLE_MAP_POPCNT_LUT).
+  add_executable( bicycle-map-tests tests/map_test.cpp src/data/Mem.cpp )
+  target_include_directories( bicycle-map-tests PRIVATE include )
+  add_test( NAME map COMMAND bicycle-map-tests )
+  add_test( NAME ids COMMAND sh "${CMAKE_SOURCE_DIR}/tests/ids_test.sh" "${BICYCLE_LUA_HOST}" "${CMAKE_SOURCE_DIR}" )
+  add_executable( bicycle-map-lut-tests tests/map_test.cpp src/data/Mem.cpp )
+  target_include_directories( bicycle-map-lut-tests PRIVATE include )
+  target_compile_definitions( bicycle-map-lut-tests PRIVATE BICYCLE_MAP_POPCNT_LUT )
+  add_test( NAME map-lut COMMAND bicycle-map-lut-tests )
+  # True 3D: math (include/m/Math3D.h), level collision, character physics and raycasts (src/c/Physics3D.cpp).
+  add_executable( bicycle-3d-tests tests/math3d_test.cpp src/c/Physics3D.cpp )
+  target_link_libraries( bicycle-3d-tests PRIVATE bicycle_data )
+  if ( BICYCLE_RELEASE )  # release bicycle_data reads only the embedded pack
+    target_sources( bicycle-3d-tests PRIVATE src/data/EmbeddedPack.c )
+    add_dependencies( bicycle-3d-tests embedded-pack )
+  endif()
+  add_test( NAME math3d COMMAND bicycle-3d-tests )
   set_tests_properties( codecs PROPERTIES FIXTURES_REQUIRED packed )
 endif()
 
@@ -162,7 +248,8 @@ set( BICYCLE_SOURCES
   src/v/common/Image.cpp src/v/common/ColorPalette.cpp src/v/common/Window.cpp src/v/common/Dialogue.cpp
   src/v/common/Menu.cpp src/v/common/TextMenu.cpp src/v/common/Scene.cpp src/v/common/Bar.cpp
   src/c/Trigger.cpp src/c/Timer.cpp src/c/WindowManager.cpp src/c/CollisionDetector.cpp
-  src/c/Kinematics.cpp src/c/Animator.cpp src/c/MidiPlayer.cpp src/c/Dice.cpp )
+  src/c/Kinematics.cpp src/c/Animator.cpp src/c/MidiPlayer.cpp src/c/Dice.cpp
+  src/c/Physics3D.cpp src/c/World3DApi.cpp src/c/InputState.cpp )
 # Not built (unfinished or replaced): src/c/Input.cpp (Linux evdev keyboard), src/c/RenderSystem.cpp, src/v/common/Graph.cpp
 if ( BICYCLE_RENDER STREQUAL "ASCII" )
   list( APPEND BICYCLE_SOURCES src/v/ascii/AsciiRenderer.cpp src/c/SshInputListener.cpp )
@@ -179,6 +266,8 @@ if ( BICYCLE_RELEASE )
     OBJECT_DEPENDS "${BICYCLE_EMBEDDED_PACK}" )
 endif()
 add_executable( o ${BICYCLE_SOURCES} )
+add_dependencies( o ids )
+target_include_directories( o PRIVATE "${CMAKE_SOURCE_DIR}" )  # gen/ids.h
 target_include_directories( o PRIVATE include )
 target_link_libraries( o PRIVATE bicycle_data bicycle_luajit bicycle_fluidsynth Threads::Threads )
 target_compile_definitions( o PRIVATE BICYCLE_RENDER_${BICYCLE_RENDER} )
@@ -217,6 +306,33 @@ if ( MSVC )
 else()
   target_compile_options( o PRIVATE -Wall -Wno-switch )
 endif()
+if ( NOT MSVC )
+  # Unused code and data dropped at link time; exported (FFI) functions are roots, so they stay.
+  target_compile_options( o PRIVATE -ffunction-sections -fdata-sections $<$<BOOL:${BICYCLE_SIZE}>:-Os> )
+  if ( APPLE )
+    target_link_options( o PRIVATE -Wl,-dead_strip )
+  else()
+    target_link_options( o PRIVATE -Wl,--gc-sections )
+  endif()
+  # Release (zero-I/O) builds ship: no symbols or debug info at all.
+  if ( BICYCLE_RELEASE AND NOT APPLE )
+    target_link_options( o PRIVATE -s )
+  endif()
+endif()
+if ( BICYCLE_LTO )
+  set_property( TARGET o PROPERTY INTERPROCEDURAL_OPTIMIZATION ON )
+endif()
+# Debug info out of the executable into o.debug (o-2d.debug, ...), linked back with a .gnu_debuglink, which gdb
+# and lldb follow. Builds without -g skip it.
+if ( BICYCLE_SPLIT_DEBUG AND NOT MSVC AND NOT APPLE AND NOT BICYCLE_RELEASE AND CMAKE_BUILD_TYPE MATCHES "Deb" )
+  find_program( BICYCLE_OBJCOPY NAMES llvm-objcopy ${CMAKE_OBJCOPY} objcopy )
+  if ( BICYCLE_OBJCOPY )
+    add_custom_command( TARGET o POST_BUILD
+      COMMAND "${BICYCLE_OBJCOPY}" --only-keep-debug "$<TARGET_FILE:o>" "$<TARGET_FILE:o>.debug"
+      COMMAND "${BICYCLE_OBJCOPY}" --strip-debug "--add-gnu-debuglink=$<TARGET_FILE:o>.debug" "$<TARGET_FILE:o>"
+      WORKING_DIRECTORY "$<TARGET_FILE_DIR:o>" VERBATIM )
+  endif()
+endif()
 if ( MINGW )
   # Export the engine functions for the FFI, and link the compiler's runtime (libstdc++/libc++, winpthread)
   # statically so o.exe runs without MinGW's DLLs on PATH.
@@ -231,10 +347,55 @@ if ( WIN32 )
     VERBATIM )
 endif()
 
+# ctest runs this build directory's own copy of the executable. The one in the repo root is shared by every build
+# directory of the same mode (a plat3d and an fps3d release build both write o-3d), so tests of one build could run
+# another's executable (`This release build runs only its embedded game`).
+set( BICYCLE_TEST_EXE "${CMAKE_BINARY_DIR}/test-bin/${BICYCLE_EXE_NAME}${CMAKE_EXECUTABLE_SUFFIX}" )
+add_custom_command( TARGET o POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/test-bin"
+  COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:o>" "${BICYCLE_TEST_EXE}"
+  VERBATIM )
+
 # Release builds: run the game headless for 120 frames under strace and fail if it opens anything but OS files
 # (tests/release_io_test.sh lists what's allowed and why). Needs strace; 2D/3D also xvfb-run (or a DISPLAY).
 if ( BICYCLE_RELEASE AND NOT CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_NAME STREQUAL "Linux" )
   string( TOLOWER "${BICYCLE_RENDER}" modeLower )
-  add_test( NAME release-zero-io COMMAND sh "${CMAKE_SOURCE_DIR}/tests/release_io_test.sh" "$<TARGET_FILE:o>" ${modeLower} 120 )
+  add_test( NAME release-zero-io COMMAND sh "${CMAKE_SOURCE_DIR}/tests/release_io_test.sh" "${BICYCLE_TEST_EXE}" ${modeLower} 120 )
   set_tests_properties( release-zero-io PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 300 )
+  # Games with scenes change scenes during the run too (loads after start-up must come from the pack as well).
+  if ( BICYCLE_RELEASE_GAME STREQUAL "test" )
+    set_tests_properties( release-zero-io PROPERTIES ENVIRONMENT "BICYCLE_SCENE_CYCLE=2:intro:house:20" )
+  elseif ( BICYCLE_RELEASE_GAME STREQUAL "plat3d" AND BICYCLE_RENDER STREQUAL "3D" )
+    set_tests_properties( release-zero-io PROPERTIES ENVIRONMENT "BICYCLE_SCENE_CYCLE=2:courtyard:bonus:20" )
+  endif()
+endif()
+
+# Scene changes: back and forth between the test game's two scenes; the SCENE pool must empty on every unload and
+# its high-water mark stay flat (tests/scene_lifecycle_test.sh). Dev and release builds alike.
+if ( NOT CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_NAME STREQUAL "Linux" )
+  string( TOLOWER "${BICYCLE_RENDER}" modeLowerLc )
+  # Which two scenes to walk between, per game (the first of BICYCLE_GAMES; games without scenes skip the test).
+  list( GET BICYCLE_GAMES 0 lifecycleGame )
+  set( lifecyclePair "" )
+  if ( lifecycleGame STREQUAL "test" )
+    set( lifecyclePair "intro:house" )
+  elseif ( lifecycleGame STREQUAL "plat3d" AND BICYCLE_RENDER STREQUAL "3D" )
+    set( lifecyclePair "courtyard:bonus" )
+  endif()
+  # plat3d's coins (tests/coin_collect_test.sh): removing a body inside its collision dispatch. 3D dev builds run
+  # loose files; a release build needs plat3d packed.
+  if ( BICYCLE_RENDER STREQUAL "3D" AND ( NOT BICYCLE_RELEASE OR lifecycleGame STREQUAL "plat3d" ) )
+    add_test( NAME coin-collect COMMAND sh "${CMAKE_SOURCE_DIR}/tests/coin_collect_test.sh" "${BICYCLE_TEST_EXE}"
+              WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}" )
+    set_tests_properties( coin-collect PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 400 )
+  endif()
+  if ( lifecyclePair )
+    add_test( NAME scene-lifecycle COMMAND sh "${CMAKE_SOURCE_DIR}/tests/scene_lifecycle_test.sh" "${BICYCLE_TEST_EXE}" ${modeLowerLc} 20
+              ${lifecycleGame} ${lifecyclePair} WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}" )
+    set_tests_properties( scene-lifecycle PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 400 )
+  endif()
+  # The Aseprite door/song scripts in batch mode (skipped unless BICYCLE_ASEPRITE points at an aseprite binary).
+  set( BICYCLE_ASEPRITE "$ENV{BICYCLE_ASEPRITE}" CACHE FILEPATH "Aseprite binary for the aseprite-scene-scripts test" )
+  add_test( NAME aseprite-scene-scripts COMMAND sh "${CMAKE_SOURCE_DIR}/tests/aseprite_scene_scripts_test.sh" "${CMAKE_SOURCE_DIR}" )
+  set_tests_properties( aseprite-scene-scripts PROPERTIES SKIP_RETURN_CODE 77 ENVIRONMENT "BICYCLE_ASEPRITE=${BICYCLE_ASEPRITE}" )
 endif()

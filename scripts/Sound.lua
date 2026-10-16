@@ -11,24 +11,45 @@ local function genomePath( rel )
   return "./"..gameName.."/genome/"..rel
 end
 
+-- SoundFonts load once per run (they outlive scenes: loaded outside the scene's memory, see Scene.lua), and a scene
+-- whose song is already playing keeps it going.
+local soundfonts = {}  -- path -> SoundFont id
 local function loadSoundfont( rel )
   if not rel then return -1 end
+  if soundfonts[rel] then return soundfonts[rel] end
+  local scoped = memSceneScoped and memSceneScoped()
+  if scoped then ffi.C.sceneScope( false ) end
   local id = ffi.C.loadSoundfont( genomePath( rel ) )
+  if scoped then ffi.C.sceneScope( true ) end
   if id < 0 then io.stderr:write( "bicycle: couldn't load SoundFont "..rel.."; using General MIDI\n" ) end
+  soundfonts[rel] = id
   return id
 end
 
-function Sound.load( music, sfx )
+Sound.song = nil  -- the song playing (path relative to genome/), or nil
+
+-- keepSong: leave the current song playing whatever this scene's music says (Scene.go's music = "keep").
+function Sound.load( music, sfx, keepSong )
   local loaded = {}  -- don't stack the same SoundFont twice
-  if music then
+  if keepSong then
+    if music and music.soundfont then loaded[music.soundfont] = loadSoundfont( music.soundfont ) end
+  elseif music then
     if music.soundfont then loaded[music.soundfont] = loadSoundfont( music.soundfont ) end
-    if music.song and not os.getenv( "BICYCLE_MUTE_MUSIC" ) then  -- set BICYCLE_MUTE_MUSIC=1 to hear only SFX
+    if music.song ~= Sound.song then
+      ffi.C.stopSong()
+      Sound.song = nil
+    end
+    if music.song and music.song ~= Sound.song and not os.getenv( "BICYCLE_MUTE_MUSIC" ) then  -- BICYCLE_MUTE_MUSIC=1: SFX only
       if ffi.C.loadMidi( genomePath( music.song ) ) then
         ffi.C.playSong()  -- loops forever
+        Sound.song = music.song
       else
         io.stderr:write( "bicycle: couldn't load song "..music.song.."\n" )
       end
     end
+  else
+    ffi.C.stopSong()
+    Sound.song = nil
   end
   if sfx then
     local id = loaded[sfx.soundfont] or loadSoundfont( sfx.soundfont )
@@ -36,16 +57,27 @@ function Sound.load( music, sfx )
       ffi.C.selectProgram( ffi.C.getSfxChannel(), id, sfx.bank or 0, sfx.program or 0 )
     end
     for name, key in pairs( sfx.sounds or {} ) do
-      Sound.sounds[name] = key
+      Sound.sounds[require( "Ids" ).define( "sound", name )] = key  -- by sound id (README, "IDs")
     end
   end
 end
 
 -- Plays a named sound effect (or a raw MIDI key) on the SFX channel.
 function Sound.play( name, vel )
-  local key = Sound.sounds[name] or ( type( name ) == "number" and name )
-  if not key then error( "Unknown sound effect '"..tostring( name ).."'." ) end
+  local key
+  if type( name ) == "number" then
+    key = name  -- a raw MIDI key
+  else
+    key = Sound.sounds[require( "Ids" ).get( "sound", name )]  -- unknown names error, listing the known ones
+    if not key then error( "Sound effect '"..tostring( name ).."' isn't in this scene's sfx.sounds.", 2 ) end
+  end
   ffi.C.playSoundFX( key, vel or 110 )
+end
+
+-- The MIDI key of a named sound effect (e.g. for W.sound in 3D), or nil.
+function Sound.key( name )
+  local id = require( "Ids" ).find( "sound", name )
+  return id and Sound.sounds[id]
 end
 
 function Sound.stopMusic()

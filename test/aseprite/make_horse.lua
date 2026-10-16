@@ -1,5 +1,5 @@
 -- Authors test/aseprite/horse_sprite.aseprite: a 12x6 brown horse (named horse_sprite so its exports don't overwrite the horse genome, test/genome/horse.lua) facing right with a 2-frame "walk" tag. It's the pixel
--- counterpart of test/genome/img/horse.txt (the hand-drawn ASCII horse the ASCII mode keeps using; see the
+-- counterpart of test/genome/body/graybody/colormap/horse.txt (the hand-drawn ASCII horse the ASCII mode keeps using; see the
 -- horse genome's sprite2d gene). Run in batch mode:
 --   aseprite -b --script test/aseprite/make_horse.lua
 local here = debug.getinfo(1, "S").source:match("^@?(.*[/\\])") or "./"

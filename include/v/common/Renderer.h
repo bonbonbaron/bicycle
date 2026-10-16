@@ -52,6 +52,9 @@ class Renderer {
     virtual auto lines() const -> int = 0;
     // Whether the screen changed size since the last call (cols()/lines() are already updated).
     virtual auto checkResize() -> bool = 0;
+    // The screen is below the smallest usable size: WindowManager skips the windows and the renderer shows a
+    // "too small" notice until it grows again (ASCII; pixel windows scale instead).
+    virtual auto tooSmall() const -> bool { return false; }
 
     // Reads pending key presses and hands them to the Trigger system.
     virtual void pollInput() = 0;
@@ -96,6 +99,21 @@ class Renderer {
     virtual void setModelAction( Entity entity, const std::string& action ) {}
     // A sprite/tileset image just loaded: the pixel modes pack it into their texture atlas (ASCII ignores it).
     virtual void preloadImage( const std::shared_ptr<const BImg>& img ) {}
+    // Real-time input (include/c/InputState.h): mouse look and gamepads (pixel modes; ASCII ignores them).
+    virtual void setMouseCapture( bool on ) {}
+    virtual void enableGamepad() {}
+    // Scene changes: forget a despawned entity's per-entity state (3D models), then, once the old scene's objects
+    // are gone, drop what only it used (atlas images, scenery, cached meshes) so its memory can be freed.
+    virtual void forgetEntity( Entity entity ) {}
+    virtual void onSceneUnloaded() {}
+    // Scene transitions, drawn over everything at the end of each frame: kind 0 none, 1 fade (to black), 2 wipe
+    // (left to right), 3 dissolve (cells drop out in a fixed random order; ASCII's own); t from 0 (clear) to 1
+    // (covered). Every mode accepts every kind and draws the closest it has.
+    virtual void setTransition( int kind, float t ) { _transKind = kind; _transT = t; }
+  protected:
+    int _transKind{};
+    float _transT{};
+  public:
 };
 
 auto renderer() -> Renderer&;  // the build's renderer (BICYCLE_RENDER)

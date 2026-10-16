@@ -5,8 +5,15 @@
 
 static std::bitset<NUM_SUPPORTED_ENTITIES> _availableEntityIds{-1ULL};
 
+static unsigned _generation[NUM_SUPPORTED_ENTITIES]{};
+
 void delEntityId( const Entity entity ) {
   _availableEntityIds.set( entity, true );
+  if ( entity < NUM_SUPPORTED_ENTITIES ) ++_generation[entity];
+}
+
+auto entityGeneration( const Entity entity ) -> unsigned {
+  return entity < NUM_SUPPORTED_ENTITIES ? _generation[entity] : 0;
 }
 
 auto newEntityId() -> Entity {

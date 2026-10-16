@@ -231,7 +231,7 @@ local function makeSprite(ctr, globAnim)
 		if cfg.pixels then colorpal:add(TRANSPARENT) end  -- index 0
 		local cmIdx
 		local outputLayer = {}
-		if layer.isReference then
+		if layer.isReference or layer.name == "entities" then  -- entities: scene placement (sceneentities.lua)
 			dbgp("skipping reference layer "..layer.name)
 			goto continue
 		end
@@ -244,7 +244,7 @@ local function makeSprite(ctr, globAnim)
 			if layer.isTilemap then
 
 				dbgp("PROCESSING LAYER "..layer.name.." AS A TILEMAP")
-				local outputColormapFp = cfg.genomePath..layerName.."_tileset_colormap.png"
+				local outputColormapFp = cfg.pathFor(layerName.."_tileset_colormap", "png")
 				local tileset = layer.tileset
 				local TILE_W = tileset.grid.tileSize.width
 				local TILE_H = tileset.grid.tileSize.height
@@ -331,7 +331,7 @@ local function makeSprite(ctr, globAnim)
 				if cfg.pixels then
 					outputTileset.pixels = layerName.."_tileset_pixels"
 					outputTileset.colormap = outputTileset.pixels
-					writeBimg(cfg.genomePath..outputTileset.pixels..".bimg", tilesetW, TILE_H, colorpal, tilesetPixels)
+					writeBimg(cfg.pathFor(outputTileset.pixels, "bimg"), tilesetW, TILE_H, colorpal, tilesetPixels)
 				else
 					outputTilesetImg:saveAs(outputColormapFp)
 				end
@@ -342,12 +342,11 @@ local function makeSprite(ctr, globAnim)
 				dbgp("PROCESSING LAYER "..layer.name.." AS AN IMAGE")
 				-- Decide between outputting ASCII art or pixel art.
 				local colormapName = layerName.."_colormap"
-				local outputColormapFp = cfg.genomePath..colormapName.."."
 				local ext = "png"
 				if cfg.ascii then
 					ext = "lua"
 				end
-				outputColormapFp = outputColormapFp .. ext
+				local outputColormapFp = cfg.pathFor(colormapName, ext)
 				-- First, obtain the total size of the output image.
 				local outputW = 0
 				local outputH = 0
@@ -432,7 +431,7 @@ local function makeSprite(ctr, globAnim)
 					outputLayer.pixels = layerName.."_pixels"
 					outputLayer.pixelW = outputW
 					outputLayer.pixelH = outputH
-					writeBimg(cfg.genomePath..outputLayer.pixels..".bimg", outputW, outputH, colorpal, framePixels)
+					writeBimg(cfg.pathFor(outputLayer.pixels, "bimg"), outputW, outputH, colorpal, framePixels)
 				end
 				-- If there are any animation frames, write out the source rectangles for each frame.
 				-- Collision map
@@ -468,9 +467,11 @@ local function makeSprite(ctr, globAnim)
 			end  -- whether layer is a tileset or an image
 		end  -- if layer is group, recurse
 		::continue::
-		g.serialize_table(colorpalName, colorpal, DEBUG)
-		outputLayer.colorpal = colorpalName
-		table.insert( luaSprite.layers, outputLayer )
+		if layer.name ~= "entities" then  -- not art: no palette, not in the manifest
+			g.serialize_table(colorpalName, colorpal, DEBUG)
+			outputLayer.colorpal = colorpalName
+			table.insert( luaSprite.layers, outputLayer )
+		end
 	end  -- for each layer
 end  -- function makeSprite()
 
@@ -487,3 +488,11 @@ if colorMode == ColorMode.RGB or colorMode == ColorMode.INDEXED then
 	-- TODO
 	g.serialize_table(spriteName, luaSprite, DEBUG)
 end
+
+-- New tags/sprites: refresh gen/ids.lua now (the build does it too; README, "IDs").
+-- A scene background with an entities layer: rewrite the scene's entities (sceneentities.lua).
+do
+	local ok, err = pcall(function() require("sceneentities").sync(s) end)
+	if not ok then print("sceneentities: " .. tostring(err)) end
+end
+require("refreshids")()

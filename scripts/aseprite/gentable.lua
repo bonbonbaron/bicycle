@@ -100,7 +100,7 @@ function gen.serialize_table (fileBasename, tbl, dbg, indent)
   -- Write the file
   local outfile = fileBasename..".lua"
   -- TODO figure out how to configure where this goes in game engine context
-  local f, err = io.open(cfg.genomePath..outfile, "w")
+  local f, err = io.open(cfg.pathFor(fileBasename, "lua"), "w")
   if not f then
     error("Could not open " .. outfile .. " for writing: " .. tostring(err))
   end

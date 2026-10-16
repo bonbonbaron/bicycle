@@ -31,6 +31,7 @@ class WindowManager {
     std::shared_ptr<Window> _currWindow{};
     std::array<std::shared_ptr<Window>, MAX_NUM_WINDOWS> _windows;
     unsigned _population{};
+    bool _pendingResize{};  // the screen changed while too small to lay out
     std::mutex _mut{};
 };
 

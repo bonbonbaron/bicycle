@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 #include <optional>
-#include <unordered_map>
+#include "m/EntitySlots.h"
 
 #include "m/Camera.h"
 #include "m/Box.h"
@@ -77,6 +77,7 @@ class Grid {
   public:
     // Adds entity to the latest created layer.
     void addEntity( const Entity entity );
+    void addEntityTo( const Entity entity, unsigned layerIdx );  // e.g. a persistent entity arriving in a scene
     void addLayer( const Layer& layer );
     auto getLayers() -> std::vector<Layer>&;
     void setFocusedLayerIdx( const unsigned layerIdx );
@@ -84,7 +85,7 @@ class Grid {
     auto getLayer( Entity entity ) -> std::optional<unsigned>;
   private:
     std::vector<Layer> _layers{};
-    std::unordered_map<Entity, unsigned> _entityToLayerMap{};
+    EntitySlots<unsigned> _entityToLayerMap{};  // flat, by entity id (generation-checked)
     unsigned _focusedLayerIdx{};  // Whatever entity the camera focuses on, all other layers move in parallax wrt that layer.
 };
 
@@ -92,6 +93,7 @@ class Scene : public Window {
   public:
     Scene();
     Scene( const int x, const int y, const int w, const int h );
+    ~Scene() override;  // frees the layers' images and the camera (entities in it are despawned by Lua first)
     // TODO make addGrid() or something to replace Scene( const Grid& grid );
 
     void render() override;
@@ -115,6 +117,6 @@ class Scene : public Window {
     void renderFg( const Layer& layer );
     void updateCameraLimits();
     std::vector<Bar> _hud{};
-    std::unordered_map<Entity, bool> _hidden{};
+    EntitySlots<bool> _hidden{};
     void renderHud();
 };

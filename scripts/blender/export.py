@@ -1,6 +1,7 @@
 # Exports a .blend's meshes for bicycle's 3D mode. Run headless (from the repo root):
 #   blender -b test/blender/meadow3d.blend --python scripts/blender/export.py -- [out_dir]
-# out_dir defaults to test/genome/models. For each mesh object it writes:
+# genome_dir defaults to test/genome. Meshes, skins and textures go to <genome_dir>/model/ and the scene list to
+# <genome_dir>/level/scene3d.lua (README, "Genome layout"). For each mesh object it writes:
 #   <object>.obj + <object>.mtl   triangulated geometry with per-corner normals and UVs, Y up (Blender's Z up is
 #                                 converted: x, y, z -> x, z, -y), materials as usemtl groups
 #   <image>.bimg                  each image texture, true-color .bimg (include/data/BImg.h), top row first
@@ -20,8 +21,13 @@ import struct
 import sys
 
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
-OUT = os.path.abspath(argv[0] if argv else os.path.join(os.getcwd(), "test", "genome", "models"))
+GENOME = os.path.abspath(argv[0] if argv else os.path.join(os.getcwd(), "test", "genome"))
+if os.path.basename(GENOME) in ("model", "models"):  # old invocations passed <game>/genome/models
+    GENOME = os.path.dirname(GENOME)
+OUT = os.path.join(GENOME, "model")
+LEVEL = os.path.join(GENOME, "level")
 os.makedirs(OUT, exist_ok=True)
+os.makedirs(LEVEL, exist_ok=True)
 
 
 def yup(v):
@@ -207,9 +213,9 @@ from mathutils import Matrix  # noqa: E402
 C = Matrix(((1, 0, 0, 0), (0, 0, 1, 0), (0, -1, 0, 0), (0, 0, 0, 1)))
 depsgraph = bpy.context.evaluated_depsgraph_get()
 objects = [export_object(o, depsgraph) for o in bpy.context.scene.objects if o.type == "MESH"]
-with open(os.path.join(OUT, "scene3d.lua"), "w") as f:
+with open(os.path.join(LEVEL, "scene3d.lua"), "w") as f:
     f.write("-- written by scripts/blender/export.py from %s\nreturn {\n  objects = {\n" % os.path.basename(bpy.data.filepath))
     for o in objects:
-        f.write('    { name = "%s", mesh = "models/%s", role = "%s" },\n' % (o["name"], o["name"], o["role"]))
+        f.write('    { name = "%s", mesh = "model/%s", role = "%s" },\n' % (o["name"], o["name"], o["role"]))
     f.write("  }\n}\n")
 print("bicycle export: wrote %d objects to %s" % (len(objects), OUT))

@@ -7,6 +7,7 @@
 #include <unordered_set>
 #include "c/MotionMath.h"
 #include "data/Mem.h"
+#include "m/Math3D.h"
 
 class Kinematics : public Controllable {
   public:
@@ -34,8 +35,27 @@ class Kinematics : public Controllable {
     void follow( Entity e, Entity tgt, float offX, float offY, float rate, float bobRows, float bobHz, bool mirror,
                  float deadX, float deadY );
     // Keeps a driven entity's top-left within [minX, maxX] x [minY, maxY] cells (e.g. the camera in its world).
+    // Caps a follower's dead zone (cells, each side) without forgetting the one it asked for, e.g. when the camera
+    // shrinks with the terminal; a larger cap later gives back up to the requested size.
+    void capDeadZone( Entity e, float maxX, float maxY );
     void setBounds( Entity e, float minX, float minY, float maxX, float maxY );
     void stopMotion( Entity e );
+    // Scene changes: forget(e) drops every motion of a despawned entity (and stops followers that tracked it);
+    // snap(e) makes a follower jump to its goal on the next frame (e.g. a fairy arriving with the hero).
+    void forget( Entity e );
+    void snap( Entity e );
+
+    // 3D motions of an entity's transform (meters, seconds, degrees; positions are feet / box centers).
+    void linear3D( Entity e, float speed, bool pingPong );   // along addWaypoint3D points
+    void addWaypoint3D( Entity e, float x, float y, float z );
+    // Around center entity (0: the point c) on a horizontal circle of radius r, plus a vertical bob.
+    void orbit3D( Entity e, Entity center, m3::Vec3 c, float r, float degPerSec, float phaseDeg, float bobAmp, float bobHz );
+    // The entity's position eases to tgt's + offset (rate 0 = hard).
+    void follow3D( Entity e, Entity tgt, m3::Vec3 offset, float rate );
+    void spin3D( Entity e, float yawDegPerSec );  // continuous yaw (pickups), with any motion or none
+    // The 3D camera: a kinematic body driven by the rig in World3D (Physics3D.h) toward its target, like any
+    // follower; Lua sets the mode and feeds yaw/pitch, the camera never positions itself.
+    void runCamera3D( float dt );
     auto motionType( Entity e ) const -> int;  // -1 if not driven
   private:
     Kinematics() = default;
@@ -77,7 +97,11 @@ class Kinematics : public Controllable {
       float lastTgtX{};
       int facing{ 1 };
       bool mirror{}, bounded{}, started{};
-      motion::Vec2 dead{}, lo{}, hi{};
+      motion::Vec2 dead{}, deadWant{}, lo{}, hi{};
+      // 3D
+      m3::Vec3 pos3{}, center3{}, offset3{};
+      mem::Vector<m3::Vec3> path3{ mem::Allocator<m3::Vec3>( mem::GENERAL ) };
+      float radius3{}, bobAmp{}, spin{};
     };
     auto driven( Entity e ) -> Driven&;
     void runDriven();

@@ -1,4 +1,5 @@
 #include "v/common/Scene.h"
+#include "c/Physics3D.h"
 #include "c/Kinematics.h"
 #include "m/World.h"
 #include "v/common/Renderer.h"
@@ -53,6 +54,13 @@ void Grid::addEntity( const Entity entity ) {
   _entityToLayerMap[ entity ] = _layers.size() - 1;  // so it's zero-indexed
 }
 
+void Grid::addEntityTo( const Entity entity, unsigned layerIdx ) {
+  assert( _layers.size() > 0 );
+  layerIdx = std::min<unsigned>( layerIdx, _layers.size() - 1 );
+  _layers[layerIdx].fg.push_back( entity );
+  _entityToLayerMap[ entity ] = layerIdx;
+}
+
 auto Grid::getLayers() -> std::vector<Layer>& {
   return _layers;
 }
@@ -66,12 +74,8 @@ auto Grid::getFocusedLayerIdx() -> unsigned {
 }
 
 auto Grid::getLayer( Entity entity ) -> std::optional<unsigned> {
-  std::optional<unsigned> layerIdx{};
-  const auto& pair = _entityToLayerMap.find( entity );
-  if ( pair != _entityToLayerMap.end() ) {
-    layerIdx = pair->second;
-  }
-  return layerIdx;
+  if ( const unsigned* idx = _entityToLayerMap.find( entity ) ) return *idx;
+  return std::nullopt;
 }
 
 
@@ -83,6 +87,20 @@ Scene::Scene() : Window( 0, 0, gfx::cols() - 2, gfx::lines() ) {
 Scene::Scene( const int x, const int y, const int w, const int h ) : Window( x, y, w, h ) {
   _camera.setDims( getHeight(), getWidth() );
   _camera.setMargin( 10 );  // TODO set margin in a bicycle API call
+}
+
+Scene::~Scene() {
+  if ( !World::alive() ) return;  // process exit: the World (and its entity ids) are already gone
+  for ( const auto& layer : _grid.getLayers() ) {
+    World::set<Image>( layer.id, Image{} );
+    World::set<Box>( layer.id, Box{} );
+    delEntityId( layer.id );
+  }
+  const Entity cam = _camera.getId();
+  Kinematics::getInstance().forget( cam );
+  phys3d::World3D::get().removeEntity( cam );
+  World::set<Box>( cam, Box{} );
+  delEntityId( cam );
 }
 
 // The camera may roam over the largest FIXED layer (the "world"). Other modes move or repeat on their own.
@@ -106,7 +124,7 @@ void Scene::updateCameraLimits() {
 
 void Scene::renderFg( const Layer& layer ) {
   for ( const auto& entity : layer.fg ) {
-    if ( auto it = _hidden.find( entity ); it != _hidden.end() && it->second ) {
+    if ( const bool* h = _hidden.find( entity ); h && *h ) {
       continue;
     }
     _camera.draw( entity, *this );
@@ -181,10 +199,22 @@ void Scene::onInput( Input& input ) {
 }
 
 // A full-screen scene grows or shrinks with the terminal, e.g. when a terminal is maximized after the game started.
+// The camera's view follows the window; its limits, dead zone and position are refit right away so the next frame
+// (which curses fully repaints after a resize) shows the focus in view.
 void Scene::onTermResize() {
-  setWidth( gfx::cols() - 4 );  // same size the default constructor gives
-  setHeight( gfx::lines() );
+  place( 0, 0, std::max( 1, gfx::cols() - 4 ), gfx::lines() );  // same size the default constructor gives
   _camera.setDims( getHeight(), getWidth() );
+  updateCameraLimits();
+  auto& cam = World::get<Box>( _camera.getId() );
+  cam.pos.x = std::clamp<int>( cam.pos.x, 0, _camera.getMaxX() );
+  cam.pos.y = std::clamp<int>( cam.pos.y, 0, _camera.getMaxY() );
+  if ( const Entity focus = _camera.getFocus() ) {
+    // Keep the focus at least 2 cells inside each edge: the dead zone can't be wider than the view allows.
+    constexpr float ONE = 1 << FIXEDPT_DEC_BITS;
+    const auto& tgt = World::get<Box>( focus );
+    Kinematics::getInstance().capDeadZone( _camera.getId(), ( float( cam.size.w ) - tgt.size.w ) / ( 2 * ONE ) - 2,
+                                           ( float( cam.size.h ) - tgt.size.h ) / ( 2 * ONE ) - 2 );
+  }
 }
 
 void Scene::setFocus( Entity entity ) {

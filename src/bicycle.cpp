@@ -3,7 +3,9 @@
 #include "bicycle.h"
 #include "Constants.h"
 #include "c/Trigger.h"
+#include "c/StartupStats.h"
 #include "c/CollisionDetector.h"
+#include "c/Physics3D.h"
 #include "v/common/Dialogue.h"
 #include "v/common/TextMenu.h"
 #include "v/common/Scene.h"
@@ -14,9 +16,15 @@
 #include "data/Pack.h"
 #include "data/BImg.h"
 #include <sstream>
+#include <functional>
+#include <unordered_map>
+#include <cstring>
+#include <chrono>
+#include <array>
 #include <cctype>
 #include <cstdio>
 #include "c/Input.h"
+#include "c/InputState.h"
 
 namespace bicycle {
 
@@ -43,9 +51,12 @@ namespace bicycle {
 #elif defined( BICYCLE_RELEASE_ASSETS )
     assets::mount( gameName );
 #endif
+    startup::mark( "asset pack" );
     gfx::renderer().init( gameName );
+    startup::mark( "renderer init (window, GL, fonts)" );
     auto& trig = Trigger::getInstance();
     trig.init( gameName );
+    startup::mark( "game main.lua (scene, models, audio)" );
   }
 
   // Pixel images: one pixel is 2x1 cells (see Renderer.h).
@@ -64,6 +75,37 @@ namespace bicycle {
     auto bytes = assets::read( path, mem::TEMPORARY );
     if ( !bytes ) return std::nullopt;
     return BImg::parse( *bytes );
+  }
+
+  // Graybodies are loaded once and shared: every entity (and every palette variant) drawing the same pixels gets
+  // the same image while any of them is alive. Weak entries, so a scene's images still go when it unloads.
+  static std::unordered_map<std::string, std::weak_ptr<const BImg>> sharedImages;
+  static auto sharedImage( const std::string& key, const std::function<std::optional<BImg>()>& make )
+      -> std::shared_ptr<const BImg> {
+    if ( auto it = sharedImages.find( key ); it != sharedImages.end() ) {
+      if ( auto p = it->second.lock() ) return p;
+    }
+    auto img = make();
+    if ( !img ) return nullptr;
+    auto p = std::make_shared<const BImg>( std::move( *img ) );
+    sharedImages[key] = p;
+    return p;
+  }
+  static auto loadGraybody( const std::string& path ) -> std::shared_ptr<const BImg> {
+    return sharedImage( path, [&] { return loadBImg( path ); } );
+  }
+  // "i:rgba,i:rgba,..." (decimal; RGBA with R in the low byte) -> palette entries to replace.
+  static auto parsePalette( const char* spec ) -> std::vector<std::pair<int, uint32_t>> {
+    std::vector<std::pair<int, uint32_t>> out;
+    if ( !spec ) return out;
+    std::istringstream in( spec );
+    std::string item;
+    while ( std::getline( in, item, ',' ) ) {
+      const auto colon = item.find( ':' );
+      if ( colon == std::string::npos ) continue;
+      out.emplace_back( std::stoi( item.substr( 0, colon ) ), static_cast<uint32_t>( std::stoul( item.substr( colon + 1 ) ) ) );
+    }
+    return out;
   }
 
   Entity push( std::shared_ptr<Window> shared ) {
@@ -171,9 +213,80 @@ namespace bicycle {
 
     // A pixel image from .bimg layers (newline-separated paths, bottom layer first) composited in order. Layers
     // are frame strips of the same size (scripts/aseprite/sprite.lua pixel export). Returns false if one's missing.
+    // A palette variant of a sprite (genome palette = "<name>_palette"): each layer's graybody with some palette
+    // entries replaced ("i:rgba,..."). Variants share their graybody's pixels (BImg::gray) and are themselves
+    // shared by every entity using the same sprite + palette.
+    bool newPixelImage( Entity entity, const char* paths );
+    bool newPixelImagePal( Entity entity, const char* paths, const char* palette ) {
+      if ( !palette || !*palette ) return newPixelImage( entity, paths );
+      std::vector<std::string> layers;
+      {
+        std::istringstream in( paths );
+        std::string path;
+        while ( std::getline( in, path ) ) if ( !path.empty() ) layers.push_back( path );
+      }
+      if ( layers.size() != 1 ) {  // composites are true color: recolor each layer, then stack them
+        for ( auto& l : layers ) {
+          auto gray = loadGraybody( l );
+          if ( !gray || !gray->indexed() ) return false;
+        }
+        auto img = sharedImage( std::string( paths ) + "|" + palette, [&]() -> std::optional<BImg> {
+          std::optional<BImg> out;
+          const auto pal = parsePalette( palette );
+          for ( auto& l : layers ) {
+            auto gray = loadGraybody( l );
+            if ( !out ) {
+              out.emplace();
+              out->w = gray->w;
+              out->h = gray->h;
+              out->rgba.assign( static_cast<size_t>( gray->w ) * gray->h, 0u );
+            }
+            auto p = gray->palette;
+            for ( auto [i, c] : pal ) if ( i >= 0 && static_cast<size_t>( i ) < p.size() ) p[i] = c;
+            for ( int y = 0; y < std::min( out->h, gray->h ); ++y )
+              for ( int x = 0; x < std::min( out->w, gray->w ); ++x ) {
+                const uint8_t k = gray->indices[static_cast<size_t>( y ) * gray->w + x];
+                if ( k && ( p[k] >> 24 ) ) out->rgba[static_cast<size_t>( y ) * out->w + x] = p[k];
+              }
+          }
+          return out;
+        } );
+        if ( !img ) return false;
+        World::set<Image>( entity, pixelImage( img ) );
+        World::get<Box>( entity ).size = World::get<Image>( entity ).size;
+        return true;
+      }
+      auto gray = loadGraybody( layers[0] );
+      if ( !gray || !gray->indexed() ) return false;
+      auto img = sharedImage( layers[0] + "|" + palette, [&]() -> std::optional<BImg> {
+        BImg v;
+        v.w = gray->w;
+        v.h = gray->h;
+        v.palette = gray->palette;
+        for ( auto [i, c] : parsePalette( palette ) ) {
+          if ( i >= 0 && static_cast<size_t>( i ) < v.palette.size() ) v.palette[i] = c;
+        }
+        v.gray = gray;  // the indices stay the graybody's
+        return v;
+      } );
+      World::set<Image>( entity, pixelImage( img ) );
+      World::get<Box>( entity ).size = World::get<Image>( entity ).size;
+      return true;
+    }
+
     bool newPixelImage( Entity entity, const char* paths ) {
+      // One layer: the shared graybody itself (many coins, one image).
+      std::string path( paths );
+      while ( !path.empty() && path.back() == '\n' ) path.pop_back();
+      if ( !path.empty() && path.find( '\n' ) == std::string::npos ) {
+        auto img = loadGraybody( path );
+        if ( !img ) return false;
+        World::set<Image>( entity, pixelImage( img ) );
+        World::get<Box>( entity ).size = World::get<Image>( entity ).size;
+        return true;
+      }
       std::istringstream in( paths );
-      std::string path;
+      path.clear();
       std::optional<BImg> out;
       int nLayers{};
       while ( std::getline( in, path ) ) {
@@ -266,17 +379,27 @@ namespace bicycle {
     // ANIMATION
     // Strips are built once per entity: newAnimStrip(), then addAnimFrame() for each frame in play order.
     // Src rects are in character cells within the entity's image (all frames side by side).
-    void newAnimStrip( Entity entity, const char* stripName, bool repeat ) {
-      Animator::getInstance().newStrip( entity, stripName, repeat );
+    // Strips are keyed by animation tag id (ids.anim in gen/ids.lua; Lua resolves names once, scripts/Ids.lua).
+    void newAnimStrip( Entity entity, uint8_t stripId, bool repeat ) {
+      Animator::getInstance().newStrip( entity, stripId, repeat );
     }
 
-    void addAnimFrame( Entity entity, const char* stripName, unsigned durationMs, int x, int y, int w, int h ) {
-      Animator::getInstance().addFrame( entity, stripName, durationMs, Rect( x, y, w, h ) );
+    void addAnimFrame( Entity entity, uint8_t stripId, unsigned durationMs, int x, int y, int w, int h ) {
+      Animator::getInstance().addFrame( entity, stripId, durationMs, Rect( x, y, w, h ) );
     }
 
-    // Switches to and starts a strip; returns false if it's already playing or doesn't exist.
-    bool setAnim( Entity entity, const char* stripName ) {
-      return Animator::getInstance().set( entity, stripName );
+    // Switches to and starts a strip; returns false if it's already playing or the entity doesn't have it.
+    bool setAnim( Entity entity, uint8_t stripId ) {
+      return Animator::getInstance().set( entity, stripId );
+    }
+
+    // Release builds treat the generated ids as complete (scripts/Ids.lua).
+    bool isReleaseBuild() {
+#ifdef BICYCLE_RELEASE_ASSETS
+      return true;
+#else
+      return false;
+#endif
     }
 
     void stopAnim( Entity entity ) {
@@ -359,6 +482,77 @@ namespace bicycle {
       if ( scene ) {
         scene->setHidden( entity, hidden );
       }
+    }
+
+    // ============
+    // SCENE CHANGES (scripts/Scene.lua: Scene.goto)
+    // ============
+    // Everything the engine keeps for an entity, dropped: timers, animation, motion (and followers of it),
+    // collisions, its 3D model, its components; then its id is free again.
+    void despawnEntity( Entity entity ) {
+      Trigger::forgetEntity( entity );  // queued collisions/timeouts to or from it: never delivered
+      Timer::getInstance().stopEntity( entity );
+      Animator::getInstance().forget( entity );
+      Kinematics::getInstance().forget( entity );
+      CollisionDetector::getInstance().removeEntity( entity );
+      phys3d::World3D::get().removeEntity( entity );  // true 3D: transform, body, overlaps
+      gfx::renderer().forgetEntity( entity );
+      World::set<Image>( entity, Image{} );
+      World::set<Box>( entity, Box{} );
+      World::set<CollBox>( entity, CollBox{} );
+      World::set<Rect>( entity, Rect{} );
+      delEntityId( entity );
+    }
+
+    // While on, images, meshes and songs being loaded go to the SCENE pool (mem::memSceneScope).
+    void sceneScope( bool on ) {
+      mem::memSceneScope( on );
+    }
+
+    // After the old scene's entities and window are gone: the renderer drops what only it used, then SCENE is reset.
+    // Returns the SCENE bytes still alive (0 = unloaded cleanly; anything else is a leak and keeps the pool).
+    long long sceneUnloaded() {
+      gfx::renderer().onSceneUnloaded();
+      return static_cast<long long>( mem::memSceneReset() );
+    }
+
+    // BICYCLE_SCENE_STATS=1: one line per scene change on stderr (tests/scene_lifecycle_test.sh reads it).
+    void sceneStats( const char* event, const char* sceneName, long long leaked ) {
+      static const bool on = [] { const char* e = std::getenv( "BICYCLE_SCENE_STATS" ); return e && *e && *e != '0'; }();
+      if ( !on ) return;
+      const auto s = mem::memStats( mem::SCENE ), g = mem::memStats( mem::GRAPHIC ), a = mem::memStats( mem::AUDIO ),
+                 gen = mem::memStats( mem::GENERAL );
+      std::fprintf( stderr, "bicycle scene: %s %s scene_hw=%zu scene_live=%zu leaked=%lld graphic_hw=%zu graphic_live=%zu "
+                    "audio_live=%zu general_live=%zu\n", event, sceneName, s.highWater, s.inUse, leaked, g.highWater,
+                    g.inUse, a.inUse, gen.inUse );
+    }
+
+    void setTransition( int kind, float t ) {
+      gfx::renderer().setTransition( kind, t );
+    }
+
+    void musicFade( float level, unsigned ms ) {
+      MidiPlayer::getInstance().fadeTo( level, ms );
+    }
+
+    void motionSnap( Entity entity ) {
+      Kinematics::getInstance().snap( entity );
+    }
+
+    // A persistent entity joins the current scene's layer layerIdx (0-based; clamped to the last layer).
+    void attachEntity( Entity entity, unsigned layerIdx ) {
+      auto scene = dynamic_pointer_cast<Scene>( WindowManager::getInstance().back() );
+      if ( scene && !scene->getGrid().getLayers().empty() ) scene->getGrid().addEntityTo( entity, layerIdx );
+    }
+
+    // The window on top: whether it's a scene, and its id (Scene.goto closes dialogues and menus over the scene).
+    bool topIsScene() {
+      return dynamic_pointer_cast<Scene>( WindowManager::getInstance().back() ) != nullptr;
+    }
+
+    Entity topWindowId() {
+      auto w = WindowManager::getInstance().back();
+      return w ? w->getId() : 0;
     }
 
     Entity popWindow() {
@@ -507,10 +701,37 @@ namespace bicycle {
       }
     }
 
+    // BICYCLE_SCRIPTED_MOUSE="12:0@30-60;L@80-80;R@90-95": mouse motion (dx:dy pixels per frame) or a held button
+    // (L/R/M) over a frame range, into the polled input state (include/c/InputState.h), like a real mouse.
+    // Scripted key presses above also count as held keys on their frames.
+    struct MouseScript { float dx, dy; int button; long from, to; };
+    std::vector<MouseScript> mouseScript;
+    if ( const char* s = std::getenv( "BICYCLE_SCRIPTED_MOUSE" ) ) {
+      std::stringstream ss( s );
+      std::string item;
+      while ( std::getline( ss, item, ';' ) ) {
+        MouseScript m{};
+        char b{};
+        if ( std::sscanf( item.c_str(), "%f:%f@%ld-%ld", &m.dx, &m.dy, &m.from, &m.to ) == 4 ) { m.button = -1; mouseScript.push_back( m ); }
+        else if ( std::sscanf( item.c_str(), "%c@%ld-%ld", &b, &m.from, &m.to ) == 3 ) {
+          m.button = b == 'L' ? 0 : b == 'R' ? 1 : 2;
+          mouseScript.push_back( m );
+        }
+      }
+    }
+    unsigned scriptedButtons{};
+    const bool frameStats = std::getenv( "BICYCLE_FRAME_STATS" ) && *std::getenv( "BICYCLE_FRAME_STATS" ) == '1';
+    std::array<double, 3> acc{};
+
     while ( wm.size() > 0 ) {
       if ( maxFrames > 0 && frames >= maxFrames ) break;
       // Inputs
       Timer::run();
+      auto& held = inputState();
+      if ( gfx::renderer().mode() == gfx::Mode::Ascii ) {  // terminals report presses only: no held state
+        held.beginFrame();
+        held.held.reset();
+      }
       gfx::renderer().pollInput();
       for ( const auto& p : script ) {
         if ( frames >= p.from && frames <= p.to && ( frames - p.from ) % p.every == 0 ) {
@@ -518,18 +739,46 @@ namespace bicycle {
           in.currKeysPressed.set( static_cast<unsigned>( p.key ) );
           in.lastPressed = p.key;
           Trigger::sendInput( in );
+          if ( frames == p.from || p.every > 1 ) held.pressed.set( static_cast<unsigned>( p.key ) );
+          held.held.set( static_cast<unsigned>( p.key ) );
         }
       }
+      unsigned buttons{};
+      for ( const auto& m : mouseScript ) {
+        if ( frames < m.from || frames > m.to ) continue;
+        if ( m.button < 0 ) { held.mouseDx += m.dx; held.mouseDy += m.dy; }
+        else buttons |= 1u << m.button;
+      }
+      held.mouseButtons = ( held.mouseButtons & ~scriptedButtons ) | buttons;
+      held.mousePressed |= buttons & ~scriptedButtons;
+      scriptedButtons = buttons;
       ++frames;
       if ( gfx::renderer().quitRequested() ) {
         break;
       }
-      Kinematics::getInstance().run();
+      using clk = std::chrono::steady_clock;
+      const auto t0 = clk::now();
+      Kinematics::getInstance().run();  // 2D motions, then the 3D layer (physics, camera rig)
+      MidiPlayer::getInstance().tickFade();
       CollisionDetector::check();
+      const auto t1 = clk::now();
       // Process inputs
       trigger.send();
+      const auto t2 = clk::now();
       // Outputs
       wm.render();   // TODO make this internally only change dirty windows
+      if ( frames == 1 ) startup::mark( "first frame" );
+      const auto t3 = clk::now();
+      // BICYCLE_FRAME_STATS=1: where a frame's time goes (ms, averaged over 90 frames): motion + physics, Lua
+      // (events + onFrame), rendering (including the GL work and the swap).
+      if ( frameStats ) {
+        auto ms = []( clk::duration d ) { return std::chrono::duration<double, std::milli>( d ).count(); };
+        acc[0] += ms( t1 - t0 ); acc[1] += ms( t2 - t1 ); acc[2] += ms( t3 - t2 );
+        if ( frames % 90 == 0 ) {
+          std::fprintf( stderr, "frame: physics %.2f ms, lua %.2f ms, render %.2f ms (avg of 90)\n", acc[0] / 90, acc[1] / 90, acc[2] / 90 );
+          acc = {};
+        }
+      }
 
       mem::memRst( mem::TEMPORARY );  // scratch never outlives a frame
       Timer::sleepFrame();  // burn off excess frame time

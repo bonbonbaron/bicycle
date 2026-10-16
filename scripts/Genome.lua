@@ -14,9 +14,12 @@ Gene.new = function( type, val )
   return instance
 end
 
+local Ids = require("Ids")  -- names -> build-time ids (README, "IDs")
+local Layout = require("GenomeLayout")  -- where each kind of genome file lives (README, "Genome layout")
+
 function Gene.getAssetDir(geneType)
   checkType(geneType, "string")
-  return "./"..gameName.."/genome/"..geneType.."/"
+  return "./"..gameName.."/genome/"..Layout.geneDir( geneType )
 end
 
 function Gene.getLuaAsset( assetType, assetName )
@@ -63,7 +66,8 @@ function Sprite.assetName( name )
 end
 
 function Sprite.getAsset( name )
-  local fp = "./"..gameName.."/genome/"..Sprite.assetName( name )..".lua"
+  local n = Sprite.assetName( name )
+  local fp = "./"..gameName.."/genome/"..Layout.dirFor( n )..n..".lua"
   local result, err = Asset.dofile( fp )
   if err then error( "Couldn't load sprite asset '"..fp.."': "..tostring(err) ) end
   return result
@@ -71,7 +75,8 @@ end
 
 -- Path of a pixel export's .bimg (see scripts/aseprite/sprite.lua).
 function Sprite.pixelPath( name )
-  return "./"..gameName.."/genome/"..Sprite.assetName( name )..".bimg"
+  local n = Sprite.assetName( name )
+  return "./"..gameName.."/genome/"..Layout.dirFor( n )..n..".bimg"
 end
 
 -- Render mode of this build: "ascii", "2d" or "3d" ("ascii" outside the engine, e.g. headless tests).
@@ -86,7 +91,8 @@ function Sprite.usePixels( hasPixels )
 end
 
 function Sprite.exists( name )
-  return Asset.exists( "./"..gameName.."/genome/"..Sprite.assetName( name )..".lua" )
+  local n = Sprite.assetName( name )
+  return Asset.exists( "./"..gameName.."/genome/"..Layout.dirFor( n )..n..".lua" )
 end
 
 local function splitLines( str )
@@ -309,7 +315,43 @@ end
 -- Returns { name, kind, layers }. kind is "character" if the sprite's layers are images (frames, maybe
 -- animated) or "tilemap" if they're tilemaps. Mixing the two in one sprite is an error: export them separately.
 -- Characters also get result.character: all image layers composited into one.
+-- Loaded once per sprite name and shared by every body using it, palette variants included: the graybody
+-- (pixels, animation strips/rects, colormap) is palette-agnostic, so a red and a green beetle use one table.
+Sprite.cache = {}
+
 function Sprite.load( name )
+  local key = name.."@"..Sprite.renderMode()
+  if Sprite.cache[key] then return Sprite.cache[key] end
+  local result = Sprite.loadUncached( name )
+  Sprite.cache[key] = result
+  return result
+end
+
+-- A color palette variant (genome palette = "<name>_palette", in body/palette/color/) as the engine's
+-- "index:rgba,..." string. The file is either { colors = { [index] = rgba, ... } } (hand-written swaps; rgba is
+-- 0xAABBGGRR, R in the low byte like .bimg) or an exporter palette set { members = { [rgba] = index } }.
+function Sprite.paletteSpec( name )
+  local pal = Sprite.getAsset( name )
+  local items = {}
+  if pal.colors then
+    for i, c in pairs( pal.colors ) do items[#items + 1] = i..":"..c end
+  else
+    for c, i in pairs( pal.members or {} ) do items[#items + 1] = i..":"..c end
+  end
+  table.sort( items )
+  return table.concat( items, "," )
+end
+
+-- A collision palette (genome collpal = "<name>_collset", in body/palette/collision/): { types = { [region] =
+-- "<Genome.COLL name>" } }, mapping the graybody's collision regions (1 = the whole body) to collision types.
+function Sprite.collisionType( collpal, region )
+  local cp = Sprite.getAsset( collpal )
+  local t = cp.types and cp.types[region or 1]
+  if t == nil then error( "Collision palette '"..collpal.."' has no type for region "..tostring( region or 1 ).."." ) end
+  return t
+end
+
+function Sprite.loadUncached( name )
   local spr = Sprite.getAsset( name )
   checkType( spr.layers, "table" )
   local globAnim = spr.anim and Sprite.getAsset( spr.anim.."_globalAnim" ) or nil
@@ -395,11 +437,12 @@ Animation.__index = Animation
 -- src rect and duration. Expects the entity's image to be Sprite.toStrip()'s image.
 Animation.new = function( entity, character, rects )
   for stripName, strip in pairs( character.strips ) do
-    ffi.C.newAnimStrip( entity, stripName, strip.numReps == 0 )
+    local id = Ids.define( "anim", stripName )  -- tags come from the art: resolved once, here
+    ffi.C.newAnimStrip( entity, id, strip.numReps == 0 )
     for _, seqIdx in ipairs( strip.sequence ) do
       local frame = strip.frames[seqIdx]
       local rect = rects[frame.frameIdx]
-      ffi.C.addAnimFrame( entity, stripName, frame.durationMs, rect.x, rect.y, rect.w, rect.h )
+      ffi.C.addAnimFrame( entity, id, frame.durationMs, rect.x, rect.y, rect.w, rect.h )
     end
   end
   local instance = { entity = entity, character = character }
@@ -415,7 +458,8 @@ function Animation:set( stripName )
   if Animation.rigged[self.entity] and type( stripName ) == "string" then
     ffi.C.setModelAction( self.entity, stripName:match( "^[^_]+" ) or stripName )
   end
-  return self:has( stripName ) and ffi.C.setAnim( self.entity, stripName )
+  local id = Ids.get( "anim", stripName )  -- not an animation tag anywhere: a clear error (a typo)
+  return self:has( stripName ) and ffi.C.setAnim( self.entity, id )
 end
 
 function Animation:has( stripName )
@@ -431,13 +475,15 @@ function Animation:frameIdx()
 end
 
 -- Collision types games can refer to by name in coll genes; onCollision( other, type ) receives the number.
-local COLL = { hero = 1, solid = 2, coin = 3, enemy = 4, npc = 5 }
+-- The generator (tools/ids/genids.lua) reads this table: the ids in gen/ids.lua/ids.h (ids::Coll) are these values.
+local COLL = { hero = 1, solid = 2, coin = 3, enemy = 4, npc = 5, door = 6, fire = 7 }
 
 Gene["GeneLoader"] = {
   scene = function(entity, gene)
     checkType( entity, "number" )
     checkType( gene, "table" )
-    asset = Gene.getLuaAsset( "scene", gene.val )
+    local asset = Gene.getLuaAsset( "scene", gene.val )
+    asset.file = gene.val
     Scene.new( asset )
   end,
 	img = function(entity, gene)
@@ -454,7 +500,8 @@ Gene["GeneLoader"] = {
       if character.pixels then
         local paths = {}
         for i, name in ipairs( character.pixels ) do paths[i] = Sprite.pixelPath( name ) end
-        if not ffi.C.newPixelImage( entity, table.concat( paths, "\n" ) ) then
+        local pal = tbl.palette and Sprite.paletteSpec( tbl.palette ) or ""
+        if not ffi.C.newPixelImagePal( entity, table.concat( paths, "\n" ), pal ) then
           error( "Couldn't load sprite pixels for '"..gene.val.."'." )
         end
         rects = {}  -- frames side by side, no gap, each the canvas size (in cells)
@@ -479,25 +526,47 @@ Gene["GeneLoader"] = {
   end,
   -- coll = { type = "solid", layer = 0, box = { x, y, w, h } }: collide with entities on the same layer.
   -- type is a name from Genome.COLL (or a number); box is relative to the entity, in cells (default: whole entity).
-  coll = function(entity, gene)
+  coll = function(entity, gene, tbl)
     local c = gene.val
     checkType( c, "table" )
-    local collType = type( c.type ) == "number" and c.type or COLL[c.type or "solid"]
+    -- Without a type, a genome's collision palette (collpal) picks it for the body's region (default 1).
+    local name = c.type or ( tbl and tbl.collpal and Sprite.collisionType( tbl.collpal, c.region ) ) or "solid"
+    local collType = type( name ) == "number" and name or COLL[name]
     if not collType then error( "Unknown collision type '"..tostring( c.type ).."'." ) end
     local box = c.box or { 0, 0, 0, 0 }
     ffi.C.addCollider( entity, c.layer or 0, collType, box[1], box[2], box[3], box[4] )
   end,
   initAnim = 0,  -- do nothing; read by the sprite loader
-  -- model = "<Blender object>": in 3D mode the entity is drawn as test/genome/models/<name>.bmesh (exported by
+  palette = 0,   -- color palette variant: read by the sprite loader (Sprite.paletteSpec)
+  collpal = 0,   -- collision palette: read by the coll loader (Sprite.collisionType)
+  -- model = "<Blender object>": in 3D mode the entity is drawn as test/genome/model/<name>.bmesh (exported by
   -- scripts/blender/export.py) instead of its sprite; other modes ignore it.
   model = function(entity, gene)
     if Sprite.renderMode() ~= "3d" then return end
-    if not ffi.C.setModel( entity, "./"..gameName.."/genome/models/"..gene.val..".bmesh" ) then
+    if not ffi.C.setModel( entity, "./"..gameName.."/genome/model/"..gene.val..".bmesh" ) then
       error( "Couldn't load model '"..gene.val.."' (meshes come from the asset pack: build the 'assets' target)." )
     end
     Animation.rigged[entity] = true
   end,
   motion = 0,  -- started by Scene once every entity is placed (Genome.startMotion), so targets can be named
+  -- persist = true: the entity survives scene changes (the hero, a companion); see Scene.goto in Scene.lua.
+  persist = 0,
+  onSceneEnter = 0,  -- persistent entities: called as ( sceneName, spawnName ) after arriving in a new scene
+  onDespawn = 0,     -- called just before a scene change (or Scene.removeForever) despawns the entity
+  -- door = { to = "house", spawn = "entry", w = 4, h = 6, on = "touch" | "press", transition = "fade",
+  --          duration = 0.6, music = "crossfade" | "cut" | "keep" }
+  -- An invisible trigger zone w x h cells (from its pos): when the player (a hero collider) walks into it ("touch",
+  -- the default) or presses E/Space inside it ("press"), Scene.goto( to, { spawn = spawn, ... } ). Scene files set
+  -- each door's fields on the instance: { genome = "door", pos = { 150, 36 }, door = { to = "house", spawn = "entry" } }.
+  door = function(entity, gene, tbl)
+    local d = gene.val
+    checkType( d, "table" )
+    if not d.to then error( "door gene needs to = \"<scene name>\"" ) end
+    local box = ffi.C.World_getBoxes().arr[entity]
+    box.size.w, box.size.h = ( d.w or 4 ) * 256, ( d.h or 6 ) * 256
+    ffi.C.addCollider( entity, d.layer or 0, COLL.door, 0, 0, 0, 0 )
+    Scene.armDoor( tbl )
+  end,
   sprite2d = 0,  -- read by Genome.new: the sprite pixel modes use instead of img/sprite (ASCII keeps its own art)
   onSpawn = 0,  -- do nothing; called by Scene once the entity is placed
   onUncollision = 0,  -- do nothing, just allow it to exist
@@ -553,8 +622,10 @@ end
 local Genome = {}
 Genome.__index = Genome
 -- allow __newindex for blackboard functionality
-Genome.new = function( name )
+-- overrides: fields a scene sets on this instance (e.g. a door's target), copied over the genome's own.
+Genome.new = function( name, overrides )
   local tbl = Genome.get( name ) -- tbl is the table of type-value pairs of genes (e.g. { img = "shopkeeper", ... })
+  for k, v in pairs( overrides or {} ) do tbl[k] = v end
   -- sprite2d = "<aseprite sprite>": pixel modes draw this instead of the img/sprite gene, so a genome can keep
   -- hand-made ASCII art for the ASCII mode and still have pixel art in 2D/3D.
   if tbl.sprite2d and Sprite.renderMode() ~= "ascii" then

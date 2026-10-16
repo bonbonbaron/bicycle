@@ -56,11 +56,15 @@ In an MSYS2 CLANG64 shell, install just the toolchain, then build:
 
 ```sh
 pacman -S --needed make mingw-w64-clang-x86_64-{clang,cmake,ninja}
-cmake -B build && cmake --build build
+cmake --preset windows-clang64 && cmake --build --preset windows-clang64
 ./o.exe test
 ```
 
-(UCRT64 with `mingw-w64-ucrt-x86_64-{gcc,cmake,ninja}` works the same way.) `o.exe` doesn't depend on MSYS2's
+The preset builds RelWithDebInfo into `build/clang64` with clang and Ninja (debug info split into `o.exe.debug`);
+add `-DCMAKE_BUILD_TYPE=Debug` for -O0 stepping or `-DBICYCLE_RELEASE=ON` for a release. `make` is needed only for
+LuaJIT's own Makefile on the first configure.
+
+(UCRT64 with `mingw-w64-ucrt-x86_64-{gcc,cmake,ninja}` works the same way, with `--preset windows-ucrt64`.) `o.exe` doesn't depend on MSYS2's
 DLLs, so it also runs from `cmd` or PowerShell (`o test`, `o.bat test`, `.\o.ps1 test`).
 
 ### Windows, Visual Studio
@@ -120,6 +124,47 @@ cmake -B build/clang64 -G Ninja -DCMAKE_TOOLCHAIN_FILE=cmake/mingw-w64.cmake \
 Add `-DBICYCLE_RENDER=2D` or `3D` for `o-2d.exe` / `o-3d.exe`. The resulting executables run under Wine.
 
 ## Assets
+
+### Genome layout
+
+Every game keeps its data in `<game>/genome/`, sorted by kind (`scripts/GenomeLayout.lua` is the one place the
+engine and the Aseprite exporters get these paths from):
+
+```
+<game>/genome/
+  <entity>.lua                 genomes (hero.lua, coin.lua, door.lua, redbeetle.lua, ...) and the start genome
+  body/<sprite>.lua            sprite manifests (layers, animation): what a genome's sprite = "..." names
+  body/palette/color/          *_palette.lua      gray index -> color (one per variant: green beetle, red beetle)
+  body/palette/collision/      *_collset.lua      collision index -> collision type (normal, fire, ...)
+  body/graybody/               *_pixels.bimg      palette-agnostic gray (indexed) pixels: sprites and tilesets
+  body/graybody/animation/     *_anim_src_rects.lua, *_globalAnim.lua   frames, tags, durations
+  body/graybody/collision/     *_collmap.lua, *_collRects.lua           collision regions / masks
+  body/graybody/colormap/      *_colormap.lua, *.txt                    ASCII art (and img gene text images)
+  tilemap/                     *_tilemap.lua, *_tileset.lua             background tile layouts and tilesets
+  scene/                       scene tables (scene/bg/<name>/: text backgrounds)
+  level/                       3D level / scenery lists (scene3d.lua from scripts/blender/export.py)
+  model/                       meshes (.obj/.mtl, packed .bmesh), skins (.bskin), mesh textures
+  music/                       songs (.mid) and SoundFonts (.sf2)
+```
+
+New game: `scripts/new_game.sh mygame` (or by hand: `mkdir -p mygame/genome/body/palette/{color,collision}
+mygame/genome/body/graybody/{animation,collision,colormap} mygame/genome/{tilemap,scene,level,model,music}`).
+
+**Graybody + palettes (palette swaps).** The graybody is shared by every variant of a body: its gray pixels,
+animation and collision regions are loaded once (`Sprite.load` caches it in Lua; `newPixelImage` shares one
+image per `.bimg` among all entities). A genome picks the palettes separately:
+
+```lua
+local redbeetle = { sprite = "beetle_sprite",           -- graybody (+ its animation) shared with genome/beetle.lua
+                    palette = "redbeetle_palette",      -- body/palette/color/: { colors = { [1] = 0xFF2828BE, ... } }
+                    collpal = "redbeetle_collset",      -- body/palette/collision/: { types = { [1] = "fire" } }
+                    coll = {} }                         -- no type: the collision palette picks it (region 1)
+```
+
+A color palette lists only the gray indices it recolors (RGBA, R in the low byte, as in `.bimg`); an exporter
+`*_palette.lua` works too. The variant image keeps a pointer to the graybody's indices (`BImg::gray`) instead of
+copying them, and every red beetle shares that one variant. Like a green and a red koopa: same graybody, same
+animation, different color and collision palettes.
 
 ### Dev workflow vs finalizing a game
 
@@ -216,7 +261,8 @@ DLLs. The `strace` check is Linux-only.
 
 ### 2D art: Aseprite
 
-`scripts/aseprite/sprite.lua` exports an `.aseprite` file to `test/genome/` (see `scripts/aseprite/README.txt`):
+`scripts/aseprite/sprite.lua` exports an `.aseprite` file into `test/genome/`'s layout (Genome layout above; see
+`scripts/aseprite/README.txt`):
 
 ```sh
 aseprite -b test/aseprite/pilgrim.aseprite --script scripts/aseprite/sprite.lua
@@ -232,8 +278,61 @@ The pixel modes use the `.bimg` files when a sprite has them, and a genome can n
 ### 3D art: Blender
 
 See `scripts/blender/README.md`: `make_scene.py` authors the test scene headless, `export.py` exports it
-(`blender -b scene.blend --python scripts/blender/export.py -- test/genome/models`), and the pack turns the OBJs
+(`blender -b scene.blend --python scripts/blender/export.py -- test/genome`), and the pack turns the OBJs
 into `.bmesh`. Genomes pick a mesh with `model = "<object>"`.
+
+### Scene tools in Aseprite: doors and music
+
+`scripts/aseprite/adddoor.lua` adds a door to a scene. Open the scene's background sprite (the game and scene
+come from its path: `test/aseprite/meadow.aseprite` is `test`'s `intro`, whose `bg = "meadow"`), select the
+doorway with the marquee (or add a slice named `door`), run File > Scripts > adddoor, and pick the target scene
+and its spawn (both drop-downs list what's in `<game>/genome/scene/`; the spawn list follows the scene). It
+writes `{ genome = "door", pos = {...}, door = { to, spawn, w, h, on } }` into the scene's first fg layer and can
+add the return spawn here (`from_<target>`, beside the door). `scripts/aseprite/addsong.lua` sets a scene's
+`music = { soundfont, song, transition }` from the game's `genome/music/*.mid` / `*.sf2` (transition:
+crossfade, cut or keep, used when the scene is entered unless `Scene.go` says otherwise).
+
+Batch mode (`--script-param list=1` prints the drop-downs' choices):
+
+```sh
+aseprite -b --script-param game=test --script-param scene=house --script-param to=intro \
+  --script-param spawn=from_house --script-param x=140 --script-param y=36 --script-param w=6 --script-param h=10 \
+  --script-param on=press --script-param return_spawn=from_intro --script scripts/aseprite/adddoor.lua
+aseprite -b --script-param game=test --script-param scene=house --script-param song=music/house.mid \
+  --script-param transition=cut --script scripts/aseprite/addsong.lua
+```
+
+### Placing entities in Aseprite
+
+A scene's entities live on its background sprite, on a layer named `entities` (`test/aseprite/meadow.aseprite`
+for `intro`, `house.aseprite` for `house`). Each entity is a slice named `<genome>#<n>` whose top-left is its
+position (1 sprite pixel = 2x1 cells) and whose properties hold `genome`, `fg` (the scene's fg layer), `order` (spawn
+order) and `extra` (other fields as Lua, e.g. `focus = true, persist = true` or `door = { to = "house", spawn =
+"entry" }`). The entities layer draws an outline for each so you can see them; it's never exported as art.
+
+* `scripts/aseprite/addentity.lua`: select a spot, pick a genome (the game's `genome/*.lua`, the same names as
+  `ids.genome`), the fg layer, persist/focus, a motion preset (linear, orbital, spin) and any more fields.
+* `scripts/aseprite/adddoor.lua` with the scene's background open makes the door a slice there too (its size is
+  the door's `w`/`h`); without it, it edits the scene file as before.
+* Move or resize slices in Aseprite, then re-run either script (`--script-param sync=1`) or export with
+  `sprite.lua`: the scene file's entities are rewritten.
+
+They're written into `genome/scene/<scene>.lua` between `-- BEGIN entities (generated ...)` and `-- END entities`
+in each fg layer; entries you write by hand outside those markers are kept, and re-exporting gives the same text.
+`--script-param import=1` moves a scene's hand-written entries onto slices once (that's how intro and house were
+converted, with identical output). Batch:
+
+```sh
+aseprite -b test/aseprite/meadow.aseprite --script-param genome=coin --script-param x=30 --script-param y=42 \
+  [--script-param fg=4] [--script-param persist=1] [--script-param motion=spin] --script scripts/aseprite/addentity.lua
+aseprite -b test/aseprite/meadow.aseprite --script-param list=1 --script scripts/aseprite/addentity.lua
+```
+
+plat3d and fps3d build their 3D scenes in Lua (`world3d.build`), with no Aseprite background, so they have no
+entities layer.
+
+`ctest -R aseprite-scene-scripts` runs both on a copy of the test game (configure with
+`-DBICYCLE_ASEPRITE=/path/to/aseprite`).
 
 ## Motion and tracking (Kinematics)
 
@@ -286,6 +385,17 @@ fraction (green, then yellow/amber, then red), take optional bar sprites (`hp:sp
 `scripts/Hud.lua`), and render text with TrueType (`fonts/ui.ttf`, stb_truetype). In the pixel modes, ASCII-art
 images that have no pixel version are drawn as solid cell blocks, not characters.
 
+ASCII follows the terminal's size. Each frame the renderer polls it: `TIOCGWINSZ` on Linux/macOS, PDCurses'
+`is_termresized()` on Windows. On a change it resizes curses (`resize_term`) and tells every window
+(`Window::onTermResize`):
+* The scene refits its view.
+* The camera's limits and dead zone are recomputed and the camera is clamped.
+* A bottom dialogue stays full width at the bottom and rewraps its text.
+* Other windows are pulled back on screen.
+
+Curses' screen cache is invalidated, so the next frame repaints every cell. Below 32x10 the game shows a "too
+small" notice until the terminal grows again.
+
 ## Texture atlas (2D and 3D)
 
 Every sprite and tileset image is registered as it loads and packed into one atlas (`src/v/sdl/SpriteAtlas.cpp`)
@@ -300,12 +410,109 @@ billboards in a single batched draw call. Mesh textures (which tile with GL_REPE
 Rigged models export a `.bskin` next to their mesh (see `scripts/blender/README.md`); the 3D renderer skins them on
 the GPU and `anim:set(tag)` chooses the action (`walk_left` -> `walk`). Unrigged models still turn and bob.
 
+## Scene changes
+
+`Scene.go( name, opts )` (also `Scene.goTo`, or `Scene["goto"]`: `goto` is reserved in LuaJIT) leaves the
+current scene for `genome/scene/<name>.lua` at the end of the frame:
+
+```lua
+local Scene = require('Scene')
+Scene.go( "house", { spawn = "entry", transition = "fade", duration = 0.6, music = "crossfade" } )
+-- transition: "fade" | "wipe" | "dissolve" | "none" (default: dissolve in ASCII, fade in 2D/3D)
+-- music: "crossfade" (fade out, then the new song fades in; a scene with the same song keeps playing) | "cut" | "keep"
+```
+
+A scene names its arrival points and its doors (the `door` gene: an invisible collision trigger):
+
+```lua
+house.spawns = { entry = { 20, 40 } }
+house.fg = { [2] = {
+  { genome = "door", pos = { 2, 36 }, door = { to = "intro", spawn = "from_house", w = 8, h = 12 } },
+  { genome = "keepsake", pos = { 120, 42 }, key = "keepsake" },
+} }
+```
+
+`door = { to, spawn, w, h (cells), on = "touch" | "press", transition, duration, music }`: "press" doors wait for
+the player to call `Scene.useDoor()` (the test hero does on E/Space). A door touched within half a second of
+arriving waits until the player steps off it, so spawning on a door doesn't bounce you back.
+
+Genomes with `persist = true` (the hero, the fairy) are carried over: same entity, same Lua table, same timers. The
+player lands on the spawn point, companions keep their offset from it (followers snap there instead of flying
+across the map), the camera keeps tracking with the same options, the HUD is rebuilt, and each gets
+`onSceneEnter( sceneName, spawnName )`. Everything else is despawned (`onDespawn` first).
+
+The order is fixed and runs between frames: 1. the transition covers the screen (input is frozen); 2. windows over
+the scene, then the scene's entities, are despawned; 3. the scene window pops and the SCENE memory pool is reset;
+4. the new scene loads; 5. the persistent entities arrive; 6. the transition uncovers it. A `Scene.go` during a
+change is ignored (returns false) unless `replace = true` and the screen isn't covered yet.
+
+Per-scene saved state: `Scene.state` is a Lua table kept per scene file for the whole run (put anything in it).
+`Scene.removeForever( self )` despawns an entity at the end of the frame and keeps it out of that scene from then
+on (instances are identified by `key`, or genome + position). `Scene.preload( name )` reads the next scene's Lua
+ahead of time.
+
+Memory: everything a scene loads (images, tilemaps, meshes, songs) goes into the SCENE pool
+(`BICYCLE_MEM_SCENE_MB`, default 64), which is reset on every change, only once nothing in it is still alive, so it
+never leaves a dangling pointer; anything left is reported. SoundFonts and persistent entities stay in the
+long-lived pools. `BICYCLE_SCENE_STATS=1` prints the pools on each change; `ctest -R scene-lifecycle` walks back and
+forth 20 times and fails if the SCENE pool isn't empty after each unload or its high-water mark grows.
+
+Release builds: the packer checks that every scene a door, `W.door{ to = ... }` or `Scene.go( "..." )` names is in
+the pack. True-3D games (plat3d) use scenes too: see docs/true-3d.md, "Scene changes in true 3D".
+
+The test game: walk the hero (WASD) right into the cottage door in the meadow; inside, walk left out of the
+doorway. The fairy follows both ways; the coin on the cottage floor stays gone once picked up.
+
+## IDs (build-time string interning) and small maps
+
+Names that scripts and data use at run time (animation tags, scenes, spawns, doors, songs, SoundFonts, sound
+effects, colors, collision types, graph edges, genomes) get small integer ids at build time:
+`tools/ids/genids.lua` scans every game's `genome/` tree, `main.lua` and `scripts/*.lua` and writes
+
+* `gen/ids.h`: `enum class ids::Anim : uint8_t { DEFAULT = 0, crawl = 1, ..., COUNT }` (and `Scene`, `Spawn`, `Door`,
+  `Song`, `Soundfont`, `Sound`, `Color`, `Coll`, `Edge`, `Genome`), with `ids::animNames[]` / `ids::animCount`;
+* `gen/ids.lua`: `ids.anim.walk_up == 10`, `ids.names.anim[10] == "walk_up"` (`require("gen.ids")`).
+
+`gen/` is generated (git-ignored). Nobody edits an id list: CMake runs the generator (on LuaJIT's host `minilua`,
+built with LuaJIT, so nothing extra is installed on Linux, Windows CLANG64 or a cross build) whenever any of its
+inputs changes, and the globs re-run CMake when files are added or removed. The Aseprite scripts (`sprite.lua`,
+`adddoor.lua`, `addsong.lua`) regenerate it too right after they write (`scripts/aseprite/refreshids.lua`, using
+Aseprite's own Lua), so new tags, scenes and spawns are known before the next build. By hand:
+
+```sh
+build/_deps/src/luajit/src/host/minilua tools/ids/genids.lua --root . --out gen --list build/ids-inputs.txt [--strict]
+```
+
+The generator also checks references: a door to a missing scene or spawn, a scene's song/SoundFont that isn't
+in `genome/music/`, a literal `Scene.go("...")`, `Sound.play("...")`/`Sound.key("...")` naming nothing, an
+`initAnim` that isn't one of its sprite's tags, unknown collision types. Dev builds print these as warnings; release
+builds (`BICYCLE_RELEASE`, `BICYCLE_RELEASE_ASSETS`) run it with `--strict`, the packs depend on it, and a typo fails
+the build. Release embeds `gen/ids.lua` in the pack.
+
+Scripts keep writing names: `anim:set( "walk_up" )`, `Scene.go( "house", { spawn = "entry" } )`,
+`Sound.play( "coin" )`. `scripts/Ids.lua` resolves each once, at load (`Ids.get`; a name that's no tag/scene/spawn/sound
+anywhere is an error that lists the known ones), and the engine works with ids from there: the Animator's strips are
+a `bicycle::map` by tag id, doors resolve their target scene and spawn ids when they're armed, scenes are cached by
+scene id with their spawns by spawn id, and sound effects are keyed by sound id. Names an asset brings that are
+newer than `gen/ids.lua` (dev only) get the next free id with a "rebuild" warning.
+
+**`bicycle::map<V, Pool>`** (`include/data/Map.h`) is the map for those ids: a port of jollybean's popcount-indexed
+map (via mapbench's map2.c): a 256-bit presence bitfield plus prefix counts, values dense in key order in a
+`mem` pool (template parameter or constructor, like `mem::Vector<T, POOL>`), lookups one bit test + one popcount,
+ascending inserts append, overwrites in place, lazy x2 growth or exact capacity, non-trivial values allowed.
+`-DBICYCLE_MAP_POPCNT_LUT` uses a byte table for CPUs without popcount. `ctest -R map`.
+
+Per-entity data uses **`EntitySlots<T, Pool>`** (`include/m/EntitySlots.h`) instead of `unordered_map<Entity, T>`: a
+flat pool-backed array by entity id whose slots remember the entity's generation (bumped by `delEntityId`), so a
+recycled id never sees the previous owner's data (Scene's entity -> layer and hidden flags, the 3D renderer's models
+and motion state).
+
 ## Memory pools
 
 All engine memory comes from one arena cut into bump-allocated pools (`include/data/Mem.h`, after jollybean's
 `mem.c`): PERMANENT (asset pack), GENERAL (every `new` in the engine, std containers), TEXT (the LuaJIT heap and
 scripts), GRAPHIC (images, meshes, textures, framebuffers, GL staging), AUDIO (SoundFonts, MIDI) and TEMPORARY
-(scratch, reset every frame and after each image load). `mem::Allocator` / `mem::Vector` / `mem::String` /
+(scratch, reset every frame and after each image load) and SCENE (what the current scene loaded; see Scene changes). `mem::Allocator` / `mem::Vector` / `mem::String` /
 `mem::Resource` (pmr) put std containers in a pool. Sizes: `-DBICYCLE_MEM_<POOL>_MB=` or the same environment
 variable; overflowing a pool is fatal and names it. `BICYCLE_MEM_STATS=1` prints high-water marks at exit.
 
@@ -316,6 +523,9 @@ still uses malloc. fluidsynth's cpp11 thread code is patched at fetch time (new 
 
 ## Environment variables
 
+* `BICYCLE_SCENE_STATS=1`: print the memory pools on every scene change. `BICYCLE_SCENE_CYCLE=<n>[:<a>:<b>:<frames>]`:
+  make n scene changes between scenes a and b (default intro and house), one every <frames> frames, then quit
+  (`BICYCLE_SCENE_CYCLE_TRANSITION=fade|wipe|dissolve|none` picks the transition).
 * `BICYCLE_MODEL_ACTION=<action>`: 3D, pin every rigged model to one action.
 
 `BICYCLE_MAX_FRAMES=<n>`: quit after n frames (headless tests).
@@ -328,3 +538,9 @@ ASCII the file is a text dump of the screen) (+ `BICYCLE_SCREENSHOT_FRAME`, defa
 
 and `BICYCLE_AUDIO_DRIVER`, `BICYCLE_AUDIO_FILE`, `BICYCLE_GM_SF2`, `BICYCLE_MUTE_MUSIC`, `BICYCLE_PROFILE` (audio
 start-up timings) and `BICYCLE_DEBUG_LOG` (Lua `dbglog`): see `include/c/MidiPlayer.h` and `tools/audio/README.md`.
+
+## True 3D
+
+The 3D build can run genuinely 3D games (third-person platformers, first-person shooters): 3D transforms and
+character physics, a level collision mesh from Blender, raycasts, camera rigs driven by Kinematics, mouse look and
+gamepads, shadows and fog. See [docs/true-3d.md](docs/true-3d.md); demos: `./o-3d plat3d`, `./o-3d fps3d`.

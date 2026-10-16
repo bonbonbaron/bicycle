@@ -1,11 +1,13 @@
 require('bicycle')
 local Sound = require('Sound')
+local Scene = require('Scene')
 local Hud = require('Hud')
 require('Dialogue')
 -- The player: an animated Aseprite character (see scripts/aseprite/sprite.lua) who walks with WASD,
 -- is blocked by solid things, gets hurt by enemies (health bar up top), and talks to NPCs with E or Space.
--- model: in 3D mode the hero is the Blender character test/genome/models/pilgrim3d (scripts/blender/make_scene.py).
-local hero = { sprite="pilgrim", model="pilgrim3d", initAnim="walk_down", coll={ type="hero" } }
+-- model: in 3D mode the hero is the Blender character test/genome/model/pilgrim3d (scripts/blender/make_scene.py).
+-- persist: the hero survives scene changes (Scene.go in scripts/Scene.lua): carried through doors, HUD and camera kept.
+local hero = { sprite="pilgrim", model="pilgrim3d", initAnim="walk_down", coll={ type="hero" }, persist=true }
 
 local STEP = 256  -- one cell in fixed-point (FIXEDPT_DEC_BITS = 8)
 local DIRS = {
@@ -74,6 +76,7 @@ function hero:onInput(input)
   end
   -- While a Dialogue is up it has the input focus, so we don't move (or get here at all).
   if input == ffi.C.E or input == ffi.C.Space then
+    if Scene.useDoor() then return end  -- standing in a door (on = "press" doors wait for this)
     local npc = self:speakerInReach()
     if npc then
       Sound.play( "blip" )
@@ -124,6 +127,15 @@ function hero:respawn()
   self.invulnerable = INVULNERABLE_TICKS
   self.touching = {}
   dbglog( "respawn: health %d", self.health )
+end
+
+-- After walking through a door: we're at the new scene's spawn point; forget what we touched in the old one.
+function hero:onSceneEnter( sceneName, spawnName )
+  local pos = box( self.id ).pos
+  self.spawn = { x = pos.x, y = pos.y }
+  self.touching = {}
+  self.prevPos = nil
+  dbglog( "hero entered %s (spawn %s)", sceneName, tostring( spawnName ) )
 end
 
 -- Flash while invulnerable.

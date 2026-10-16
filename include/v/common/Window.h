@@ -21,7 +21,9 @@ class Window {
     void clear();
     virtual void render() = 0;
     virtual void onInput( Input& input ) = 0;
-    virtual void onTermResize() {}
+    // The screen changed size (gfx::cols() and gfx::lines() are already updated). By default the window keeps its
+    // size and position but is pulled back inside the screen.
+    virtual void onTermResize();
     virtual auto panelKind() const -> gfx::Panel { return gfx::Panel::Dialogue; }  // the screen changed size (gfx::cols() and gfx::lines() are already updated)
     void repaint();
 
@@ -34,6 +36,10 @@ class Window {
     void setY( const int y );
     void setWidth( const int w );
     void setHeight( const int h );
+    // Moves and resizes in one step, in the order curses accepts (a window may never stick out of the screen).
+    void place( int x, int y, int w, int h );
+    auto requestedX() const -> int { return _x; }  // where the window asked to be (getX() is where curses put it)
+    auto requestedY() const -> int { return _y; }
 
     void setBorder( const bool showBorder );
     auto isBorderShowing() const -> bool;

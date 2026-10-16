@@ -3,16 +3,41 @@
   "configurePresets": [
     {
       "name": "default",
-      "displayName": "Ninja (Linux, MSYS2, MinGW); dependencies fetched and built",
+      "displayName": "Ninja (Linux, MSYS2, MinGW); dependencies fetched and built; RelWithDebInfo, debug info split into o.debug",
       "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build"
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+      }
     },
     {
       "name": "system",
       "displayName": "Ninja, using installed packages only (BICYCLE_USE_SYSTEM_DEPS=ON)",
       "inherits": "default",
       "binaryDir": "${sourceDir}/build/system",
-      "cacheVariables": { "BICYCLE_USE_SYSTEM_DEPS": "ON" }
+      "cacheVariables": {
+        "BICYCLE_USE_SYSTEM_DEPS": "ON"
+      }
+    },
+    {
+      "name": "windows-clang64",
+      "displayName": "Windows, MSYS2 CLANG64 shell (clang, Ninja); dependencies fetched and built; RelWithDebInfo",
+      "inherits": "default",
+      "binaryDir": "${sourceDir}/build/clang64",
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++"
+      }
+    },
+    {
+      "name": "windows-ucrt64",
+      "displayName": "Windows, MSYS2 UCRT64 shell (gcc, Ninja); dependencies fetched and built; RelWithDebInfo",
+      "inherits": "default",
+      "binaryDir": "${sourceDir}/build/ucrt64",
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "gcc",
+        "CMAKE_CXX_COMPILER": "g++"
+      }
     },
     {
       "name": "msvc",
@@ -23,8 +48,26 @@
     }
   ],
   "buildPresets": [
-    { "name": "default", "configurePreset": "default" },
-    { "name": "system", "configurePreset": "system" },
-    { "name": "msvc", "configurePreset": "msvc", "configuration": "Release" }
+    {
+      "name": "default",
+      "configurePreset": "default"
+    },
+    {
+      "name": "system",
+      "configurePreset": "system"
+    },
+    {
+      "name": "windows-clang64",
+      "configurePreset": "windows-clang64"
+    },
+    {
+      "name": "windows-ucrt64",
+      "configurePreset": "windows-ucrt64"
+    },
+    {
+      "name": "msvc",
+      "configurePreset": "msvc",
+      "configuration": "Release"
+    }
   ]
 }

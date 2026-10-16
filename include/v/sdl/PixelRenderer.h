@@ -32,6 +32,8 @@ class PixelRenderer : public Renderer {
     auto lines() const -> int override { return _fbH / CELL_H; }
     auto checkResize() -> bool override;
     void pollInput() override;
+    void setMouseCapture( bool on ) override;
+    void enableGamepad() override;
     auto quitRequested() const -> bool override { return _quit; }
 
     auto createWindow( int x, int y, int w, int h ) -> WinHandle override;
@@ -47,6 +49,7 @@ class PixelRenderer : public Renderer {
     void setAttr( WinHandle win, int attr, bool on ) override;
     void presentWindow( WinHandle ) override {}
     void endFrame() override;
+    void applyTransition();
 
     void drawLayer( WinHandle win, const Image& img, int offX, int offY, bool wrap, int winW, int winH ) override;
     void drawEntity( WinHandle win, Entity entity, const Box& camBox ) override;
@@ -55,6 +58,7 @@ class PixelRenderer : public Renderer {
       _subY = fy * CELL_H >> FIXEDPT_DEC_BITS;
     }
     void preloadImage( const std::shared_ptr<const BImg>& img ) override { _atlas.add( img ); }
+    void onSceneUnloaded() override { _atlas.prune(); }
 
   protected:
     struct Win {
@@ -120,6 +124,8 @@ class PixelRenderer : public Renderer {
 
   private:
     void handleEvent( const SDL_Event& e );
+    void* _pad{};       // SDL_Gamepad* (enableGamepad)
+    bool _padInit{};
 };
 
 auto colorToArgb( int color ) -> uint32_t;  // Color (ColorPalette.h) -> ARGB
