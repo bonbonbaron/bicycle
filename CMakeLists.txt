@@ -143,6 +143,8 @@ add_custom_target( package DEPENDS ${packs} )
 
 # Headless codec tests: `ctest --test-dir build` (or build/bicycle-tests test).
 if ( NOT CMAKE_CROSSCOMPILING )
+  add_executable( bicycle-motion-tests tests/motion_test.cpp )
+  target_include_directories( bicycle-motion-tests PRIVATE include )
   add_executable( bicycle-tests tests/codec_test.cpp )
   target_link_libraries( bicycle-tests PRIVATE bicycle_pack_codecs )
   enable_testing()
@@ -150,6 +152,7 @@ if ( NOT CMAKE_CROSSCOMPILING )
   add_test( NAME pack-assets COMMAND "${CMAKE_COMMAND}" --build "${CMAKE_BINARY_DIR}" --target package )
   set_tests_properties( pack-assets PROPERTIES FIXTURES_SETUP packed )
   add_test( NAME codecs COMMAND bicycle-tests test WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}" )
+  add_test( NAME motion COMMAND bicycle-motion-tests )
   set_tests_properties( codecs PROPERTIES FIXTURES_REQUIRED packed )
 endif()
 
