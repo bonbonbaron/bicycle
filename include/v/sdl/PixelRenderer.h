@@ -8,11 +8,15 @@
 #include <cstdint>
 #include <memory>
 #include <vector>
+#include "data/Mem.h"
 
 struct SDL_Window;
 union SDL_Event;
 
 namespace gfx {
+
+// Framebuffers and GL staging live in the GRAPHIC pool.
+using Pixels = mem::Vector<uint32_t, mem::GRAPHIC>;
 
 class PixelRenderer : public Renderer {
   public:
@@ -66,11 +70,11 @@ class PixelRenderer : public Renderer {
     void saveScreenshotIfDue();
     auto screenshotDue() const -> bool;  // this frame will be saved (BICYCLE_SCREENSHOT)
     // The finished frame as ARGB, top row first (3D reads it back from GL before swapping).
-    virtual void captureFrame( std::vector<uint32_t>& out ) { out = _fb; }
+    virtual void captureFrame( gfx::Pixels& out ) { out = _fb; }
     std::string _gameName;
 
     SDL_Window* _window{};
-    std::vector<uint32_t> _fb;
+    gfx::Pixels _fb;
     int _fbW{};
     int _fbH{};
     bool _quit{};

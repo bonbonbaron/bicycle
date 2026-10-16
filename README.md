@@ -154,6 +154,20 @@ See `scripts/blender/README.md`: `make_scene.py` authors the test scene headless
 (`blender -b scene.blend --python scripts/blender/export.py -- test/genome/models`), and the pack turns the OBJs
 into `.bmesh`. Genomes pick a mesh with `model = "<object>"`.
 
+## Memory pools
+
+All engine memory comes from one arena cut into bump-allocated pools (`include/data/Mem.h`, after jollybean's
+`mem.c`): PERMANENT (asset pack), GENERAL (every `new` in the engine, std containers), TEXT (the LuaJIT heap and
+scripts), GRAPHIC (images, meshes, textures, framebuffers, GL staging), AUDIO (SoundFonts, MIDI) and TEMPORARY
+(scratch, reset every frame and after each image load). `mem::Allocator` / `mem::Vector` / `mem::String` /
+`mem::Resource` (pmr) put std containers in a pool. Sizes: `-DBICYCLE_MEM_<POOL>_MB=` or the same environment
+variable; overflowing a pool is fatal and names it. `BICYCLE_MEM_STATS=1` prints high-water marks at exit.
+
+Limits: LuaJIT takes the custom allocator only in GC64 builds (the default on x64/arm64, which the fetched LuaJIT
+is); a non-GC64 build falls back to LuaJIT's own allocator with a warning. fluidsynth copies SoundFont samples into
+its own malloc'd memory, so only the sf2/mid bytes are in AUDIO. Third-party C code (SDL, fluidsynth, GL drivers)
+still uses malloc. fluidsynth's cpp11 thread code is patched at fetch time (new vs free mismatch).
+
 ## Environment variables
 
 `BICYCLE_LOOSE_ASSETS`, `BICYCLE_WINDOW_SIZE`, `BICYCLE_SCREENSHOT=<file.bmp>` (+ `BICYCLE_SCREENSHOT_FRAME`,

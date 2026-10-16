@@ -1,3 +1,5 @@
+#include "data/Mem.h"
+#include <cstdio>
 #include "c/Trigger.h"
 #include "m/Entity.h"
 #include "c/Timer.h"
@@ -66,7 +68,7 @@ static int packSearcher( lua_State* L ) {
     for ( auto& c : path ) if ( c == '.' ) c = '/';
   }
   path += ".lua";
-  auto code = assets::read( path );
+  auto code = assets::read( path, mem::TEXT );
   if ( !code || !assets::exists( path ) ) {
     lua_pushstring( L, ( "\n\tno '" + path + "' in the asset pack" ).c_str() );
     return 1;
@@ -77,8 +79,23 @@ static int packSearcher( lua_State* L ) {
   return 1;
 }
 
+// The Lua heap lives in the TEXT pool. LuaJIT accepts a custom allocator only in GC64 builds (the default on
+// x64/arm64 since 2.1); a non-GC64 64-bit LuaJIT returns NULL from lua_newstate, so we fall back to its own
+// allocator (mmap'd low memory) and say so.
+static void* luaPoolAlloc( void*, void* ptr, size_t, size_t nsize ) {
+  if ( nsize == 0 ) {
+    if ( ptr ) mem::memDel( ptr );
+    return nullptr;
+  }
+  return mem::memResize( ptr, nsize, mem::TEXT );
+}
+
 void Trigger::init( const std::string& gameName ) {
-  L = luaL_newstate();
+  L = lua_newstate( luaPoolAlloc, nullptr );
+  if ( !L ) {
+    std::fprintf( stderr, "bicycle: LuaJIT refused a custom allocator (non-GC64 build); Lua heap is outside the TEXT pool\n" );
+    L = luaL_newstate();
+  }
   luaL_openlibs(L);
   // Assets: <game>/assets.bpak if it's there (see include/data/Pack.h).
   assets::mount( gameName );
@@ -100,7 +117,7 @@ void Trigger::init( const std::string& gameName ) {
 
   // Start the game
   std::string gamePath{"./" + gameName + "/main.lua"};
-  auto mainLua = assets::read( gamePath );
+  auto mainLua = assets::read( gamePath, mem::TEXT );
   if ( !mainLua ) {
     bicycle::die( "Can't find " + gamePath );
   }

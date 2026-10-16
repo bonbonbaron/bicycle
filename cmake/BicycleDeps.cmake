@@ -255,6 +255,17 @@ function( bicycle_fluidsynth )
     endif()
   endif()
   bicycle_fetch( fluidsynth "${BICYCLE_FLUIDSYNTH_URL}" ${BICYCLE_FLUIDSYNTH_SHA256} src )
+  # fluidsynth's cpp11 threads allocate thread info with new and free it with FLUID_FREE (free()). With the
+  # engine's global operator new routed into the memory pools (src/data/MemNew.cpp), that mismatch corrupts the
+  # malloc heap, so allocate it with FLUID_NEW. Patching drops the install stamp so the dep is rebuilt once.
+  set( sys "${src}/src/utils/fluid_sys_cpp11.cpp" )
+  file( READ "${sys}" body )
+  if ( body MATCHES "info = new fluid_thread_info_t;" )
+    string( REPLACE "info = new fluid_thread_info_t;" "info = FLUID_NEW(fluid_thread_info_t); if (!info) throw std::bad_alloc();" body "${body}" )
+    string( REPLACE "delete info;" "FLUID_FREE(info);" body "${body}" )
+    file( WRITE "${sys}" "${body}" )
+    file( REMOVE "${BICYCLE_DEPS_PREFIX}/.fluidsynth-installed" )
+  endif()
   set( off )
   foreach( opt libsndfile jack dbus ladspa midishare network oss sdl3 pipewire readline openmp systemd libinstpatch
                signalsmith portaudio winmidi coreaudio coremidi ipv6 )

@@ -245,7 +245,7 @@ auto PixelRenderer::screenshotDue() const -> bool {
 void PixelRenderer::saveScreenshotIfDue() {
   if ( !screenshotDue() ) return;
   const char* path = std::getenv( "BICYCLE_SCREENSHOT" );
-  std::vector<uint32_t> shot;
+  gfx::Pixels shot;
   captureFrame( shot );
   if ( shot.size() != _fb.size() ) return;
   SDL_Surface* s = SDL_CreateSurfaceFrom( _fbW, _fbH, SDL_PIXELFORMAT_ARGB8888, shot.data(), _fbW * 4 );

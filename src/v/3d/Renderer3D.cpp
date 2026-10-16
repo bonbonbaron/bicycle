@@ -329,7 +329,7 @@ class Renderer3D final : public PixelRenderer {
       _haveScene = false;
     }
 
-    void captureFrame( std::vector<uint32_t>& out ) override { out = _capture; }
+    void captureFrame( gfx::Pixels& out ) override { out = _capture; }
 
   private:
     static void vertexLayout() {
@@ -379,7 +379,7 @@ class Renderer3D final : public PixelRenderer {
     }
 
     auto texture( const BImg& img ) -> GLuint {
-      std::vector<uint32_t> rgba( static_cast<size_t>( img.w ) * img.h );
+      gfx::Pixels rgba( static_cast<size_t>( img.w ) * img.h );
       for ( int y = 0; y < img.h; ++y )
         for ( int x = 0; x < img.w; ++x ) rgba[static_cast<size_t>( y ) * img.w + x] = img.pixel( x, y );
       GLuint t{};
@@ -400,7 +400,7 @@ class Renderer3D final : public PixelRenderer {
 
     auto loadMesh( const std::string& path ) -> std::shared_ptr<GpuMesh> {
       if ( auto it = _meshes.find( path ); it != _meshes.end() ) return it->second;
-      auto bytes = assets::read( path );
+      auto bytes = assets::read( path, mem::GRAPHIC );
       auto m = bytes ? mesh::decode( *bytes ) : std::nullopt;
       if ( !m ) {
         std::fprintf( stderr, "bicycle 3D: can't load mesh %s (build the 'assets' target: meshes are packed)\n", path.c_str() );
@@ -408,7 +408,7 @@ class Renderer3D final : public PixelRenderer {
       }
       // Expand to one vertex per corner (normals and uvs are per corner), grouped by material.
       auto g = std::make_shared<GpuMesh>();
-      std::vector<float> verts;
+      mem::Vector<float, mem::GRAPHIC> verts;
       const size_t nMat = std::max<size_t>( 1, m->materials.size() );
       for ( size_t mat = 0; mat < nMat; ++mat ) {
         GpuMesh::Range r;
@@ -429,7 +429,7 @@ class Renderer3D final : public PixelRenderer {
           const auto& mm = m->materials[mat];
           r.rgba = mm.rgba;
           if ( !mm.texture.empty() ) {
-            auto tb = assets::read( "./" + _gameName + "/" + mm.texture );
+            auto tb = assets::read( "./" + _gameName + "/" + mm.texture, mem::GRAPHIC );
             auto ti = tb ? BImg::parse( *tb ) : std::nullopt;
             if ( ti ) r.tex = texture( *ti );
           }
@@ -545,7 +545,7 @@ class Renderer3D final : public PixelRenderer {
     }
 
     void readBack() {
-      std::vector<uint32_t> px( static_cast<size_t>( _fbW ) * _fbH );
+      gfx::Pixels px( static_cast<size_t>( _fbW ) * _fbH );
       gl.PixelStorei( GL_PACK_ALIGNMENT, 4 );
       gl.ReadPixels( 0, 0, _fbW, _fbH, GL_BGRA, GL_UNSIGNED_BYTE, px.data() );
       _capture.resize( px.size() );
@@ -566,7 +566,7 @@ class Renderer3D final : public PixelRenderer {
     std::map<const BImg*, std::pair<std::shared_ptr<const BImg>, GLuint>> _spriteTex;
     struct Motion { float x{}; float facing{}; int walk{}; bool seen{}; };
     std::unordered_map<Entity, Motion> _motion;
-    std::vector<uint32_t> _capture;
+    gfx::Pixels _capture;
     long _tick{};
 };
 

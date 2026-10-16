@@ -1,3 +1,4 @@
+#include "data/Mem.h"
 #include <iostream> // TODO: delete when you're done debugging
 #include "bicycle.h"
 #include "Constants.h"
@@ -47,7 +48,8 @@ namespace bicycle {
   }
 
   static auto loadBImg( const std::string& path ) -> std::optional<BImg> {
-    auto bytes = assets::read( path );
+    mem::TempScope scratch;  // the file bytes are scratch; the parsed image lives in GRAPHIC
+    auto bytes = assets::read( path, mem::TEMPORARY );
     if ( !bytes ) return std::nullopt;
     return BImg::parse( *bytes );
   }
@@ -386,8 +388,8 @@ namespace bicycle {
     // ASSETS (the game's asset pack, or loose files; see include/data/Pack.h)
     // Returns the asset's bytes (valid until the next call) and their length, or null.
     const char* assetRead( const char* path, size_t* len ) {
-      static thread_local std::string buf;
-      auto data = assets::read( path );
+      static thread_local mem::Blob buf;
+      auto data = assets::read( path, mem::TEXT );
       if ( !data ) {
         return nullptr;
       }
@@ -443,6 +445,7 @@ namespace bicycle {
       // Outputs
       wm.render();   // TODO make this internally only change dirty windows
 
+      mem::memRst( mem::TEMPORARY );  // scratch never outlives a frame
       Timer::sleepFrame();  // burn off excess frame time
     }
 

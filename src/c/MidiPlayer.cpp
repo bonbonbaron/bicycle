@@ -1,3 +1,4 @@
+#include "data/Mem.h"
 #include <chrono>
 #include <cstdio>
 #include <cstring>
@@ -18,11 +19,11 @@
 namespace {
   constexpr const char* MEM_PREFIX = "bicycle-mem://";
   std::mutex memMtx;
-  std::map<std::string, std::shared_ptr<const std::string>> memFiles;
+  std::map<std::string, std::shared_ptr<const mem::Blob>> memFiles;
 
   struct SfHandle {
     FILE* fp{};
-    std::shared_ptr<const std::string> mem;
+    std::shared_ptr<const mem::Blob> mem;
     long long pos{};
   };
 
@@ -189,7 +190,7 @@ MidiPlayer::~MidiPlayer() {
 // Replaces whatever song was queued.
 // The song comes from the asset pack (inflated) or the file.
 auto MidiPlayer::loadMidi( const std::string& midiFilepath ) -> bool {
-  auto midi = assets::read( midiFilepath );
+  auto midi = assets::read( midiFilepath, mem::AUDIO );
   if ( !midi ) {
     return false;
   }
@@ -247,13 +248,13 @@ void MidiPlayer::unpauseSong() {
 auto MidiPlayer::loadSoundfont( const std::string& sfFilepath ) -> int {
   std::string name = sfFilepath;
   if ( assets::mounted() ) {
-    auto data = assets::read( sfFilepath );
+    auto data = assets::read( sfFilepath, mem::AUDIO );
     if ( !data ) {
       return -1;
     }
     name = MEM_PREFIX + sfFilepath;
     std::unique_lock<std::mutex> l( memMtx );
-    memFiles[name] = std::make_shared<const std::string>( std::move( *data ) );
+    memFiles[name] = std::make_shared<const mem::Blob>( std::move( *data ) );
   }
   else if ( !fileExists( sfFilepath ) ) {
     return -1;
