@@ -41,4 +41,5 @@ class MidiPlayer {
     fluid_synth_t* _synthP{};
     fluid_audio_driver_t* _aDriverP{};
     fluid_player_t* _playerP{};
+    std::string _rawFile{};  // BICYCLE_AUDIO_FILE when fluidsynth can only write raw samples
 };

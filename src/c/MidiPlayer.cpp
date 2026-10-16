@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
+#include <iterator>
 #include "c/MidiPlayer.h"
 
 // BICYCLE_PROFILE=<file> appends how long each audio start-up step took (ms), to find what slows start-up.
@@ -22,6 +23,24 @@ static auto fileExists( const std::string& fp ) -> bool {
   return std::ifstream( fp ).good();
 }
 
+// Turns a file of raw 16-bit little-endian stereo samples into a WAV file.
+static void addWavHeader( const std::string& path, const unsigned rate ) {
+  std::ifstream in( path, std::ios::binary );
+  std::string data( ( std::istreambuf_iterator<char>( in ) ), std::istreambuf_iterator<char>() );
+  in.close();
+  auto le = []( std::string& s, unsigned v, int bytes ) {
+    for ( int i = 0; i < bytes; ++i ) s += static_cast<char>( ( v >> ( 8 * i ) ) & 0xff );
+  };
+  std::string h = "RIFF";
+  le( h, 36 + data.size(), 4 );
+  h += "WAVEfmt ";
+  le( h, 16, 4 ); le( h, 1, 2 ); le( h, 2, 2 ); le( h, rate, 4 ); le( h, rate * 4, 4 ); le( h, 4, 2 ); le( h, 16, 2 );
+  h += "data";
+  le( h, data.size(), 4 );
+  std::ofstream out( path, std::ios::binary | std::ios::trunc );
+  out << h << data;
+}
+
 MidiPlayer::MidiPlayer() {
   profile( "start" );
   // Settings
@@ -30,6 +49,14 @@ MidiPlayer::MidiPlayer() {
   if ( const char* file = std::getenv( "BICYCLE_AUDIO_FILE" ) ) {
     fluid_settings_setstr( _settingsP, "audio.driver", "file" );
     fluid_settings_setstr( _settingsP, "audio.file.name", file );
+    // fluidsynth writes WAV only when built with libsndfile; otherwise it writes raw samples, and the destructor
+    // puts a WAV header on them.
+    if ( fluid_settings_str_equal( _settingsP, "audio.file.type", "raw" ) ||
+         fluid_settings_setstr( _settingsP, "audio.file.type", "wav" ) != FLUID_OK ) {
+      fluid_settings_setstr( _settingsP, "audio.file.format", "s16" );
+      fluid_settings_setstr( _settingsP, "audio.file.endian", "little" );
+      _rawFile = file;
+    }
   }
   else if ( const char* driver = std::getenv( "BICYCLE_AUDIO_DRIVER" ) ) {
     fluid_settings_setstr( _settingsP, "audio.driver", driver );
@@ -66,8 +93,13 @@ MidiPlayer::MidiPlayer() {
 }
 
 MidiPlayer::~MidiPlayer() {
+  double rate{ 44100 };
+  if ( _settingsP ) fluid_settings_getnum( _settingsP, "synth.sample-rate", &rate );
   if ( _aDriverP ) delete_fluid_audio_driver( _aDriverP );
   if ( _playerP ) delete_fluid_player( _playerP );
+  if ( !_rawFile.empty() ) {
+    addWavHeader( _rawFile, static_cast<unsigned>( rate ) );
+  }
   if ( _synthP ) delete_fluid_synth( _synthP );
   if ( _settingsP ) delete_fluid_settings( _settingsP );
 }
