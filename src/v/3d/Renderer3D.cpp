@@ -8,6 +8,8 @@
 // Cells -> world: X = cells / 16 (one 8-pixel-wide sprite = 1 unit), Y = height above the ground in pixel rows / 8,
 // Z = 0 for models, slightly behind for billboards. The ground row is the lowest entity bottom in view.
 #include "v/sdl/PixelRenderer.h"
+#include <cstring>
+#include <string>
 #include "v/common/Image.h"
 #include "data/Mesh.h"
 #include "data/Obj.h"
@@ -120,17 +122,25 @@ enum : GLenum {
   X( void, TexParameterfv, GLenum, GLenum, const GLfloat* ) \
   X( void, Uniform3fv, GLint, GLsizei, const GLfloat* ) \
   X( void, Uniform1f, GLint, GLfloat ) \
-  X( void, Uniform2fv, GLint, GLsizei, const GLfloat* )
+  X( void, Uniform2fv, GLint, GLsizei, const GLfloat* ) \
+  X( void, DisableVertexAttribArray, GLuint ) \
+  X( void, BindAttribLocation, GLuint, GLuint, const GLchar* )
 
 struct GL {
 #define BGL_DECL( ret, name, ... ) ret( BGL_API* name )( __VA_ARGS__ ) = nullptr;
   BGL_FUNCS( BGL_DECL )
 #undef BGL_DECL
+  // Not in OpenGL ES 2.0 (the GLES2 path does without them).
+  static auto optional( const char* n ) -> bool {
+    for ( const char* o : { "GenVertexArrays", "DeleteVertexArrays", "BindVertexArray", "DrawBuffer", "ReadBuffer", "TexParameterfv" } )
+      if ( std::strcmp( n, o ) == 0 ) return true;
+    return false;
+  }
   auto load() -> bool {
     bool ok = true;
 #define BGL_LOAD( ret, name, ... ) \
     name = reinterpret_cast<decltype( name )>( SDL_GL_GetProcAddress( "gl" #name ) ); \
-    if ( !name ) { std::fprintf( stderr, "bicycle 3D: missing gl" #name "\n" ); ok = false; }
+    if ( !name && !optional( #name ) ) { std::fprintf( stderr, "bicycle 3D: missing gl" #name "\n" ); ok = false; }
     BGL_FUNCS( BGL_LOAD )
 #undef BGL_LOAD
     return ok;
@@ -210,10 +220,10 @@ void main() {
     mat4 s = aWeights.x * uBones[int(aJoints.x)] + aWeights.y * uBones[int(aJoints.y)]
            + aWeights.z * uBones[int(aJoints.z)] + aWeights.w * uBones[int(aJoints.w)];
     p = s * p;
-    n = mat3(s) * n;
+    n = mat3(s[0].xyz, s[1].xyz, s[2].xyz) * n;
   }
   gl_Position = uMvp * p;
-  vN = mat3(uModel) * n;
+  vN = mat3(uModel[0].xyz, uModel[1].xyz, uModel[2].xyz) * n;
   vUv = aUv;
   vec4 w = uModel * p;
   vWorld = w.xyz;
@@ -445,7 +455,7 @@ class Renderer3D final : public PixelRenderer {
           if ( r.tex ) gl.DeleteTextures( 1, &r.tex );
         }
         if ( g.vbo ) gl.DeleteBuffers( 1, &g.vbo );
-        if ( g.vao ) gl.DeleteVertexArrays( 1, &g.vao );
+        if ( g.vao && gl.DeleteVertexArrays ) gl.DeleteVertexArrays( 1, &g.vao );
         it = _meshes.erase( it );
       }
     }
@@ -470,24 +480,39 @@ class Renderer3D final : public PixelRenderer {
     auto windowFlags() const -> uint64_t override { return SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE; }
     auto frameClearColor() const -> uint32_t override { return 0u; }  // overlay: transparent where nothing's drawn
 
+    // OpenGL 3.3 core, else OpenGL ES 2.0 (Raspberry Pi vc4/v3d, Mesa on small GPUs): no VAOs, GLSL 100 shaders,
+    // no shadow map. BICYCLE_GLES2=1 (or -DBICYCLE_GLES2=ON) goes straight to ES 2.0.
+    static void contextAttributes( bool es2 ) {
+      SDL_GL_SetAttribute( SDL_GL_CONTEXT_MAJOR_VERSION, es2 ? 2 : 3 );
+      SDL_GL_SetAttribute( SDL_GL_CONTEXT_MINOR_VERSION, es2 ? 0 : 3 );
+      SDL_GL_SetAttribute( SDL_GL_CONTEXT_PROFILE_MASK, es2 ? SDL_GL_CONTEXT_PROFILE_ES : SDL_GL_CONTEXT_PROFILE_CORE );
+    }
     void beforeWindowCreated() override {
-      SDL_GL_SetAttribute( SDL_GL_CONTEXT_MAJOR_VERSION, 3 );
-      SDL_GL_SetAttribute( SDL_GL_CONTEXT_MINOR_VERSION, 3 );
-      SDL_GL_SetAttribute( SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE );
+#ifdef BICYCLE_GLES2
+      s_es2 = true;
+#endif
+      if ( const char* e = std::getenv( "BICYCLE_GLES2" ) ) s_es2 = *e && *e != '0';
+      contextAttributes( s_es2 );
       SDL_GL_SetAttribute( SDL_GL_DEPTH_SIZE, 24 );
       SDL_GL_SetAttribute( SDL_GL_DOUBLEBUFFER, 1 );
     }
 
     void onWindowCreated() override {
       _ctx = SDL_GL_CreateContext( _window );
+      if ( !_ctx && !s_es2 ) {  // no GL 3.3 core: try OpenGL ES 2.0
+        std::fprintf( stderr, "bicycle 3D: no OpenGL 3.3 core context (%s); trying OpenGL ES 2.0\n", SDL_GetError() );
+        s_es2 = true;
+        contextAttributes( true );
+        _ctx = SDL_GL_CreateContext( _window );
+      }
       if ( !_ctx || !gl.load() ) {
-        std::fprintf( stderr, "bicycle 3D: no OpenGL 3.3 context: %s\n", SDL_GetError() );
+        std::fprintf( stderr, "bicycle 3D: no OpenGL 3.3 or ES 2.0 context: %s\n", SDL_GetError() );
         std::exit( 1 );
       }
       SDL_GL_SetSwapInterval( 0 );
       startup::mark( "  window + GL context" );
       if ( std::getenv( "BICYCLE_GL_INFO" ) ) {
-        std::fprintf( stderr, "GL %s on %s\n", gl.GetString( GL_VERSION ), gl.GetString( GL_RENDERER ) );
+        std::fprintf( stderr, "GL %s on %s%s\n", gl.GetString( GL_VERSION ), gl.GetString( GL_RENDERER ), s_es2 ? " (GLES2 path)" : "" );
       }
       _prog = program( VS, FS );
       _depthProg = program( VS, DEPTH_FS );
@@ -497,6 +522,8 @@ class Renderer3D final : public PixelRenderer {
       gl.Uniform1i( gl.GetUniformLocation( _prog, "tex" ), 0 );
       gl.Uniform1i( gl.GetUniformLocation( _prog, "uShadowMap" ), 1 );
       // Shadow map: a depth texture compared in the shader (sampler2DShadow, hardware PCF where available).
+      // GLES2: none (no depth textures or shadow samplers in core ES 2.0).
+      if ( !s_es2 ) {
       gl.GenTextures( 1, &_shadowTex );
       gl.BindTexture( GL_TEXTURE_2D, _shadowTex );
       gl.TexImage2D( GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, SHADOW_SIZE, SHADOW_SIZE, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr );
@@ -516,22 +543,22 @@ class Renderer3D final : public PixelRenderer {
       _shadowOk = gl.CheckFramebufferStatus( GL_FRAMEBUFFER ) == GL_FRAMEBUFFER_COMPLETE;
       gl.BindFramebuffer( GL_FRAMEBUFFER, 0 );
       if ( !_shadowOk ) std::fprintf( stderr, "bicycle 3D: no shadow map framebuffer; shadows off\n" );
+      }
       _overlayProg = program( OVERLAY_VS, OVERLAY_FS );
       // Billboard quad: rewritten per sprite. Overlay quad: the whole screen.
-      gl.GenVertexArrays( 1, &_quadVao );
+      if ( !s_es2 ) gl.GenVertexArrays( 1, &_quadVao );
       gl.GenBuffers( 1, &_quadVbo );
-      gl.BindVertexArray( _quadVao );
+      if ( !s_es2 ) gl.BindVertexArray( _quadVao );
       gl.BindBuffer( GL_ARRAY_BUFFER, _quadVbo );
       gl.BufferData( GL_ARRAY_BUFFER, 4 * 8 * sizeof( float ), nullptr, GL_DYNAMIC_DRAW );
       vertexLayout();
       const float screen[] = { -1, -1, 1, -1, -1, 1, 1, 1 };
-      gl.GenVertexArrays( 1, &_overlayVao );
+      if ( !s_es2 ) gl.GenVertexArrays( 1, &_overlayVao );
       gl.GenBuffers( 1, &_overlayVbo );
-      gl.BindVertexArray( _overlayVao );
+      if ( !s_es2 ) gl.BindVertexArray( _overlayVao );
       gl.BindBuffer( GL_ARRAY_BUFFER, _overlayVbo );
       gl.BufferData( GL_ARRAY_BUFFER, sizeof screen, screen, GL_STATIC_DRAW );
-      gl.VertexAttribPointer( 0, 2, GL_FLOAT, 0, 2 * sizeof( float ), nullptr );
-      gl.EnableVertexAttribArray( 0 );
+      overlayLayout();
       gl.GenTextures( 1, &_overlayTex );
       texParams( _overlayTex, GL_CLAMP_TO_EDGE );
     }
@@ -569,6 +596,29 @@ class Renderer3D final : public PixelRenderer {
       gl.EnableVertexAttribArray( 0 );
       gl.EnableVertexAttribArray( 1 );
       gl.EnableVertexAttribArray( 2 );
+      if ( s_es2 ) { gl.DisableVertexAttribArray( 3 ); gl.DisableVertexAttribArray( 4 ); }
+    }
+    static void overlayLayout() {
+      gl.VertexAttribPointer( 0, 2, GL_FLOAT, 0, 2 * sizeof( float ), nullptr );
+      gl.EnableVertexAttribArray( 0 );
+      if ( s_es2 ) for ( GLuint a = 1; a < 5; ++a ) gl.DisableVertexAttribArray( a );
+    }
+    // A VAO where there are VAOs; on GLES2 the buffer and its attribute layout, every time.
+    static void bindVertices( GLuint vao, GLuint vbo, void ( *layout )() ) {
+      if ( !s_es2 ) { gl.BindVertexArray( vao ); return; }
+      gl.BindBuffer( GL_ARRAY_BUFFER, vbo );
+      layout();
+    }
+    // Textures from ARGB words (BGRA bytes): GLES2 has no BGRA upload, so swap to RGBA first.
+    static void uploadBGRA( int w, int h, const uint32_t* px ) {
+      if ( !s_es2 ) { gl.TexImage2D( GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_BGRA, GL_UNSIGNED_BYTE, px ); return; }
+      static std::vector<uint32_t> tmp;
+      tmp.resize( static_cast<size_t>( w ) * h );
+      for ( size_t i = 0; i < tmp.size(); ++i ) {
+        const uint32_t c = px[i];
+        tmp[i] = ( c & 0xFF00FF00u ) | ( ( c >> 16 ) & 0xFFu ) | ( ( c & 0xFFu ) << 16 );
+      }
+      gl.TexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, tmp.data() );
     }
 
     // Meshes: pos3 nrm3 uv2 joints4 weights4.
@@ -589,7 +639,26 @@ class Renderer3D final : public PixelRenderer {
       gl.TexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap );
     }
 
+    // GLSL 330 -> GLSL ES 1.00 (GLES2): attribute/varying, texture2D, gl_FragColor, no shadow sampler.
+    static auto toEs2( std::string src, bool vertex ) -> std::string {
+      auto replaceAll = [&]( const std::string& a, const std::string& b ) {
+        for ( size_t p = 0; ( p = src.find( a, p ) ) != std::string::npos; p += b.size() ) src.replace( p, a.size(), b );
+      };
+      replaceAll( "#version 330 core\n", vertex ? "#version 100\nprecision highp float;\n" : "#version 100\nprecision mediump float;\n" );
+      for ( int l = 0; l < 5; ++l ) replaceAll( "layout(location = " + std::to_string( l ) + ") ", "" );
+      replaceAll( "\nin ", vertex ? "\nattribute " : "\nvarying " );
+      replaceAll( "\nout vec4 o;", "" );
+      replaceAll( "\nout ", "\nvarying " );
+      replaceAll( "texture(", "texture2D(" );
+      replaceAll( " o = ", " gl_FragColor = " );
+      replaceAll( "uniform sampler2DShadow uShadowMap;", "" );
+      // shadow(): sampler2DShadow lookups -> lit (no shadow map on GLES2)
+      replaceAll( "s += texture2D(uShadowMap, vec3(p.xy + vec2(x, y) * uShadowTexel, p.z - bias));", "s += 1.0;" );
+      return src;
+    }
     static auto program( const char* vs, const char* fs ) -> GLuint {
+      std::string vsEs, fsEs;
+      if ( s_es2 ) { vsEs = toEs2( vs, true ); fsEs = toEs2( fs, false ); vs = vsEs.c_str(); fs = fsEs.c_str(); }
       auto compile = []( GLenum type, const char* src ) {
         GLuint s = gl.CreateShader( type );
         gl.ShaderSource( s, 1, &src, nullptr );
@@ -606,6 +675,9 @@ class Renderer3D final : public PixelRenderer {
       GLuint p = gl.CreateProgram();
       gl.AttachShader( p, compile( GL_VERTEX_SHADER, vs ) );
       gl.AttachShader( p, compile( GL_FRAGMENT_SHADER, fs ) );
+      // The attribute locations the 330 shaders give with layout(location): GLES2 binds them before linking.
+      const char* attrs[] = { "aPos", "aNrm", "aUv", "aJoints", "aWeights" };
+      for ( GLuint a = 0; a < 5; ++a ) gl.BindAttribLocation( p, a, attrs[a] );
       gl.LinkProgram( p );
       GLint ok{};
       gl.GetProgramiv( p, GL_LINK_STATUS, &ok );
@@ -625,7 +697,7 @@ class Renderer3D final : public PixelRenderer {
       gl.GenTextures( 1, &t );
       texParams( t, GL_REPEAT );
       gl.PixelStorei( GL_UNPACK_ALIGNMENT, 1 );
-      gl.TexImage2D( GL_TEXTURE_2D, 0, GL_RGBA8, img.w, img.h, 0, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data() );
+      gl.TexImage2D( GL_TEXTURE_2D, 0, s_es2 ? GL_RGBA : GL_RGBA8, img.w, img.h, 0, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data() );
       return t;
     }
 
@@ -727,9 +799,9 @@ class Renderer3D final : public PixelRenderer {
         g->center = ( lo + hi ) * 0.5f;
         g->radius = m3::length( hi - lo ) * 0.5f;
       }
-      gl.GenVertexArrays( 1, &g->vao );
+      if ( !s_es2 ) gl.GenVertexArrays( 1, &g->vao );
       gl.GenBuffers( 1, &g->vbo );
-      gl.BindVertexArray( g->vao );
+      if ( !s_es2 ) gl.BindVertexArray( g->vao );
       gl.BindBuffer( GL_ARRAY_BUFFER, g->vbo );
       gl.BufferData( GL_ARRAY_BUFFER, verts.size() * sizeof( float ), verts.data(), GL_STATIC_DRAW );
       meshLayout();
@@ -747,7 +819,7 @@ class Renderer3D final : public PixelRenderer {
       gl.UniformMatrix4fv( gl.GetUniformLocation( prog, "uMvp" ), 1, 0, mvp.data() );
       gl.UniformMatrix4fv( gl.GetUniformLocation( prog, "uModel" ), 1, 0, model.data() );
       gl.Uniform1i( gl.GetUniformLocation( prog, "uLit" ), 1 );
-      gl.BindVertexArray( m.vao );
+      bindVertices( m.vao, m.vbo, meshLayout );
       for ( const auto& r : m.ranges ) {
         gl.Uniform4fv( gl.GetUniformLocation( prog, "uColor" ), 1, r.rgba.data() );
         gl.Uniform1i( gl.GetUniformLocation( prog, "uTex" ), r.tex ? 1 : 0 );
@@ -839,11 +911,10 @@ class Renderer3D final : public PixelRenderer {
           if ( !_atlasTex ) gl.GenTextures( 1, &_atlasTex );
           texParams( _atlasTex, GL_CLAMP_TO_EDGE );
           gl.PixelStorei( GL_UNPACK_ALIGNMENT, 4 );
-          gl.TexImage2D( GL_TEXTURE_2D, 0, GL_RGBA8, _atlas.width(), _atlas.height(), 0, GL_BGRA, GL_UNSIGNED_BYTE, _atlas.pixels().data() );
+          uploadBGRA( _atlas.width(), _atlas.height(), reinterpret_cast<const uint32_t*>( _atlas.pixels().data() ) );
           _atlasTexVersion = _atlas.version();
         }
-        gl.BindVertexArray( _quadVao );
-        gl.BindBuffer( GL_ARRAY_BUFFER, _quadVbo );
+        bindVertices( _quadVao, _quadVbo, vertexLayout );
         gl.BufferData( GL_ARRAY_BUFFER, _bbVerts.size() * sizeof( float ), _bbVerts.data(), GL_DYNAMIC_DRAW );
         const Mat4 id = identity();
         gl.UniformMatrix4fv( gl.GetUniformLocation( _prog, "uMvp" ), 1, 0, viewProj.data() );
@@ -1034,11 +1105,10 @@ class Renderer3D final : public PixelRenderer {
           if ( !_atlasTex ) gl.GenTextures( 1, &_atlasTex );
           texParams( _atlasTex, GL_CLAMP_TO_EDGE );
           gl.PixelStorei( GL_UNPACK_ALIGNMENT, 4 );
-          gl.TexImage2D( GL_TEXTURE_2D, 0, GL_RGBA8, _atlas.width(), _atlas.height(), 0, GL_BGRA, GL_UNSIGNED_BYTE, _atlas.pixels().data() );
+          uploadBGRA( _atlas.width(), _atlas.height(), reinterpret_cast<const uint32_t*>( _atlas.pixels().data() ) );
           _atlasTexVersion = _atlas.version();
         }
-        gl.BindVertexArray( _quadVao );
-        gl.BindBuffer( GL_ARRAY_BUFFER, _quadVbo );
+        bindVertices( _quadVao, _quadVbo, vertexLayout );
         gl.BufferData( GL_ARRAY_BUFFER, _bbVerts.size() * sizeof( float ), _bbVerts.data(), GL_DYNAMIC_DRAW );
         const m3::Mat4 id = m3::identity();
         gl.UniformMatrix4fv( gl.GetUniformLocation( _prog, "uMvp" ), 1, 0, viewProj.data() );
@@ -1076,22 +1146,24 @@ class Renderer3D final : public PixelRenderer {
       gl.ActiveTexture( GL_TEXTURE0 );
       gl.BindTexture( GL_TEXTURE_2D, _overlayTex );
       gl.PixelStorei( GL_UNPACK_ALIGNMENT, 4 );
-      gl.TexImage2D( GL_TEXTURE_2D, 0, GL_RGBA8, _fbW, _fbH, 0, GL_BGRA, GL_UNSIGNED_BYTE, _fb.data() );  // ARGB words
+      uploadBGRA( _fbW, _fbH, reinterpret_cast<const uint32_t*>( _fb.data() ) );  // ARGB words
       gl.Uniform1i( gl.GetUniformLocation( _overlayProg, "tex" ), 0 );
-      gl.BindVertexArray( _overlayVao );
+      bindVertices( _overlayVao, _overlayVbo, overlayLayout );
       gl.DrawArrays( GL_TRIANGLE_STRIP, 0, 4 );
     }
 
     void readBack() {
       gfx::Pixels px( static_cast<size_t>( _fbW ) * _fbH );
       gl.PixelStorei( GL_PACK_ALIGNMENT, 4 );
-      gl.ReadPixels( 0, 0, _fbW, _fbH, GL_BGRA, GL_UNSIGNED_BYTE, px.data() );
+      gl.ReadPixels( 0, 0, _fbW, _fbH, s_es2 ? GL_RGBA : GL_BGRA, GL_UNSIGNED_BYTE, px.data() );
+      if ( s_es2 ) for ( auto& c : px ) c = ( c & 0xFF00FF00u ) | ( ( c >> 16 ) & 0xFFu ) | ( ( c & 0xFFu ) << 16 );
       _capture.resize( px.size() );
       for ( int y = 0; y < _fbH; ++y )  // GL rows are bottom first
         for ( int x = 0; x < _fbW; ++x ) _capture[static_cast<size_t>( y ) * _fbW + x] = px[static_cast<size_t>( _fbH - 1 - y ) * _fbW + x] | 0xFF000000u;
     }
 
     static GL gl;
+    static inline bool s_es2 = false;  // OpenGL ES 2.0 context (see contextAttributes)
     SDL_GLContext _ctx{};
     static constexpr int SHADOW_SIZE = 2048;
     static constexpr float SHADOW_EXTENT = 22.f;  // meters each side of the shadow focus

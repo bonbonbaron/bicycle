@@ -275,7 +275,7 @@ function( bicycle_luajit )
       endif()
       if ( CMAKE_CROSSCOMPILING )
         # LuaJIT builds code generators (buildvm, minilua) for the build machine first.
-        list( APPEND margs "HOST_CC=${BICYCLE_HOST_CC}" "TARGET_SYS=${CMAKE_SYSTEM_NAME}" )
+        list( APPEND margs "HOST_CC=${BICYCLE_LUAJIT_HOST_CC}" "TARGET_SYS=${CMAKE_SYSTEM_NAME}" )
       endif()
       if ( APPLE AND CMAKE_OSX_DEPLOYMENT_TARGET )
         list( APPEND margs "MACOSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET}" )
@@ -299,6 +299,8 @@ function( bicycle_luajit )
   message( STATUS "bicycle: LuaJIT 2.1 (fetched): ${lib}" )
 endfunction()
 set( BICYCLE_HOST_CC "cc" CACHE STRING "Host C compiler for LuaJIT's build tools when cross-compiling" )
+# LuaJIT's buildvm must have the target's pointer size: a 32-bit target (armhf) needs e.g. "gcc -m32" here.
+set( BICYCLE_LUAJIT_HOST_CC "${BICYCLE_HOST_CC}" CACHE STRING "Host C compiler for LuaJIT's buildvm/minilua (32-bit targets: gcc -m32)" )
 # Cross-compiling ncurses (e.g. for a Raspberry Pi): autoconf needs --host, and ncurses builds helper programs
 # with BUILD_CC for the build machine.
 set( BICYCLE_NCURSES_CROSS )

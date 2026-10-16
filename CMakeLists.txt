@@ -31,6 +31,7 @@ endif()
 message( STATUS "bicycle: render mode ${BICYCLE_RENDER}" )
 
 # Release: zero file I/O at run time (see "Release builds" below and README).
+option( BICYCLE_GLES2 "3D: use OpenGL ES 2.0 (GLSL 100, no VAOs, no shadows) instead of trying GL 3.3 core first" OFF )
 option( BICYCLE_RELEASE "Embed all assets and scripts in the executable; no file I/O at run time" OFF )
 option( BICYCLE_EMBED_GM_SF2 "Release: embed sf2/default-GM.sf2 (the GM fallback, ~30 MB) in the executable" OFF )
 
@@ -269,6 +270,13 @@ add_executable( o ${BICYCLE_SOURCES} )
 add_dependencies( o ids )
 target_include_directories( o PRIVATE "${CMAKE_SOURCE_DIR}" )  # gen/ids.h
 target_include_directories( o PRIVATE include )
+if ( BICYCLE_GLES2 )
+  target_compile_definitions( o PRIVATE BICYCLE_GLES2 )
+endif()
+# 32-bit ARM cross builds with clang/zig (compiler-rt): libgcc-named helpers LuaJIT calls.
+if ( CMAKE_SYSTEM_PROCESSOR MATCHES "^arm" AND CMAKE_C_COMPILER_ID STREQUAL "Clang" AND CMAKE_SIZEOF_VOID_P EQUAL 4 )
+  target_sources( o PRIVATE src/platform/arm32_libgcc_compat.c )
+endif()
 target_link_libraries( o PRIVATE bicycle_data bicycle_luajit bicycle_fluidsynth Threads::Threads )
 target_compile_definitions( o PRIVATE BICYCLE_RENDER_${BICYCLE_RENDER} )
 if ( BICYCLE_RELEASE_ASSETS )
@@ -285,17 +293,20 @@ else()
   target_link_libraries( o PRIVATE bicycle_sdl3 )
 endif()
 # The executable is o (ASCII), o-2d or o-3d, so builds of different modes can sit side by side in the repo root.
+# Where o/o-2d/o-3d go: the repo root (default), or e.g. the build directory for cross builds, so they don't
+# replace the machine's own executables.
+set( BICYCLE_OUTPUT_DIR "${CMAKE_SOURCE_DIR}" CACHE PATH "Directory for the o/o-2d/o-3d executable" )
 set( BICYCLE_EXE_NAME o )
 if ( NOT BICYCLE_RENDER STREQUAL "ASCII" )
   string( TOLOWER "o-${BICYCLE_RENDER}" BICYCLE_EXE_NAME )
 endif()
 set_target_properties( o PROPERTIES
   OUTPUT_NAME ${BICYCLE_EXE_NAME}
-  RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}
-  RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_SOURCE_DIR}
-  RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_SOURCE_DIR}
-  RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO ${CMAKE_SOURCE_DIR}
-  RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL ${CMAKE_SOURCE_DIR}
+  RUNTIME_OUTPUT_DIRECTORY ${BICYCLE_OUTPUT_DIR}
+  RUNTIME_OUTPUT_DIRECTORY_DEBUG ${BICYCLE_OUTPUT_DIR}
+  RUNTIME_OUTPUT_DIRECTORY_RELEASE ${BICYCLE_OUTPUT_DIR}
+  RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO ${BICYCLE_OUTPUT_DIR}
+  RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL ${BICYCLE_OUTPUT_DIR}
   # Lua finds the engine's extern "C" functions through LuaJIT's FFI (ffi.C.*), which looks them up among the
   # executable's exported symbols: -rdynamic on Linux, an export table on Windows.
   ENABLE_EXPORTS ON
