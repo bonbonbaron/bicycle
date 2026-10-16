@@ -52,15 +52,18 @@ void SpriteAtlas::rebuildIfDirty() {
 }
 
 void SpriteAtlas::prune() {
-  std::vector<std::shared_ptr<const BImg>> keep;
-  for ( auto& img : _imgs ) {
-    if ( img.use_count() > 1 ) keep.push_back( std::move( img ) );
-  }
-  if ( keep.size() == _imgs.size() ) {
+  // Until nothing changes: a palette variant holds its graybody (BImg::gray), so dropping the variant can leave
+  // the graybody with only the atlas's reference.
+  const size_t before = _imgs.size();
+  for ( bool dropped = true; dropped; ) {
+    std::vector<std::shared_ptr<const BImg>> keep;
+    for ( auto& img : _imgs ) {
+      if ( img.use_count() > 1 ) keep.push_back( std::move( img ) );
+    }
+    dropped = keep.size() != _imgs.size();
     _imgs = std::move( keep );
-    return;
   }
-  _imgs = std::move( keep );
+  if ( _imgs.size() == before ) return;
   _idx.clear();
   for ( size_t i = 0; i < _imgs.size(); ++i ) _idx[_imgs[i].get()] = i;
   _entries.clear();

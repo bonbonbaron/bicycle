@@ -15,6 +15,9 @@
 #include "data/Pack.h"
 #include "data/BImg.h"
 #include <sstream>
+#include <functional>
+#include <unordered_map>
+#include <cstring>
 #include <chrono>
 #include <array>
 #include <cctype>
@@ -68,6 +71,37 @@ namespace bicycle {
     auto bytes = assets::read( path, mem::TEMPORARY );
     if ( !bytes ) return std::nullopt;
     return BImg::parse( *bytes );
+  }
+
+  // Graybodies are loaded once and shared: every entity (and every palette variant) drawing the same pixels gets
+  // the same image while any of them is alive. Weak entries, so a scene's images still go when it unloads.
+  static std::unordered_map<std::string, std::weak_ptr<const BImg>> sharedImages;
+  static auto sharedImage( const std::string& key, const std::function<std::optional<BImg>()>& make )
+      -> std::shared_ptr<const BImg> {
+    if ( auto it = sharedImages.find( key ); it != sharedImages.end() ) {
+      if ( auto p = it->second.lock() ) return p;
+    }
+    auto img = make();
+    if ( !img ) return nullptr;
+    auto p = std::make_shared<const BImg>( std::move( *img ) );
+    sharedImages[key] = p;
+    return p;
+  }
+  static auto loadGraybody( const std::string& path ) -> std::shared_ptr<const BImg> {
+    return sharedImage( path, [&] { return loadBImg( path ); } );
+  }
+  // "i:rgba,i:rgba,..." (decimal; RGBA with R in the low byte) -> palette entries to replace.
+  static auto parsePalette( const char* spec ) -> std::vector<std::pair<int, uint32_t>> {
+    std::vector<std::pair<int, uint32_t>> out;
+    if ( !spec ) return out;
+    std::istringstream in( spec );
+    std::string item;
+    while ( std::getline( in, item, ',' ) ) {
+      const auto colon = item.find( ':' );
+      if ( colon == std::string::npos ) continue;
+      out.emplace_back( std::stoi( item.substr( 0, colon ) ), static_cast<uint32_t>( std::stoul( item.substr( colon + 1 ) ) ) );
+    }
+    return out;
   }
 
   Entity push( std::shared_ptr<Window> shared ) {
@@ -175,9 +209,80 @@ namespace bicycle {
 
     // A pixel image from .bimg layers (newline-separated paths, bottom layer first) composited in order. Layers
     // are frame strips of the same size (scripts/aseprite/sprite.lua pixel export). Returns false if one's missing.
+    // A palette variant of a sprite (genome palette = "<name>_palette"): each layer's graybody with some palette
+    // entries replaced ("i:rgba,..."). Variants share their graybody's pixels (BImg::gray) and are themselves
+    // shared by every entity using the same sprite + palette.
+    bool newPixelImage( Entity entity, const char* paths );
+    bool newPixelImagePal( Entity entity, const char* paths, const char* palette ) {
+      if ( !palette || !*palette ) return newPixelImage( entity, paths );
+      std::vector<std::string> layers;
+      {
+        std::istringstream in( paths );
+        std::string path;
+        while ( std::getline( in, path ) ) if ( !path.empty() ) layers.push_back( path );
+      }
+      if ( layers.size() != 1 ) {  // composites are true color: recolor each layer, then stack them
+        for ( auto& l : layers ) {
+          auto gray = loadGraybody( l );
+          if ( !gray || !gray->indexed() ) return false;
+        }
+        auto img = sharedImage( std::string( paths ) + "|" + palette, [&]() -> std::optional<BImg> {
+          std::optional<BImg> out;
+          const auto pal = parsePalette( palette );
+          for ( auto& l : layers ) {
+            auto gray = loadGraybody( l );
+            if ( !out ) {
+              out.emplace();
+              out->w = gray->w;
+              out->h = gray->h;
+              out->rgba.assign( static_cast<size_t>( gray->w ) * gray->h, 0u );
+            }
+            auto p = gray->palette;
+            for ( auto [i, c] : pal ) if ( i >= 0 && static_cast<size_t>( i ) < p.size() ) p[i] = c;
+            for ( int y = 0; y < std::min( out->h, gray->h ); ++y )
+              for ( int x = 0; x < std::min( out->w, gray->w ); ++x ) {
+                const uint8_t k = gray->indices[static_cast<size_t>( y ) * gray->w + x];
+                if ( k && ( p[k] >> 24 ) ) out->rgba[static_cast<size_t>( y ) * out->w + x] = p[k];
+              }
+          }
+          return out;
+        } );
+        if ( !img ) return false;
+        World::set<Image>( entity, pixelImage( img ) );
+        World::get<Box>( entity ).size = World::get<Image>( entity ).size;
+        return true;
+      }
+      auto gray = loadGraybody( layers[0] );
+      if ( !gray || !gray->indexed() ) return false;
+      auto img = sharedImage( layers[0] + "|" + palette, [&]() -> std::optional<BImg> {
+        BImg v;
+        v.w = gray->w;
+        v.h = gray->h;
+        v.palette = gray->palette;
+        for ( auto [i, c] : parsePalette( palette ) ) {
+          if ( i >= 0 && static_cast<size_t>( i ) < v.palette.size() ) v.palette[i] = c;
+        }
+        v.gray = gray;  // the indices stay the graybody's
+        return v;
+      } );
+      World::set<Image>( entity, pixelImage( img ) );
+      World::get<Box>( entity ).size = World::get<Image>( entity ).size;
+      return true;
+    }
+
     bool newPixelImage( Entity entity, const char* paths ) {
+      // One layer: the shared graybody itself (many coins, one image).
+      std::string path( paths );
+      while ( !path.empty() && path.back() == '\n' ) path.pop_back();
+      if ( !path.empty() && path.find( '\n' ) == std::string::npos ) {
+        auto img = loadGraybody( path );
+        if ( !img ) return false;
+        World::set<Image>( entity, pixelImage( img ) );
+        World::get<Box>( entity ).size = World::get<Image>( entity ).size;
+        return true;
+      }
       std::istringstream in( paths );
-      std::string path;
+      path.clear();
       std::optional<BImg> out;
       int nLayers{};
       while ( std::getline( in, path ) ) {

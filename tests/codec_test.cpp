@@ -365,12 +365,12 @@ static void testSkins() {
     std::printf( "  skin %-9s %zu bytes  t err %.2g  q err %.2g  pose err %.2g\n", quant ? "quantized" : "float", bytes.size(), tErr, qErr, mErr );
   }
   // The rig scripts/blender/export.py wrote, and its mesh.
-  if ( auto f = readFile( "test/genome/models/pilgrim3d.bskin" ) ) {
+  if ( auto f = readFile( "test/genome/model/pilgrim3d.bskin" ) ) {
     auto d = skin::decode( *f );
     CHECK( d && d->joints.size() == 7 && d->action( "idle" ) && d->action( "walk" ), "pilgrim3d.bskin: decode / actions" );
     MeshData m;
     std::string err;
-    if ( d && readObj( "test/genome/models/pilgrim3d.obj", m, err ) ) {
+    if ( d && readObj( "test/genome/model/pilgrim3d.obj", m, err ) ) {
       CHECK( applySkinVertices( m, *d ), "pilgrim3d: .bskin vertices don't match the OBJ" );
       size_t badSum = 0;
       for ( size_t i = 0; i + 3 < m.weights.size(); i += 4 ) badSum += m.weights[i] + m.weights[i + 1] + m.weights[i + 2] + m.weights[i + 3] != 255;
@@ -379,7 +379,7 @@ static void testSkins() {
     }
   }
   else {
-    CHECK( false, "test/genome/models/pilgrim3d.bskin missing" );
+    CHECK( false, "test/genome/model/pilgrim3d.bskin missing" );
   }
 }
 

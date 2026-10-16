@@ -2,7 +2,7 @@
 #   blender -b --factory-startup --python scripts/blender/make_level.py -- plat   -> plat3d/blender/plat3d.blend
 #   blender -b --factory-startup --python scripts/blender/make_level.py -- fps    -> fps3d/blender/fps3d.blend
 # then export like any scene:
-#   blender -b plat3d/blender/plat3d.blend --python scripts/blender/export.py -- plat3d/genome/models
+#   blender -b plat3d/blender/plat3d.blend --python scripts/blender/export.py -- plat3d/genome
 # Level geometry is authored here in game coordinates (meters, Y up; converted to Blender's Z up) as separate
 # objects (so the renderer can frustum-cull them), box-mapped UVs at TEX_SCALE texture repeats per meter, with
 # small procedural textures (written as .bimg by the exporter). Objects with bicycle_role = "character" (coins,

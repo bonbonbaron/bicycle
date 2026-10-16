@@ -171,7 +171,7 @@ function Scene.new( tbl )
   return instance
 end
 
--- True-3D scenes (docs/true-3d.md): tbl.world3d = { level = "models/scene3d.lua" (collision + drawing),
+-- True-3D scenes (docs/true-3d.md): tbl.world3d = { level = "level/scene3d.lua" (collision + drawing),
 --   sky = { r, g, b }, fog = { r, g, b, near, far }, light = { dir, color, ambient, shadows },
 --   spawns = { <name> = { x, y, z, yaw } }, build = function( scene ) ... end  (makes the scene's own bodies,
 --   doors (W.door) and anything else) }. Persistent bodies (W.Body.new{ persist = true }) are carried over.
@@ -195,13 +195,13 @@ function Scene.start( name )
 end
 
 -- 3D mode: static scenery from scripts/blender/export.py's scene3d.lua (ground, props), or the file the scene names
--- with scenery3d = "<name>" (models/<name>.lua; false for none). Characters in it are placed by their genomes'
+-- with scenery3d = "<name>" (level/<name>.lua; false for none). Characters in it are placed by their genomes'
 -- model genes instead.
 function Scene:loadScenery3d(Genome, tbl)
   if Genome.Sprite.renderMode() ~= "3d" then return end
   if tbl and tbl.scenery3d == false then return end
   local dir = "./"..gameName.."/genome/"
-  local file = dir.."models/"..( tbl and tbl.scenery3d or "scene3d" )..".lua"
+  local file = dir.."level/"..( tbl and tbl.scenery3d or "scene3d" )..".lua"
   if not Asset.exists( file ) then return end
   local scenery = Asset.dofile( file )
   for _, obj in ipairs( scenery.objects ) do
@@ -422,7 +422,8 @@ local function swap( name, opts )
   Genome.byName = {}
   for pname, g in pairs( Scene.persistent ) do Genome.byName[pname] = g.id end
   Scene.carriedLayer = {}
-  Scene.musicMode = opts.music or "crossfade"
+  -- How the music changes: Scene.go's opts.music, else the entered scene's music.transition, else crossfade.
+  Scene.musicMode = opts.music or ( tbl.music and tbl.music.transition ) or "crossfade"
   Scene.new( tbl )
   -- 5. persistent entities arrive
   local defaultLayer = firstFgLayer( tbl )
@@ -516,7 +517,8 @@ local function startTransition( p )
   -- Music: fade out unless the next scene plays the same song (or opts.music = "keep" / "cut").
   local nextMusic = sceneTable( p.name ).music
   local Sound = require( "Sound" )
-  S.trans.fadeMusic = ( opts.music or "crossfade" ) == "crossfade" and Sound.song and
+  local musicMode = opts.music or ( nextMusic and nextMusic.transition ) or "crossfade"
+  S.trans.fadeMusic = musicMode == "crossfade" and Sound.song and
                       not ( nextMusic and nextMusic.song == Sound.song )
   if S.trans.fadeMusic then ffi.C.musicFade( 0, half * 1000 / FPS ) end
 end

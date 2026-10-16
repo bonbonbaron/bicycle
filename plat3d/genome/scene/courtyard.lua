@@ -4,7 +4,7 @@ local W = require( "World3D" )
 local courtyard = { name = "Courtyard" }
 courtyard.sfx = { soundfont = "music/sfx.sf2", program = 120, sounds = { coin = 72, jump = 76, land = 55 } }
 courtyard.world3d = {
-  level = "models/scene3d.lua",
+  level = "level/scene3d.lua",
   sky = { 0.50, 0.70, 0.95 },
   fog = { 0.62, 0.76, 0.95, 25, 70 },
   light = { { -0.45, -1.0, -0.35 }, { 1.0, 0.96, 0.88 }, 0.40, true },

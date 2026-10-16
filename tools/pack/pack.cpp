@@ -4,7 +4,7 @@
 // "scripts/<x>.lua", fonts/*.ttf as "fonts/<x>.ttf" and optionally the GM SoundFont as "sf2/default-GM.sf2").
 // Packs <game>/main.lua and everything under <game>/genome:
 //   .bimg          indexed: strip-coded (jollybean's strips) or deflated, whichever is smaller; true color: deflated
-//   models/*.obj   Edgebreaker-coded into models/<name>.bmesh (with its .mtl); the .obj/.mtl aren't packed
+//   model/*.obj    Edgebreaker-coded into model/<name>.bmesh (with its .mtl); the .obj/.mtl aren't packed
 //   .png next to a .bimg of the same name (old exports) and .mtl: skipped
 //   anything else  deflated, or stored if deflate doesn't help
 // Prints each entry's method and sizes and totals per file type.
@@ -99,7 +99,7 @@ int main( int argc, char** argv ) {
   if ( fs::exists( game / "main.lua" ) ) files.push_back( game / "main.lua" );
   if ( fs::exists( game / "genome" ) ) {
     for ( auto& e : fs::recursive_directory_iterator( game / "genome" ) ) {
-      if ( e.is_regular_file() ) files.push_back( e.path() );
+      if ( e.is_regular_file() && e.path().filename() != ".gitkeep" ) files.push_back( e.path() );  // .gitkeep: empty layout dirs
     }
   }
   std::sort( files.begin(), files.end() );

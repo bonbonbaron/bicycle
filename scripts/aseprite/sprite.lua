@@ -244,7 +244,7 @@ local function makeSprite(ctr, globAnim)
 			if layer.isTilemap then
 
 				dbgp("PROCESSING LAYER "..layer.name.." AS A TILEMAP")
-				local outputColormapFp = cfg.genomePath..layerName.."_tileset_colormap.png"
+				local outputColormapFp = cfg.pathFor(layerName.."_tileset_colormap", "png")
 				local tileset = layer.tileset
 				local TILE_W = tileset.grid.tileSize.width
 				local TILE_H = tileset.grid.tileSize.height
@@ -331,7 +331,7 @@ local function makeSprite(ctr, globAnim)
 				if cfg.pixels then
 					outputTileset.pixels = layerName.."_tileset_pixels"
 					outputTileset.colormap = outputTileset.pixels
-					writeBimg(cfg.genomePath..outputTileset.pixels..".bimg", tilesetW, TILE_H, colorpal, tilesetPixels)
+					writeBimg(cfg.pathFor(outputTileset.pixels, "bimg"), tilesetW, TILE_H, colorpal, tilesetPixels)
 				else
 					outputTilesetImg:saveAs(outputColormapFp)
 				end
@@ -342,12 +342,11 @@ local function makeSprite(ctr, globAnim)
 				dbgp("PROCESSING LAYER "..layer.name.." AS AN IMAGE")
 				-- Decide between outputting ASCII art or pixel art.
 				local colormapName = layerName.."_colormap"
-				local outputColormapFp = cfg.genomePath..colormapName.."."
 				local ext = "png"
 				if cfg.ascii then
 					ext = "lua"
 				end
-				outputColormapFp = outputColormapFp .. ext
+				local outputColormapFp = cfg.pathFor(colormapName, ext)
 				-- First, obtain the total size of the output image.
 				local outputW = 0
 				local outputH = 0
@@ -432,7 +431,7 @@ local function makeSprite(ctr, globAnim)
 					outputLayer.pixels = layerName.."_pixels"
 					outputLayer.pixelW = outputW
 					outputLayer.pixelH = outputH
-					writeBimg(cfg.genomePath..outputLayer.pixels..".bimg", outputW, outputH, colorpal, framePixels)
+					writeBimg(cfg.pathFor(outputLayer.pixels, "bimg"), outputW, outputH, colorpal, framePixels)
 				end
 				-- If there are any animation frames, write out the source rectangles for each frame.
 				-- Collision map

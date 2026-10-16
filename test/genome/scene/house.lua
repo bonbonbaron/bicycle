@@ -2,7 +2,7 @@
 local house = {}
 house.name = "Cottage"
 house.bg = "house"
-house.scenery3d = "house3d"   -- 3D: test/genome/models/house3d.lua (floor + walls) instead of the meadow
+house.scenery3d = "house3d"   -- 3D: test/genome/level/house3d.lua (floor + walls) instead of the meadow
 house.spawns = { entry = { 20, 40 } }
 house.fg = {
   [2] = {

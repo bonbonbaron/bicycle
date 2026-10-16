@@ -14,4 +14,23 @@ local options = {
     genomePath = os.getenv("BICYCLE_GENOME_PATH") or (current_dir .. "../../test/genome/")
 }
 
+-- The genome tree layout (scripts/GenomeLayout.lua, shared with the engine): every output goes to the subfolder
+-- for its kind, e.g. pilgrim_body_palette.lua -> <genome>/body/palette/color/ (README, "Genome layout").
+options.layout = dofile(current_dir .. "../GenomeLayout.lua")
+
+local function makeDirs(dir)
+    if app and app.fs and app.fs.makeAllDirectories then
+        app.fs.makeAllDirectories(dir)
+    else
+        os.execute('mkdir -p "' .. dir .. '"')
+    end
+end
+
+-- Full path for a generated file by its bare name and extension (directories are created as needed).
+function options.pathFor(name, ext)
+    local dir = options.genomePath .. options.layout.dirFor(name)
+    makeDirs(dir)
+    return dir .. name .. "." .. ext
+end
+
 return options

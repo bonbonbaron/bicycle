@@ -39,7 +39,7 @@ feet. Demos: `./o-3d plat3d` (third person) and `./o-3d fps3d` (first person).
 ```lua
 local W = require("World3D")
 local Input = require("Input3D")
-W.level( "./mygame/genome/models/scene3d.lua" )      -- static: draw + collide; decor: draw; collider: collide
+W.level( "./mygame/genome/level/scene3d.lua" )      -- static: draw + collide; decor: draw; collider: collide
 W.View.light( { -0.45, -1, -0.35 }, { 1, 0.96, 0.88 }, 0.4, true )   -- direction, color, ambient, shadows
 W.View.fog( 0.62, 0.76, 0.95, 25, 70 )
 local hero = W.Body.new{ kind = "character", x = 0, y = 1, z = 8, model = "pilgrim3d", modelYaw = 90, collType = 1 }
@@ -68,7 +68,7 @@ coin:spin( 180 )  platform:path( { { 2, 0.75, -14 }, { 2, 4, -14 } }, 1.2, true 
 -- plat3d/genome/scene/bonus.lua
 local W = require( "World3D" )
 return { name = "Bonus room", sfx = { ... },
-  world3d = { level = "models/bonus3d.lua", sky = { r, g, b }, fog = { r, g, b, near, far },
+  world3d = { level = "level/bonus3d.lua", sky = { r, g, b }, fog = { r, g, b, near, far },
               light = { dir, color, ambient, shadows }, spawns = { entry = { x, y, z, yaw } },
               build = function( scene )            -- the scene's own bodies, loaded into the SCENE pool
                 W.Body.new{ kind = "kinematic", ... }

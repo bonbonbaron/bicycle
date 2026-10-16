@@ -35,7 +35,7 @@ auto BImg::serialize() const -> std::string {
   bytes::u16( o, 0 );
   if ( indexed() ) {
     for ( auto c : palette ) bytes::u32( o, c );
-    o.append( reinterpret_cast<const char*>( indices.data() ), indices.size() );
+    o.append( reinterpret_cast<const char*>( idx().data() ), idx().size() );
   }
   else {
     for ( auto c : rgba ) bytes::u32( o, c );

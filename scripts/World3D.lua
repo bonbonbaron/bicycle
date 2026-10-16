@@ -2,7 +2,7 @@
 -- yaw 0 looks down -Z. An entity's position is its feet. 2D games don't need this module.
 --
 --   local W = require("World3D")
---   W.level( "./plat3d/genome/models/scene3d.lua" )       -- draw + collide every static object
+--   W.level( "./plat3d/genome/level/scene3d.lua" )       -- draw + collide every static object
 --   local hero = W.Body.new{ kind = "character", x = 0, y = 1, z = 0, model = "hero3d", modelYaw = -90 }
 --   W.Camera.orbit( hero.id, { distance = 6, height = 1.4, rate = 10 } )
 --   function onFrame( dt ) hero:wish( vx, vz ) if jump then hero:jump() end end
@@ -65,7 +65,8 @@ local rad, deg = math.rad, math.deg
 -- collides, "decor" is only drawn, "collider" only collides (invisible walls), "character" is skipped (placed by
 -- the game). Returns the scene table.
 function W.level( scenePath, cell )
-  local dir = scenePath:match( "^(.*/)models/[^/]*$" ) or scenePath:match( "^(.*/)" )
+  -- mesh names in the list are relative to the game's genome/ (e.g. "model/ground")
+  local dir = scenePath:match( "^(.*/genome/)" ) or scenePath:match( "^(.*/)" )
   local scene = Asset.dofile( scenePath )
   for _, obj in ipairs( scene.objects ) do
     local mesh = dir..obj.mesh..".bmesh"
@@ -83,7 +84,7 @@ end
 -- Bodies -------------------------------------------------------------------------------------------------------------
 -- opts: kind = "character" | "kinematic" | "box" | nil (transform only), x, y, z, yaw, radius, height,
 --       half = { x, y, z } (box), collType (nonzero: onCollision/onUncollision reach the entity), solid,
---       model (mesh name under <game>/genome/models), modelYaw, scale, image (a billboard sprite: a .bimg path),
+--       model (mesh name under <game>/genome/model), modelYaw, scale, image (a billboard sprite: a .bimg path),
 --       gravity, jumpSpeed, accel, airAccel, maxSlope, step
 W.Body = {}
 W.Body.__index = W.Body
@@ -126,7 +127,7 @@ function W.Body.make( opts )
     C.bodyTune( id, opts.gravity or 25, opts.jumpSpeed or 9, opts.accel or 60, opts.airAccel or 18, opts.maxSlope or 50, opts.step or 0.35 )
   end
   if opts.model then
-    if not ffi.C.setModel( id, "./"..gameName.."/genome/models/"..opts.model..".bmesh" ) then
+    if not ffi.C.setModel( id, "./"..gameName.."/genome/model/"..opts.model..".bmesh" ) then
       error( "3D: can't load model "..opts.model )
     end
   end

@@ -14,7 +14,7 @@ if ffi.C.renderMode() ~= 2 then error( "fps3d needs the 3D build (-DBICYCLE_REND
 
 ffi.C.pushScene()
 Sound.load( nil, { soundfont = "music/sfx.sf2", program = 120, sounds = { shot = 60, hit = 72, ping = 76 } } )
-W.level( "./fps3d/genome/models/scene3d.lua" )
+W.level( "./fps3d/genome/level/scene3d.lua" )
 W.View.sky( 0.30, 0.34, 0.42 )
 W.View.fog( 0.30, 0.34, 0.42, 18, 60 )
 W.View.light( { 0.35, -1.0, 0.5 }, { 1.0, 0.95, 0.85 }, 0.42, true )

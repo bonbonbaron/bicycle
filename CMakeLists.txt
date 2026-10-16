@@ -274,4 +274,8 @@ if ( NOT CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_NAME STREQUAL "Linux" )
               ${lifecycleGame} ${lifecyclePair} WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}" )
     set_tests_properties( scene-lifecycle PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 400 )
   endif()
+  # The Aseprite door/song scripts in batch mode (skipped unless BICYCLE_ASEPRITE points at an aseprite binary).
+  set( BICYCLE_ASEPRITE "$ENV{BICYCLE_ASEPRITE}" CACHE FILEPATH "Aseprite binary for the aseprite-scene-scripts test" )
+  add_test( NAME aseprite-scene-scripts COMMAND sh "${CMAKE_SOURCE_DIR}/tests/aseprite_scene_scripts_test.sh" "${CMAKE_SOURCE_DIR}" )
+  set_tests_properties( aseprite-scene-scripts PROPERTIES SKIP_RETURN_CODE 77 ENVIRONMENT "BICYCLE_ASEPRITE=${BICYCLE_ASEPRITE}" )
 endif()

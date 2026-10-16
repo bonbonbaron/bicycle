@@ -1,10 +1,10 @@
--- plat3d's second scene: a walled bonus room with blocks and a ring of coins (models/bonus3d.lua). The glowing
+-- plat3d's second scene: a walled bonus room with blocks and a ring of coins (level/bonus3d.lua). The glowing
 -- flag at the far end leads back to the courtyard's tower (spawn from_bonus).
 local W = require( "World3D" )
 local bonus = { name = "Bonus room" }
 bonus.sfx = { soundfont = "music/sfx.sf2", program = 120, sounds = { coin = 72, jump = 76, land = 55 } }
 bonus.world3d = {
-  level = "models/bonus3d.lua",
+  level = "level/bonus3d.lua",
   sky = { 0.18, 0.16, 0.22 },
   fog = { 0.18, 0.16, 0.22, 12, 30 },
   light = { { 0.3, -1.0, -0.5 }, { 1.0, 0.85, 0.65 }, 0.45, true },

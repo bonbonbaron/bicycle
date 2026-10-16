@@ -121,6 +121,47 @@ Add `-DBICYCLE_RENDER=2D` or `3D` for `o-2d.exe` / `o-3d.exe`. The resulting exe
 
 ## Assets
 
+### Genome layout
+
+Every game keeps its data in `<game>/genome/`, sorted by kind (`scripts/GenomeLayout.lua` is the one place the
+engine and the Aseprite exporters get these paths from):
+
+```
+<game>/genome/
+  <entity>.lua                 genomes (hero.lua, coin.lua, door.lua, redbeetle.lua, ...) and the start genome
+  body/<sprite>.lua            sprite manifests (layers, animation): what a genome's sprite = "..." names
+  body/palette/color/          *_palette.lua      gray index -> color (one per variant: green beetle, red beetle)
+  body/palette/collision/      *_collset.lua      collision index -> collision type (normal, fire, ...)
+  body/graybody/               *_pixels.bimg      palette-agnostic gray (indexed) pixels: sprites and tilesets
+  body/graybody/animation/     *_anim_src_rects.lua, *_globalAnim.lua   frames, tags, durations
+  body/graybody/collision/     *_collmap.lua, *_collRects.lua           collision regions / masks
+  body/graybody/colormap/      *_colormap.lua, *.txt                    ASCII art (and img gene text images)
+  tilemap/                     *_tilemap.lua, *_tileset.lua             background tile layouts and tilesets
+  scene/                       scene tables (scene/bg/<name>/: text backgrounds)
+  level/                       3D level / scenery lists (scene3d.lua from scripts/blender/export.py)
+  model/                       meshes (.obj/.mtl, packed .bmesh), skins (.bskin), mesh textures
+  music/                       songs (.mid) and SoundFonts (.sf2)
+```
+
+New game: `scripts/new_game.sh mygame` (or by hand: `mkdir -p mygame/genome/body/palette/{color,collision}
+mygame/genome/body/graybody/{animation,collision,colormap} mygame/genome/{tilemap,scene,level,model,music}`).
+
+**Graybody + palettes (palette swaps).** The graybody is shared by every variant of a body: its gray pixels,
+animation and collision regions are loaded once (`Sprite.load` caches it in Lua; `newPixelImage` shares one
+image per `.bimg` among all entities). A genome picks the palettes separately:
+
+```lua
+local redbeetle = { sprite = "beetle_sprite",           -- graybody (+ its animation) shared with genome/beetle.lua
+                    palette = "redbeetle_palette",      -- body/palette/color/: { colors = { [1] = 0xFF2828BE, ... } }
+                    collpal = "redbeetle_collset",      -- body/palette/collision/: { types = { [1] = "fire" } }
+                    coll = {} }                         -- no type: the collision palette picks it (region 1)
+```
+
+A color palette lists only the gray indices it recolors (RGBA, R in the low byte, as in `.bimg`); an exporter
+`*_palette.lua` works too. The variant image keeps a pointer to the graybody's indices (`BImg::gray`) instead of
+copying them, and every red beetle shares that one variant. Like a green and a red koopa: same graybody, same
+animation, different color and collision palettes.
+
 ### Dev workflow vs finalizing a game
 
 **Dev (the default)**: the engine reads loose, uncompressed files straight from the game folder: Lua and genomes,
@@ -216,7 +257,8 @@ DLLs. The `strace` check is Linux-only.
 
 ### 2D art: Aseprite
 
-`scripts/aseprite/sprite.lua` exports an `.aseprite` file to `test/genome/` (see `scripts/aseprite/README.txt`):
+`scripts/aseprite/sprite.lua` exports an `.aseprite` file into `test/genome/`'s layout (Genome layout above; see
+`scripts/aseprite/README.txt`):
 
 ```sh
 aseprite -b test/aseprite/pilgrim.aseprite --script scripts/aseprite/sprite.lua
@@ -232,8 +274,32 @@ The pixel modes use the `.bimg` files when a sprite has them, and a genome can n
 ### 3D art: Blender
 
 See `scripts/blender/README.md`: `make_scene.py` authors the test scene headless, `export.py` exports it
-(`blender -b scene.blend --python scripts/blender/export.py -- test/genome/models`), and the pack turns the OBJs
+(`blender -b scene.blend --python scripts/blender/export.py -- test/genome`), and the pack turns the OBJs
 into `.bmesh`. Genomes pick a mesh with `model = "<object>"`.
+
+### Scene tools in Aseprite: doors and music
+
+`scripts/aseprite/adddoor.lua` adds a door to a scene. Open the scene's background sprite (the game and scene
+come from its path: `test/aseprite/meadow.aseprite` is `test`'s `intro`, whose `bg = "meadow"`), select the
+doorway with the marquee (or add a slice named `door`), run File > Scripts > adddoor, and pick the target scene
+and its spawn (both drop-downs list what's in `<game>/genome/scene/`; the spawn list follows the scene). It
+writes `{ genome = "door", pos = {...}, door = { to, spawn, w, h, on } }` into the scene's first fg layer and can
+add the return spawn here (`from_<target>`, beside the door). `scripts/aseprite/addsong.lua` sets a scene's
+`music = { soundfont, song, transition }` from the game's `genome/music/*.mid` / `*.sf2` (transition:
+crossfade, cut or keep, used when the scene is entered unless `Scene.go` says otherwise).
+
+Batch mode (`--script-param list=1` prints the drop-downs' choices):
+
+```sh
+aseprite -b --script-param game=test --script-param scene=house --script-param to=intro \
+  --script-param spawn=from_house --script-param x=140 --script-param y=36 --script-param w=6 --script-param h=10 \
+  --script-param on=press --script-param return_spawn=from_intro --script scripts/aseprite/adddoor.lua
+aseprite -b --script-param game=test --script-param scene=house --script-param song=music/house.mid \
+  --script-param transition=cut --script scripts/aseprite/addsong.lua
+```
+
+`ctest -R aseprite-scene-scripts` runs both on a copy of the test game (configure with
+`-DBICYCLE_ASEPRITE=/path/to/aseprite`).
 
 ## Motion and tracking (Kinematics)
 

@@ -12,7 +12,7 @@ Everything runs headless with Blender 4.x (tested with 4.5.9 LTS), from the repo
 
 2. Export:
 
-       blender -b test/blender/meadow3d.blend --python scripts/blender/export.py -- test/genome/models
+       blender -b test/blender/meadow3d.blend --python scripts/blender/export.py -- test/genome
 
    For each mesh object: modifiers applied, triangulated (bmesh), converted to Y up, written as
    `<object>.obj` + `.mtl` (per-corner normals and UVs, one `usemtl` group per material; diffuse color from the

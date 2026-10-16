@@ -13,7 +13,14 @@ Run File > Scripts > sprite with your sprite open, or in batch mode from the rep
 
   aseprite -b path/to/thing.aseprite --script scripts/aseprite/sprite.lua
 
-Output goes to config.lua's genomePath (default: test/genome/; override with BICYCLE_GENOME_PATH).
+Output goes to config.lua's genomePath (default: test/genome/; override with BICYCLE_GENOME_PATH), each file in
+its folder of the genome layout (scripts/GenomeLayout.lua; README.md, "Genome layout"): manifests in body/,
+palettes in body/palette/color/, collision palettes in body/palette/collision/, pixels in body/graybody/,
+animation in body/graybody/animation/, collision shapes in body/graybody/collision/, ASCII colormaps in
+body/graybody/colormap/, tilemaps and tilesets in tilemap/.
+
+Scene tools: adddoor.lua (a door to another scene's spawn) and addsong.lua (the scene's music); see README.md,
+"Scene tools in Aseprite".
 Files are named <sprite>_<layer>_*.lua. Keep characters and backgrounds in separate .aseprite files.
 
 CHARACTERS (image layers)

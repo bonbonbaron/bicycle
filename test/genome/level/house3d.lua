@@ -2,7 +2,7 @@
 -- with a doorway on the left (Blender isn't needed for boxes this simple). The packer turns the .obj files into .bmesh.
 return {
   objects = {
-    { name = "house_floor", mesh = "models/house_floor", role = "static" },
-    { name = "house_walls", mesh = "models/house_walls", role = "static" },
+    { name = "house_floor", mesh = "model/house_floor", role = "static" },
+    { name = "house_walls", mesh = "model/house_walls", role = "static" },
   }
 }

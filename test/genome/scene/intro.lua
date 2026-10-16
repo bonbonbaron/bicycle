@@ -22,7 +22,9 @@ intro.fg = {
     { genome = "fairy", pos = {30, 33}, persist = true },
     { genome = "butterfly", pos = {10, 34} },
     { genome = "moth", pos = {100, 30} },
-    { genome = "beetle", pos = {150, 45} }
+    { genome = "beetle", pos = {150, 45} },
+    -- Its palette swap: same graybody and animation, red colors, fire collision (genome/redbeetle.lua).
+    { genome = "redbeetle", pos = {50, 45} }
   }
 }
 -- Music and sound effects (see tools/audio/README.md for making these from FL Studio, LMMS or midish).
