@@ -95,3 +95,21 @@ void CollisionDetector::registerEntity( Entity entity, unsigned layer ) {
 	auto& cd = getInstance();
 	cd.addEntity( entity, layer );
 }
+
+// Whoever was touching the entity hears an uncollision (as if it walked away), so nobody keeps a stale contact.
+void CollisionDetector::removeEntity( Entity entity ) {
+  for ( auto& layer : _collLayers ) {
+    std::erase( layer, entity );
+  }
+  const auto type = World::get<CollBox>( entity ).type;
+  for ( auto it = _recordedCollisions.begin(); it != _recordedCollisions.end(); ) {
+    if ( it->first == entity || it->second == entity ) {
+      const Entity other = it->first == entity ? it->second : it->first;
+      Trigger::sendUncollision( { other, entity, type } );
+      it = _recordedCollisions.erase( it );
+    }
+    else {
+      ++it;
+    }
+  }
+}

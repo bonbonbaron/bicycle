@@ -311,12 +311,64 @@ billboards in a single batched draw call. Mesh textures (which tile with GL_REPE
 Rigged models export a `.bskin` next to their mesh (see `scripts/blender/README.md`); the 3D renderer skins them on
 the GPU and `anim:set(tag)` chooses the action (`walk_left` -> `walk`). Unrigged models still turn and bob.
 
+## Scene changes
+
+`Scene.go( name, opts )` (also `Scene.goTo`, or `Scene["goto"]`: `goto` is reserved in LuaJIT) leaves the
+current scene for `genome/scene/<name>.lua` at the end of the frame:
+
+```lua
+local Scene = require('Scene')
+Scene.go( "house", { spawn = "entry", transition = "fade", duration = 0.6, music = "crossfade" } )
+-- transition: "fade" | "wipe" | "dissolve" | "none" (default: dissolve in ASCII, fade in 2D/3D)
+-- music: "crossfade" (fade out, then the new song fades in; a scene with the same song keeps playing) | "cut" | "keep"
+```
+
+A scene names its arrival points and its doors (the `door` gene: an invisible collision trigger):
+
+```lua
+house.spawns = { entry = { 20, 40 } }
+house.fg = { [2] = {
+  { genome = "door", pos = { 2, 36 }, door = { to = "intro", spawn = "from_house", w = 8, h = 12 } },
+  { genome = "keepsake", pos = { 120, 42 }, key = "keepsake" },
+} }
+```
+
+`door = { to, spawn, w, h (cells), on = "touch" | "press", transition, duration, music }`: "press" doors wait for
+the player to call `Scene.useDoor()` (the test hero does on E/Space). A door touched within half a second of
+arriving waits until the player steps off it, so spawning on a door doesn't bounce you back.
+
+Genomes with `persist = true` (the hero, the fairy) are carried over: same entity, same Lua table, same timers. The
+player lands on the spawn point, companions keep their offset from it (followers snap there instead of flying
+across the map), the camera keeps tracking with the same options, the HUD is rebuilt, and each gets
+`onSceneEnter( sceneName, spawnName )`. Everything else is despawned (`onDespawn` first).
+
+The order is fixed and runs between frames: 1. the transition covers the screen (input is frozen); 2. windows over
+the scene, then the scene's entities, are despawned; 3. the scene window pops and the SCENE memory pool is reset;
+4. the new scene loads; 5. the persistent entities arrive; 6. the transition uncovers it. A `Scene.go` during a
+change is ignored (returns false) unless `replace = true` and the screen isn't covered yet.
+
+Per-scene saved state: `Scene.state` is a Lua table kept per scene file for the whole run (put anything in it).
+`Scene.removeForever( self )` despawns an entity at the end of the frame and keeps it out of that scene from then
+on (instances are identified by `key`, or genome + position). `Scene.preload( name )` reads the next scene's Lua
+ahead of time.
+
+Memory: everything a scene loads (images, tilemaps, meshes, songs) goes into the SCENE pool
+(`BICYCLE_MEM_SCENE_MB`, default 64), which is reset on every change, only once nothing in it is still alive, so it
+never leaves a dangling pointer; anything left is reported. SoundFonts and persistent entities stay in the
+long-lived pools. `BICYCLE_SCENE_STATS=1` prints the pools on each change; `ctest -R scene-lifecycle` walks back and
+forth 20 times and fails if the SCENE pool isn't empty after each unload or its high-water mark grows.
+
+Release builds: the packer checks that every scene a door or `Scene.go( "..." )` names is in the pack.
+
+The test game: walk the hero (WASD) right into the cottage door in the meadow; inside, walk left out of the
+doorway. The fairy follows both ways; the coin on the cottage floor stays gone once picked up.
+
 ## Memory pools
 
 All engine memory comes from one arena cut into bump-allocated pools (`include/data/Mem.h`, after jollybean's
 `mem.c`): PERMANENT (asset pack), GENERAL (every `new` in the engine, std containers), TEXT (the LuaJIT heap and
 scripts), GRAPHIC (images, meshes, textures, framebuffers, GL staging), AUDIO (SoundFonts, MIDI) and TEMPORARY
-(scratch, reset every frame and after each image load). `mem::Allocator` / `mem::Vector` / `mem::String` /
+(scratch, reset every frame and after each image load) and SCENE (what the current scene loaded; see Scene changes). `mem::Allocator` / `mem::Vector` / `mem::String` /
 `mem::Resource` (pmr) put std containers in a pool. Sizes: `-DBICYCLE_MEM_<POOL>_MB=` or the same environment
 variable; overflowing a pool is fatal and names it. `BICYCLE_MEM_STATS=1` prints high-water marks at exit.
 
@@ -327,6 +379,8 @@ still uses malloc. fluidsynth's cpp11 thread code is patched at fetch time (new 
 
 ## Environment variables
 
+* `BICYCLE_SCENE_STATS=1`: print the memory pools on every scene change. `BICYCLE_SCENE_CYCLE=<n>[:<a>:<b>:<frames>]`:
+  make n scene changes between scenes a and b (default intro and house), one every <frames> frames, then quit.
 * `BICYCLE_MODEL_ACTION=<action>`: 3D, pin every rigged model to one action.
 
 `BICYCLE_MAX_FRAMES=<n>`: quit after n frames (headless tests).

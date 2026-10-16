@@ -53,6 +53,17 @@ void Timer::stop( unsigned timerId ) {
   _availableTimers.set( timerId, true );
 }
 
+void Timer::stopEntity( const Entity entity ) {
+  for ( unsigned id = 0; id < MAX_NUM_TIMERS; ++id ) {
+    if ( !_availableTimers.test( id ) && _msgs.at( id ).entity == entity ) {
+      _decrementers.at( id ) = 0;
+      _times.at( id ) = 0;
+      _msgs.at( id ) = Timeout{};
+      _availableTimers.set( id, true );
+    }
+  }
+}
+
 void Timer::pause( const TimerId timerId ) {
   _decrementers.at(timerId) = 0;
 }

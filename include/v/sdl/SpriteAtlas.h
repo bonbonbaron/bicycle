@@ -21,6 +21,8 @@ class SpriteAtlas {
     void add( const std::shared_ptr<const BImg>& img );           // no-op if already in
     auto entry( const std::shared_ptr<const BImg>& img ) -> Entry;  // adds it if needed; rebuilds if dirty
     void rebuildIfDirty();
+    // Drops images nothing else holds any more (an unloaded scene's), so their pixels are freed; re-planned lazily.
+    void prune();
     auto pixels() const -> const mem::Vector<uint32_t, mem::GRAPHIC>& { return _px; }  // ARGB, top row first
     auto width() const -> int { return _w; }
     auto height() const -> int { return _h; }

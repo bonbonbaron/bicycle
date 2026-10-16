@@ -47,6 +47,7 @@ class PixelRenderer : public Renderer {
     void setAttr( WinHandle win, int attr, bool on ) override;
     void presentWindow( WinHandle ) override {}
     void endFrame() override;
+    void applyTransition();
 
     void drawLayer( WinHandle win, const Image& img, int offX, int offY, bool wrap, int winW, int winH ) override;
     void drawEntity( WinHandle win, Entity entity, const Box& camBox ) override;
@@ -55,6 +56,7 @@ class PixelRenderer : public Renderer {
       _subY = fy * CELL_H >> FIXEDPT_DEC_BITS;
     }
     void preloadImage( const std::shared_ptr<const BImg>& img ) override { _atlas.add( img ); }
+    void onSceneUnloaded() override { _atlas.prune(); }
 
   protected:
     struct Win {

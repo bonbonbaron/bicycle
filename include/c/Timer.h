@@ -31,6 +31,7 @@ class Timer : public Controllable {
     void unpause( const TimerId timerId ) override;
 
     void setDuration( const TimerId timerId, const unsigned durMs );
+    void stopEntity( Entity entity );  // every timer whose timeouts go to entity (a despawned entity)
     
   private:
     struct TimerConfig {

@@ -46,7 +46,7 @@ add_library( bicycle_data STATIC
   src/data/Edgebreaker.cpp )
 target_include_directories( bicycle_data PUBLIC include )
 # Memory pool sizes in MB (include/data/Mem.h); the same names as environment variables override them at run time.
-foreach( pool_default PERMANENT=16 GENERAL=128 TEXT=64 GRAPHIC=96 AUDIO=96 TEMPORARY=64 )
+foreach( pool_default PERMANENT=16 GENERAL=128 TEXT=64 GRAPHIC=96 AUDIO=96 TEMPORARY=64 SCENE=64 )
   string( REPLACE "=" ";" pd "${pool_default}" )
   list( GET pd 0 pool )
   list( GET pd 1 mb )
@@ -153,6 +153,9 @@ if ( NOT CMAKE_CROSSCOMPILING )
   set_tests_properties( pack-assets PROPERTIES FIXTURES_SETUP packed )
   add_test( NAME codecs COMMAND bicycle-tests test WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}" )
   add_test( NAME motion COMMAND bicycle-motion-tests )
+  add_executable( bicycle-mem-scene-tests tests/mem_scene_test.cpp src/data/Mem.cpp )
+  target_include_directories( bicycle-mem-scene-tests PRIVATE include )
+  add_test( NAME mem-scene COMMAND bicycle-mem-scene-tests )
   set_tests_properties( codecs PROPERTIES FIXTURES_REQUIRED packed )
 endif()
 
@@ -237,4 +240,13 @@ if ( BICYCLE_RELEASE AND NOT CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_NAME STREQUAL
   string( TOLOWER "${BICYCLE_RENDER}" modeLower )
   add_test( NAME release-zero-io COMMAND sh "${CMAKE_SOURCE_DIR}/tests/release_io_test.sh" "$<TARGET_FILE:o>" ${modeLower} 120 )
   set_tests_properties( release-zero-io PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 300 )
+endif()
+
+# Scene changes: back and forth between the test game's two scenes; the SCENE pool must empty on every unload and
+# its high-water mark stay flat (tests/scene_lifecycle_test.sh). Dev and release builds alike.
+if ( NOT CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_NAME STREQUAL "Linux" )
+  string( TOLOWER "${BICYCLE_RENDER}" modeLowerLc )
+  add_test( NAME scene-lifecycle COMMAND sh "${CMAKE_SOURCE_DIR}/tests/scene_lifecycle_test.sh" "$<TARGET_FILE:o>" ${modeLowerLc} 20
+            WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}" )
+  set_tests_properties( scene-lifecycle PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 400 )
 endif()

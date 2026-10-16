@@ -268,6 +268,18 @@ ffi.cdef([[
   bool setHudBarSprites( int id, const char* framePath, const char* fillPath );
   void setHidden( Entity entity, bool hidden );
 
+  // Scene changes (Scene.goto in scripts/Scene.lua)
+  void despawnEntity( Entity entity );
+  void sceneScope( bool on );
+  long long sceneUnloaded();
+  void sceneStats( const char* event, const char* sceneName, long long leaked );
+  void setTransition( int kind, float t );
+  void musicFade( float level, unsigned ms );
+  void motionSnap( Entity entity );
+  void attachEntity( Entity entity, unsigned layerIdx );
+  bool topIsScene();
+  Entity topWindowId();
+
   Entity pop() {
     auto& wm = WindowManager::getInstance();
     return wm.pop();
@@ -343,6 +355,7 @@ end
 gameName = ""
 
 local entities = {}  -- maps entity ID to callbackID-to-callback maps
+sceneHooks = nil  -- set by scripts/Scene.lua: { frame = fn, inputFrozen = fn }
 local focus = 0
 
 function register( entityId, entity )
@@ -351,7 +364,7 @@ end
 
 function unregister( id )
   if not id then
-    error("trying to unregsiter "..id, 5)
+    error( debug.traceback( "unregister: no entity id" ), 2 )
   end
   entities[id] = nil
 end
@@ -361,8 +374,10 @@ end
 --            bob = 0, bobHz = 1 }
 -- mode "hard" snaps to target + offset every frame; "lerp" eases: pos += (goal - pos) * (1 - exp(-rate * dt)).
 -- deadzone (cells each side) lets the target roam that far before the follower moves. Call again to switch modes.
+trackOpts = {}  -- follower -> { target, opts } as last asked (scene changes carry the hero's followers over)
 function track( follower, target, opts )
   opts = opts or {}
+  trackOpts[follower] = { target = target, opts = opts }
   local off, dz = opts.offset or { 0, 0 }, opts.deadzone or { 0, 0 }
   local rate = opts.mode == "hard" and 0 or ( opts.rate or opts.smoothing or 8 )
   ffi.C.motionFollow( follower, target, off[1], off[2], rate, opts.bob or 0, opts.bobHz or 1,
@@ -375,7 +390,11 @@ end
 --   Camera.track( hero.id, { mode = "hard" } )
 Camera = {}
 function Camera.id() return ffi.C.cameraEntity() end
-function Camera.track( target, opts ) track( ffi.C.cameraEntity(), target, opts ) end
+-- The camera's last tracking is remembered (Camera.target, Camera.opts) and re-applied in the next scene.
+function Camera.track( target, opts )
+  Camera.target, Camera.opts = target, opts
+  track( ffi.C.cameraEntity(), target, opts )
+end
 
 function focusOn( entity )
   focus = entity
@@ -403,6 +422,20 @@ end
 local bridge
 function initBridge( bridgePtr )
   bridge = ffi.cast("Bridge*", bridgePtr)
+end
+
+-- Drops queued uncollisions addressed to entities that no longer exist (despawned by a scene change before Lua
+-- read them; their ids may already belong to the next scene's entities).
+function dropUncollisionsFor( isGone )
+  if not bridge then return end
+  local u, n = bridge.uncollisions, 0
+  for i = 0, u.len - 1 do
+    if not isGone( u.arr[i].lhs ) then
+      u.arr[n] = u.arr[i]
+      n = n + 1
+    end
+  end
+  u.len = n
 end
 
 function getUpdates()
@@ -437,6 +470,10 @@ function getUpdates()
     bridge.timeouts.len = 0  -- consumed; C++ appends from len
   end
   -- Inputs (every key since last frame, in order)
+  if bridge.keys.len > 0 and sceneHooks and sceneHooks.inputFrozen() then  -- mid scene transition: keys are dropped
+    bridge.keys.len = 0
+    bridge.input.lastPressed = ffi.C.NOTHING
+  end
   if bridge.keys.len > 0 then
     entity = entities[focus]
     if not entity then error("We're focused on nonexistent entity "..tostring(focus)..".") end
@@ -446,4 +483,7 @@ function getUpdates()
     bridge.keys.len = 0
     bridge.input.lastPressed = ffi.C.NOTHING
   end
+  -- The frame's end, after every callback: queued scene changes and transitions run here (scripts/Scene.lua).
+  if sceneHooks then sceneHooks.frame() end
+
 end

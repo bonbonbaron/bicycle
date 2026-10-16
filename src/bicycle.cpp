@@ -361,6 +361,75 @@ namespace bicycle {
       }
     }
 
+    // ============
+    // SCENE CHANGES (scripts/Scene.lua: Scene.goto)
+    // ============
+    // Everything the engine keeps for an entity, dropped: timers, animation, motion (and followers of it),
+    // collisions, its 3D model, its components; then its id is free again.
+    void despawnEntity( Entity entity ) {
+      Timer::getInstance().stopEntity( entity );
+      Animator::getInstance().forget( entity );
+      Kinematics::getInstance().forget( entity );
+      CollisionDetector::getInstance().removeEntity( entity );
+      gfx::renderer().forgetEntity( entity );
+      World::set<Image>( entity, Image{} );
+      World::set<Box>( entity, Box{} );
+      World::set<CollBox>( entity, CollBox{} );
+      World::set<Rect>( entity, Rect{} );
+      delEntityId( entity );
+    }
+
+    // While on, images, meshes and songs being loaded go to the SCENE pool (mem::memSceneScope).
+    void sceneScope( bool on ) {
+      mem::memSceneScope( on );
+    }
+
+    // After the old scene's entities and window are gone: the renderer drops what only it used, then SCENE is reset.
+    // Returns the SCENE bytes still alive (0 = unloaded cleanly; anything else is a leak and keeps the pool).
+    long long sceneUnloaded() {
+      gfx::renderer().onSceneUnloaded();
+      return static_cast<long long>( mem::memSceneReset() );
+    }
+
+    // BICYCLE_SCENE_STATS=1: one line per scene change on stderr (tests/scene_lifecycle_test.sh reads it).
+    void sceneStats( const char* event, const char* sceneName, long long leaked ) {
+      static const bool on = [] { const char* e = std::getenv( "BICYCLE_SCENE_STATS" ); return e && *e && *e != '0'; }();
+      if ( !on ) return;
+      const auto s = mem::memStats( mem::SCENE ), g = mem::memStats( mem::GRAPHIC ), a = mem::memStats( mem::AUDIO ),
+                 gen = mem::memStats( mem::GENERAL );
+      std::fprintf( stderr, "bicycle scene: %s %s scene_hw=%zu scene_live=%zu leaked=%lld graphic_hw=%zu graphic_live=%zu "
+                    "audio_live=%zu general_live=%zu\n", event, sceneName, s.highWater, s.inUse, leaked, g.highWater,
+                    g.inUse, a.inUse, gen.inUse );
+    }
+
+    void setTransition( int kind, float t ) {
+      gfx::renderer().setTransition( kind, t );
+    }
+
+    void musicFade( float level, unsigned ms ) {
+      MidiPlayer::getInstance().fadeTo( level, ms );
+    }
+
+    void motionSnap( Entity entity ) {
+      Kinematics::getInstance().snap( entity );
+    }
+
+    // A persistent entity joins the current scene's layer layerIdx (0-based; clamped to the last layer).
+    void attachEntity( Entity entity, unsigned layerIdx ) {
+      auto scene = dynamic_pointer_cast<Scene>( WindowManager::getInstance().back() );
+      if ( scene && !scene->getGrid().getLayers().empty() ) scene->getGrid().addEntityTo( entity, layerIdx );
+    }
+
+    // The window on top: whether it's a scene, and its id (Scene.goto closes dialogues and menus over the scene).
+    bool topIsScene() {
+      return dynamic_pointer_cast<Scene>( WindowManager::getInstance().back() ) != nullptr;
+    }
+
+    Entity topWindowId() {
+      auto w = WindowManager::getInstance().back();
+      return w ? w->getId() : 0;
+    }
+
     Entity popWindow() {
       return pop();
     }
@@ -525,6 +594,7 @@ namespace bicycle {
         break;
       }
       Kinematics::getInstance().run();
+      MidiPlayer::getInstance().tickFade();
       CollisionDetector::check();
       // Process inputs
       trigger.send();

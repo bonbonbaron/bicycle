@@ -1,5 +1,7 @@
 #include "data/Mem.h"
+#include <algorithm>
 #include <chrono>
+#include "Constants.h"
 #include <cstdio>
 #include <cstring>
 #include <cstdlib>
@@ -286,4 +288,23 @@ auto MidiPlayer::loadSoundfont( const std::string& sfFilepath ) -> int {
 
 auto MidiPlayer::selectProgram( const int chan, const int sfontId, const int bank, const int program ) -> bool {
   return fluid_synth_program_select( _synthP, chan, sfontId, bank, program ) == FLUID_OK;
+}
+
+void MidiPlayer::fadeTo( const float level, const unsigned ms ) {
+  if ( !_synthP ) return;
+  if ( _baseGain < 0 ) _baseGain = fluid_synth_get_gain( _synthP );
+  _target = std::clamp( level, 0.0f, 1.0f );
+  const float frames = std::max( 1.0f, ms / static_cast<float>( Constants::MILLISECONDS_PER_FRAME ) );
+  _step = ( _target - _level ) / frames;
+  if ( ms == 0 ) {
+    _level = _target;
+    fluid_synth_set_gain( _synthP, _baseGain * _level );
+  }
+}
+
+void MidiPlayer::tickFade() {
+  if ( !_synthP || _baseGain < 0 || _level == _target ) return;
+  _level += _step;
+  if ( ( _step > 0 && _level >= _target ) || ( _step < 0 && _level <= _target ) || _step == 0 ) _level = _target;
+  fluid_synth_set_gain( _synthP, _baseGain * _level );
 }

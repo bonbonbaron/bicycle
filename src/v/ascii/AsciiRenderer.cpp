@@ -202,7 +202,28 @@ void AsciiRenderer::setAttr( WinHandle win, int attr, bool on ) {
   }
 }
 
+// Scene transitions in a terminal: cells are blanked in a fixed scattered order (dissolve; also used for fade) or
+// column by column (wipe), in every window as it's presented, so the dialogue and HUD dissolve with the world.
+static auto dissolveRank( int x, int y ) -> float {
+  uint32_t h = static_cast<uint32_t>( x ) * 73856093u ^ static_cast<uint32_t>( y ) * 19349663u;
+  h ^= h >> 13;
+  h *= 0x5bd1e995u;
+  h ^= h >> 15;
+  return ( h & 0xFFFF ) / 65535.0f;
+}
+
 void AsciiRenderer::presentWindow( WinHandle win ) {
+  if ( _transKind != 0 && _transT > 0.0f ) {
+    WINDOW* w = W( win );
+    const int x0 = getbegx( w ), y0 = getbegy( w ), wh = getmaxy( w ), ww = getmaxx( w );
+    const float t = std::min( 1.0f, _transT );
+    for ( int y = 0; y < wh; ++y ) {
+      for ( int x = 0; x < ww; ++x ) {
+        const bool gone = _transKind == 2 ? x0 + x < static_cast<int>( t * COLS ) : dissolveRank( x0 + x, y0 + y ) < t;
+        if ( gone ) mvwaddch( w, y, x, ' ' );
+      }
+    }
+  }
   wnoutrefresh( W( win ) );
 }
 

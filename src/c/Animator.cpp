@@ -122,3 +122,7 @@ void Animator::addFrame( const Entity entity, const std::string& stripName, cons
 auto Animator::getFrameIdx( const Entity entity ) const -> unsigned {
   return _animStates.at( entity ).frameIdx;
 }
+
+void Animator::forget( const Entity entity ) {
+  if ( entity < _animStates.size() ) _animStates[entity] = AnimState{};
+}

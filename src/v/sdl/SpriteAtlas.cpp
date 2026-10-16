@@ -51,4 +51,20 @@ void SpriteAtlas::rebuildIfDirty() {
   }
 }
 
+void SpriteAtlas::prune() {
+  std::vector<std::shared_ptr<const BImg>> keep;
+  for ( auto& img : _imgs ) {
+    if ( img.use_count() > 1 ) keep.push_back( std::move( img ) );
+  }
+  if ( keep.size() == _imgs.size() ) {
+    _imgs = std::move( keep );
+    return;
+  }
+  _imgs = std::move( keep );
+  _idx.clear();
+  for ( size_t i = 0; i < _imgs.size(); ++i ) _idx[_imgs[i].get()] = i;
+  _entries.clear();
+  _dirty = true;
+}
+
 }  // namespace gfx

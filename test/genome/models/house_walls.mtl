@@ -1,0 +1,4 @@
+newmtl house_walls
+Kd 1.0000 1.0000 1.0000
+d 1.0000
+map_Kd planks.png

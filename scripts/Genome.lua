@@ -431,13 +431,14 @@ function Animation:frameIdx()
 end
 
 -- Collision types games can refer to by name in coll genes; onCollision( other, type ) receives the number.
-local COLL = { hero = 1, solid = 2, coin = 3, enemy = 4, npc = 5 }
+local COLL = { hero = 1, solid = 2, coin = 3, enemy = 4, npc = 5, door = 6 }
 
 Gene["GeneLoader"] = {
   scene = function(entity, gene)
     checkType( entity, "number" )
     checkType( gene, "table" )
-    asset = Gene.getLuaAsset( "scene", gene.val )
+    local asset = Gene.getLuaAsset( "scene", gene.val )
+    asset.file = gene.val
     Scene.new( asset )
   end,
 	img = function(entity, gene)
@@ -498,6 +499,24 @@ Gene["GeneLoader"] = {
     Animation.rigged[entity] = true
   end,
   motion = 0,  -- started by Scene once every entity is placed (Genome.startMotion), so targets can be named
+  -- persist = true: the entity survives scene changes (the hero, a companion); see Scene.goto in Scene.lua.
+  persist = 0,
+  onSceneEnter = 0,  -- persistent entities: called as ( sceneName, spawnName ) after arriving in a new scene
+  onDespawn = 0,     -- called just before a scene change (or Scene.removeForever) despawns the entity
+  -- door = { to = "house", spawn = "entry", w = 4, h = 6, on = "touch" | "press", transition = "fade",
+  --          duration = 0.6, music = "crossfade" | "cut" | "keep" }
+  -- An invisible trigger zone w x h cells (from its pos): when the player (a hero collider) walks into it ("touch",
+  -- the default) or presses E/Space inside it ("press"), Scene.goto( to, { spawn = spawn, ... } ). Scene files set
+  -- each door's fields on the instance: { genome = "door", pos = { 150, 36 }, door = { to = "house", spawn = "entry" } }.
+  door = function(entity, gene, tbl)
+    local d = gene.val
+    checkType( d, "table" )
+    if not d.to then error( "door gene needs to = \"<scene name>\"" ) end
+    local box = ffi.C.World_getBoxes().arr[entity]
+    box.size.w, box.size.h = ( d.w or 4 ) * 256, ( d.h or 6 ) * 256
+    ffi.C.addCollider( entity, d.layer or 0, COLL.door, 0, 0, 0, 0 )
+    Scene.armDoor( tbl )
+  end,
   sprite2d = 0,  -- read by Genome.new: the sprite pixel modes use instead of img/sprite (ASCII keeps its own art)
   onSpawn = 0,  -- do nothing; called by Scene once the entity is placed
   onUncollision = 0,  -- do nothing, just allow it to exist
@@ -553,8 +572,10 @@ end
 local Genome = {}
 Genome.__index = Genome
 -- allow __newindex for blackboard functionality
-Genome.new = function( name )
+-- overrides: fields a scene sets on this instance (e.g. a door's target), copied over the genome's own.
+Genome.new = function( name, overrides )
   local tbl = Genome.get( name ) -- tbl is the table of type-value pairs of genes (e.g. { img = "shopkeeper", ... })
+  for k, v in pairs( overrides or {} ) do tbl[k] = v end
   -- sprite2d = "<aseprite sprite>": pixel modes draw this instead of the img/sprite gene, so a genome can keep
   -- hand-made ASCII art for the ASCII mode and still have pixel art in 2D/3D.
   if tbl.sprite2d and Sprite.renderMode() ~= "ascii" then
