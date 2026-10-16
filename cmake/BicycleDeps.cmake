@@ -135,8 +135,8 @@ function( bicycle_ncurses_embedded_terminfo )
     file( REMOVE_RECURSE "${bin}" "${prefix}" )
     file( MAKE_DIRECTORY "${bin}" )
     message( STATUS "bicycle: building ncurses 6.5 with built-in terminfo for ${fallbacks}" )
-    bicycle_run( "configuring ncurses" "${CMAKE_COMMAND}" -E env "CC=${CMAKE_C_COMPILER}"
-      sh "${src}/configure" "--prefix=${prefix}" --without-shared --without-debug --without-cxx
+    bicycle_run( "configuring ncurses" "${CMAKE_COMMAND}" -E env "CC=${CMAKE_C_COMPILER}" ${BICYCLE_NCURSES_CROSS_ENV}
+      sh "${src}/configure" ${BICYCLE_NCURSES_CROSS} "--prefix=${prefix}" --without-shared --without-debug --without-cxx
       --without-cxx-binding --without-ada --without-progs --without-tests --without-manpages --enable-overwrite
       --disable-database --disable-home-terminfo --disable-termcap "--with-fallbacks=${fallbacks}"
       "--with-tic-path=${BICYCLE_TIC}" "--with-infocmp-path=${BICYCLE_INFOCMP}"
@@ -217,8 +217,8 @@ function( bicycle_curses )
     set( bin "${BICYCLE_DEPS_DIR}/build/ncurses" )
     file( MAKE_DIRECTORY "${bin}" )
     message( STATUS "bicycle: building ncurses 6.5 (first configure only; this takes a minute)" )
-    bicycle_run( "configuring ncurses" "${CMAKE_COMMAND}" -E env "CC=${CMAKE_C_COMPILER}"
-      sh "${src}/configure" "--prefix=${BICYCLE_DEPS_PREFIX}" --without-shared --without-debug --without-cxx
+    bicycle_run( "configuring ncurses" "${CMAKE_COMMAND}" -E env "CC=${CMAKE_C_COMPILER}" ${BICYCLE_NCURSES_CROSS_ENV}
+      sh "${src}/configure" ${BICYCLE_NCURSES_CROSS} "--prefix=${BICYCLE_DEPS_PREFIX}" --without-shared --without-debug --without-cxx
       --without-cxx-binding --without-ada --without-progs --without-tests --without-manpages --enable-overwrite
       --with-default-terminfo-dir=/usr/share/terminfo
       --with-terminfo-dirs=/etc/terminfo:/lib/terminfo:/usr/share/terminfo:/usr/lib/terminfo
@@ -229,7 +229,12 @@ function( bicycle_curses )
   endif()
   add_library( bicycle_curses INTERFACE )
   target_include_directories( bicycle_curses INTERFACE "${BICYCLE_DEPS_PREFIX}/include" )
-  target_link_libraries( bicycle_curses INTERFACE "${BICYCLE_DEPS_PREFIX}/lib/libncurses.a" )
+  # ncurses 6.5 builds the wide-character library (libncursesw) by default.
+  set( lib "${BICYCLE_DEPS_PREFIX}/lib/libncursesw.a" )
+  if ( NOT EXISTS "${lib}" AND EXISTS "${BICYCLE_DEPS_PREFIX}/lib/libncurses.a" )
+    set( lib "${BICYCLE_DEPS_PREFIX}/lib/libncurses.a" )
+  endif()
+  target_link_libraries( bicycle_curses INTERFACE "${lib}" )
   message( STATUS "bicycle: ncurses 6.5 (fetched)" )
 endfunction()
 
@@ -294,6 +299,14 @@ function( bicycle_luajit )
   message( STATUS "bicycle: LuaJIT 2.1 (fetched): ${lib}" )
 endfunction()
 set( BICYCLE_HOST_CC "cc" CACHE STRING "Host C compiler for LuaJIT's build tools when cross-compiling" )
+# Cross-compiling ncurses (e.g. for a Raspberry Pi): autoconf needs --host, and ncurses builds helper programs
+# with BUILD_CC for the build machine.
+set( BICYCLE_NCURSES_CROSS )
+set( BICYCLE_NCURSES_CROSS_ENV )
+if ( CMAKE_CROSSCOMPILING AND NOT WIN32 )
+  set( BICYCLE_NCURSES_CROSS "--host=${CMAKE_SYSTEM_PROCESSOR}-linux-gnu" )
+  set( BICYCLE_NCURSES_CROSS_ENV "BUILD_CC=${BICYCLE_HOST_CC}" "AR=${CMAKE_AR}" "RANLIB=${CMAKE_RANLIB}" )
+endif()
 
 # --- fluidsynth ---------------------------------------------------------------------------------------------------
 function( bicycle_fluidsynth )
