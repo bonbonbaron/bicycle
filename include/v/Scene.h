@@ -2,7 +2,7 @@
 #include "v/Bar.h"
 #include <string>
 #include <vector>
-#include <cursesw.h>
+#include "curses_compat.h"
 #include <optional>
 #include <unordered_map>
 

@@ -54,7 +54,9 @@ MidiPlayer::MidiPlayer() {
 
   // General MIDI fallback goes on the bottom of the SoundFont stack.
   const char* gm = std::getenv( "BICYCLE_GM_SF2" );
-  for ( const std::string& fp : { std::string( gm ? gm : "" ), std::string( "/usr/share/sounds/sf2/default-GM.sf2" ),
+  // ./sf2/default-GM.sf2 is where to put one on Windows (or anywhere without a system-wide SoundFont).
+  for ( const std::string& fp : { std::string( gm ? gm : "" ), std::string( "./sf2/default-GM.sf2" ),
+        std::string( "/usr/share/sounds/sf2/default-GM.sf2" ),
         std::string( "/usr/share/sounds/sf2/TimGM6mb.sf2" ), std::string( "/usr/share/sounds/sf2/FluidR3_GM.sf2" ) } ) {
     if ( !fp.empty() && fileExists( fp ) && fluid_synth_sfload( _synthP, fp.c_str(), 1 ) != FLUID_FAILED ) {
       profile( ( "GM fallback " + fp ).c_str() );

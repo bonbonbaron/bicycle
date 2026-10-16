@@ -1,6 +1,6 @@
 #include "v/Scene.h"
 #include "m/World.h"
-#include <cursesw.h>
+#include "curses_compat.h"
 #include <algorithm>
 #include "c/Trigger.h"
 #include "v/Image.h"

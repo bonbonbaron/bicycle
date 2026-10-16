@@ -10,7 +10,8 @@ Scene.__newindex = function() error( "You can't create new attributes for Scene.
 
 function Scene:getFileIter(path)
   -- Open a pipe to read ("r") from the command.
-  local handle = io.popen("ls "..path)
+  local isWindows = package.config:sub(1, 1) == "\\"
+  local handle = io.popen(isWindows and ('dir /b "'..path:gsub("/", "\\")..'"') or ("ls "..path))
   if not handle then
     error("failed to execute ls for "..self.name)
   end
