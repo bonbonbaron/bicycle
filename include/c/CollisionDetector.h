@@ -16,6 +16,7 @@ class CollisionDetector {
     static void registerEntity( Entity entity, unsigned layer );
     static auto getInstance() -> CollisionDetector&;
     void addEntity( Entity entity, unsigned layer );
+    void removeEntity( Entity entity );  // from every layer, and forgets its ongoing collisions
     auto getCollisionLayers() -> CollisionLayers&;
 		auto recordedCollision( Entity e1, Entity e2 ) -> bool;
 		void recordCollision( Entity e1, Entity e2 );

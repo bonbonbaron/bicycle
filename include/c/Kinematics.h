@@ -39,6 +39,11 @@ class Kinematics : public Controllable {
     void capDeadZone( Entity e, float maxX, float maxY );
     void setBounds( Entity e, float minX, float minY, float maxX, float maxY );
     void stopMotion( Entity e );
+    // Scene changes: forget(e) drops every motion of a despawned entity (and stops followers that tracked it);
+    // snap(e) makes a follower jump to its goal on the next frame (e.g. a fairy arriving with the hero).
+    void forget( Entity e );
+    void snap( Entity e );
+    // The follow settings of e (for carrying the camera's tracking into the next scene); false if not following.
     auto motionType( Entity e ) const -> int;  // -1 if not driven
   private:
     Kinematics() = default;

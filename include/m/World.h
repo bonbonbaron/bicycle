@@ -70,6 +70,9 @@ class World {
       return castArr.at(entity);
     }
 
+    // False once the World is destroyed at exit (windows destroyed later must not touch components).
+    static auto alive() -> bool { return aliveFlag(); }
+
     auto get( const void* type ) -> ArrayVar& {
       assert( _m.contains( type ) );
       return _m.at( type );
@@ -105,6 +108,8 @@ class World {
       }
 
     World();
+    ~World() { aliveFlag() = false; }
+    static auto aliveFlag() -> bool& { static bool alive = true; return alive; }
     World( const World& rhs ) = delete;
     World& operator=( const World& ) = delete;
     static auto getInstance() -> World&;

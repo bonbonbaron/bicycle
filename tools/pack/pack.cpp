@@ -23,6 +23,8 @@
 #include <filesystem>
 #include <fstream>
 #include <map>
+#include <regex>
+#include <set>
 #include <sstream>
 
 namespace fs = std::filesystem;
@@ -101,6 +103,34 @@ int main( int argc, char** argv ) {
     }
   }
   std::sort( files.begin(), files.end() );
+  // Scene changes: every scene a door or a Scene.go names must be in the pack (genome/scene/<name>.lua), or a
+  // release build would fail only when the player walks through that door.
+  {
+    std::set<std::string> scenes;
+    for ( auto& f : files ) {
+      const std::string rel = fs::relative( f, game ).generic_string();
+      if ( rel.rfind( "genome/scene/", 0 ) == 0 && f.extension() == ".lua" ) scenes.insert( f.stem().string() );
+    }
+    static const std::regex doorTo( R"(door\s*=\s*\{[^}]*\bto\s*=\s*["']([A-Za-z0-9_]+)["'])" );
+    static const std::regex gotoCall( R"(Scene(?:\.go|\.goTo|\.goto|\[\s*["']goto["']\s*\])\s*\(\s*["']([A-Za-z0-9_]+)["'])" );
+    int missing = 0;
+    for ( auto& f : files ) {
+      if ( f.extension() != ".lua" ) continue;
+      const std::string src = readFile( f );
+      for ( const auto* re : { &doorTo, &gotoCall } ) {
+        for ( std::sregex_iterator it( src.begin(), src.end(), *re ), end; it != end; ++it ) {
+          const std::string name = ( *it )[1];
+          if ( !scenes.count( name ) ) {
+            std::fprintf( stderr, "bicycle-pack: %s goes to scene '%s', but there's no genome/scene/%s.lua\n",
+                          fs::relative( f, game ).generic_string().c_str(), name.c_str(), name.c_str() );
+            ++missing;
+          }
+        }
+      }
+    }
+    if ( missing ) return 1;
+    std::printf( "scenes: %zu packed, every door/Scene.go target found\n", scenes.size() );
+  }
   std::vector<Packed> packed;
   for ( auto& f : files ) {
     const std::string rel = fs::relative( f, game ).generic_string();

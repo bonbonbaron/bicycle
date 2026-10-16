@@ -31,12 +31,18 @@ class MidiPlayer {
     auto loadMidi( const std::string& midiFilepath ) -> bool;
     auto loadSoundfont( const std::string& sfFilepath ) -> int;  // returns SoundFont ID, or -1
     auto selectProgram( const int chan, const int sfontId, const int bank, const int program ) -> bool;
+    // Volume ramps (scene music crossfades): fadeTo( level, ms ) moves the synth's gain to level (0..1 of normal)
+    // over ms; tickFade() advances it once a frame (the main loop calls it).
+    void fadeTo( float level, unsigned ms );
+    void tickFade();
+    auto fadeLevel() const -> float { return _level; }
     ~MidiPlayer();
   private:
     MidiPlayer();
     MidiPlayer( const MidiPlayer& ) = delete;
     const auto& operator=( const MidiPlayer& ) = delete;
     int _tick{};
+    float _baseGain{ -1.0f }, _level{ 1.0f }, _target{ 1.0f }, _step{};
     fluid_settings_t* _settingsP{};
     fluid_synth_t* _synthP{};
     fluid_audio_driver_t* _aDriverP{};

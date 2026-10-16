@@ -74,6 +74,8 @@ enum : GLenum {
   X( void, BindBuffer, GLenum, GLuint ) \
   X( void, BufferData, GLenum, GLsizeiptr, const void*, GLenum ) \
   X( void, GenVertexArrays, GLsizei, GLuint* ) \
+  X( void, DeleteVertexArrays, GLsizei, const GLuint* ) \
+  X( void, DeleteTextures, GLsizei, const GLuint* ) \
   X( void, BindVertexArray, GLuint ) \
   X( void, VertexAttribPointer, GLuint, GLint, GLenum, GLboolean, GLsizei, const void* ) \
   X( void, EnableVertexAttribArray, GLuint ) \
@@ -346,6 +348,30 @@ class Renderer3D final : public PixelRenderer {
       auto m = loadMesh( path );
       if ( m ) _statics.push_back( m );
       return m != nullptr;
+    }
+
+    void forgetEntity( Entity entity ) override {
+      _models.erase( entity );
+      _motion.erase( entity );
+    }
+
+    // The old scene's scenery and any mesh no model uses any more (its GL objects and its SCENE-pool skin) go.
+    void onSceneUnloaded() override {
+      PixelRenderer::onSceneUnloaded();
+      _statics.clear();
+      for ( auto it = _meshes.begin(); it != _meshes.end(); ) {
+        if ( it->second.use_count() > 1 ) {
+          ++it;
+          continue;
+        }
+        GpuMesh& g = *it->second;
+        for ( const auto& r : g.ranges ) {
+          if ( r.tex ) gl.DeleteTextures( 1, &r.tex );
+        }
+        if ( g.vbo ) gl.DeleteBuffers( 1, &g.vbo );
+        if ( g.vao ) gl.DeleteVertexArrays( 1, &g.vao );
+        it = _meshes.erase( it );
+      }
     }
 
   protected:

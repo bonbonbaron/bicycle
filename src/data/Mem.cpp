@@ -26,6 +26,9 @@
 #ifndef BICYCLE_MEM_TEMPORARY_MB
 #define BICYCLE_MEM_TEMPORARY_MB 64
 #endif
+#ifndef BICYCLE_MEM_SCENE_MB
+#define BICYCLE_MEM_SCENE_MB 64
+#endif
 
 namespace mem {
 namespace {
@@ -33,11 +36,14 @@ namespace {
 constexpr size_t ALIGN = 16;
 constexpr size_t alignUp( size_t x, size_t a = ALIGN ) { return ( x + a - 1 ) & ~( a - 1 ); }
 
-const char* POOL_NAMES[N_POOLS] = { "Permanent", "General", "Text", "Graphic", "Audio", "Temporary" };
+const char* POOL_NAMES[N_POOLS] = { "Permanent", "General", "Text", "Graphic", "Audio", "Temporary", "Scene" };
 const char* POOL_ENV[N_POOLS] = { "BICYCLE_MEM_PERMANENT_MB", "BICYCLE_MEM_GENERAL_MB", "BICYCLE_MEM_TEXT_MB",
-                                  "BICYCLE_MEM_GRAPHIC_MB", "BICYCLE_MEM_AUDIO_MB", "BICYCLE_MEM_TEMPORARY_MB" };
+                                  "BICYCLE_MEM_GRAPHIC_MB", "BICYCLE_MEM_AUDIO_MB", "BICYCLE_MEM_TEMPORARY_MB",
+                                  "BICYCLE_MEM_SCENE_MB" };
 const size_t POOL_DEFAULT_MB[N_POOLS] = { BICYCLE_MEM_PERMANENT_MB, BICYCLE_MEM_GENERAL_MB, BICYCLE_MEM_TEXT_MB,
-                                          BICYCLE_MEM_GRAPHIC_MB, BICYCLE_MEM_AUDIO_MB, BICYCLE_MEM_TEMPORARY_MB };
+                                          BICYCLE_MEM_GRAPHIC_MB, BICYCLE_MEM_AUDIO_MB, BICYCLE_MEM_TEMPORARY_MB,
+                                          BICYCLE_MEM_SCENE_MB };
+thread_local bool tSceneScope = false;  // memSceneScope: this thread's GRAPHIC/AUDIO allocations go to SCENE
 
 // Every block starts with a header; the caller's pointer follows it (16-byte aligned).
 constexpr uint32_t MAGIC = 0xB1C7C1E5u;
@@ -196,6 +202,7 @@ void delLocked( void* p ) {
 }  // namespace
 
 auto memAdd( size_t numBytes, PoolId poolId ) -> void* {
+  if ( tSceneScope && ( poolId == GRAPHIC || poolId == AUDIO ) ) poolId = SCENE;
   Lock l;
   return addLocked( numBytes, poolId );
 }
@@ -203,6 +210,25 @@ auto memAdd( size_t numBytes, PoolId poolId ) -> void* {
 void memDel( void* p ) {
   Lock l;
   delLocked( p );
+}
+
+void memSceneScope( bool on ) {
+  tSceneScope = on;
+}
+
+auto memInSceneScope() -> bool {
+  return tSceneScope;
+}
+
+auto memSceneReset() -> size_t {
+  size_t live{};
+  {
+    Lock l;
+    if ( !_mem.ready ) return 0;
+    live = _mem.poolA[SCENE].inUse;
+  }
+  if ( live == 0 ) memRst( SCENE );
+  return live;
 }
 
 auto memResize( void* p, size_t numBytes, PoolId poolId ) -> void* {
@@ -289,7 +315,8 @@ auto resource( PoolId p ) -> Resource* {
                                    new ( memAdd( sizeof( Resource ), PERMANENT ) ) Resource( TEXT ),
                                    new ( memAdd( sizeof( Resource ), PERMANENT ) ) Resource( GRAPHIC ),
                                    new ( memAdd( sizeof( Resource ), PERMANENT ) ) Resource( AUDIO ),
-                                   new ( memAdd( sizeof( Resource ), PERMANENT ) ) Resource( TEMPORARY ) };
+                                   new ( memAdd( sizeof( Resource ), PERMANENT ) ) Resource( TEMPORARY ),
+                                   new ( memAdd( sizeof( Resource ), PERMANENT ) ) Resource( SCENE ) };
   return rs[p];
 }
 

@@ -53,6 +53,13 @@ void Grid::addEntity( const Entity entity ) {
   _entityToLayerMap[ entity ] = _layers.size() - 1;  // so it's zero-indexed
 }
 
+void Grid::addEntityTo( const Entity entity, unsigned layerIdx ) {
+  assert( _layers.size() > 0 );
+  layerIdx = std::min<unsigned>( layerIdx, _layers.size() - 1 );
+  _layers[layerIdx].fg.push_back( entity );
+  _entityToLayerMap[ entity ] = layerIdx;
+}
+
 auto Grid::getLayers() -> std::vector<Layer>& {
   return _layers;
 }
@@ -83,6 +90,19 @@ Scene::Scene() : Window( 0, 0, gfx::cols() - 2, gfx::lines() ) {
 Scene::Scene( const int x, const int y, const int w, const int h ) : Window( x, y, w, h ) {
   _camera.setDims( getHeight(), getWidth() );
   _camera.setMargin( 10 );  // TODO set margin in a bicycle API call
+}
+
+Scene::~Scene() {
+  if ( !World::alive() ) return;  // process exit: the World (and its entity ids) are already gone
+  for ( const auto& layer : _grid.getLayers() ) {
+    World::set<Image>( layer.id, Image{} );
+    World::set<Box>( layer.id, Box{} );
+    delEntityId( layer.id );
+  }
+  const Entity cam = _camera.getId();
+  Kinematics::getInstance().forget( cam );
+  World::set<Box>( cam, Box{} );
+  delEntityId( cam );
 }
 
 // The camera may roam over the largest FIXED layer (the "world"). Other modes move or repeat on their own.

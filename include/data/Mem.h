@@ -14,6 +14,10 @@
 //   GRAPHIC    images, meshes, textures, the pixel framebuffer, GL upload staging
 //   AUDIO      SoundFonts and MIDI files
 //   TEMPORARY  scratch (decoding); reset every frame and after every asset load: never keep a pointer to it
+//   SCENE      what the current scene owns: its backgrounds, its entities' images and meshes, its song. While a
+//              SceneScope is open (Lua's scene loader opens one around everything that isn't persistent), GRAPHIC
+//              and AUDIO allocations on that thread land here instead. A scene change frees the scene's objects,
+//              then resets the pool (memSceneReset), so nothing a scene loaded outlives it.
 //
 // Sizes: BICYCLE_MEM_<POOL>_MB (CMake cache variable, default below) or the same environment variable at run
 // time. Running out of a pool is fatal (it prints which pool and its size). BICYCLE_MEM_STATS=1 prints each
@@ -29,7 +33,7 @@
 
 namespace mem {
 
-enum PoolId : uint8_t { PERMANENT, GENERAL, TEXT, GRAPHIC, AUDIO, TEMPORARY, N_POOLS };
+enum PoolId : uint8_t { PERMANENT, GENERAL, TEXT, GRAPHIC, AUDIO, TEMPORARY, SCENE, N_POOLS };
 
 // jollybean's API
 auto memAdd( size_t numBytes, PoolId poolId ) -> void*;  // aligned to 16 bytes; never null (overflow is fatal)
@@ -51,6 +55,18 @@ struct PoolStats {
   size_t allocs;
 };
 auto memStats( PoolId poolId ) -> PoolStats;
+
+// Scene scope: while on (this thread only), GRAPHIC and AUDIO allocations go to SCENE.
+void memSceneScope( bool on );
+auto memInSceneScope() -> bool;
+// After a scene's objects are gone: resets SCENE if nothing in it is still alive, and returns the bytes still
+// alive (0 when the scene unloaded cleanly). Live blocks are never pulled out from under their owners: a leak
+// keeps the pool as is (and shows in the stats) instead of becoming a dangling pointer.
+auto memSceneReset() -> size_t;
+struct SceneScope {
+  SceneScope() { memSceneScope( true ); }
+  ~SceneScope() { memSceneScope( false ); }
+};
 
 // A std allocator over a pool. The pool is a template default but stored per instance, so one container type
 // can live in any pool: mem::Vector<float> v( mem::Allocator<float>( mem::GRAPHIC ) ).

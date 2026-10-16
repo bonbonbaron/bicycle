@@ -404,8 +404,44 @@ void PixelRenderer::saveScreenshotIfDue() {
 #endif
 }
 
+// Scene transitions over the finished frame (setTransition). 2D: the framebuffer is the screen. 3D: it's the overlay
+// composited over the GL world with alpha, so covering it with (alpha) black darkens the world under it too.
+void PixelRenderer::applyTransition() {
+  if ( _transKind == 0 || _transT <= 0.0f ) return;
+  const float t = std::min( 1.0f, _transT );
+  if ( _transKind == 2 ) {  // wipe: a black edge sweeping left to right
+    const int edge = static_cast<int>( t * _fbW );
+    for ( int y = 0; y < _fbH; ++y ) std::fill_n( _fb.begin() + static_cast<size_t>( y ) * _fbW, edge, 0xFF000000u );
+    return;
+  }
+  if ( _transKind == 3 ) {  // dissolve: 8x8 blocks drop out in a fixed scattered order
+    for ( int by = 0; by < _fbH; by += 8 ) {
+      for ( int bx = 0; bx < _fbW; bx += 8 ) {
+        uint32_t h = static_cast<uint32_t>( bx / 8 ) * 73856093u ^ static_cast<uint32_t>( by / 8 ) * 19349663u;
+        h ^= h >> 13;
+        h *= 0x5bd1e995u;
+        h ^= h >> 15;
+        if ( ( h & 0xFFFF ) / 65535.0f >= t ) continue;
+        for ( int y = by; y < std::min( _fbH, by + 8 ); ++y )
+          std::fill_n( _fb.begin() + static_cast<size_t>( y ) * _fbW + bx, std::min( 8, _fbW - bx ), 0xFF000000u );
+      }
+    }
+    return;
+  }
+  // fade: scale the color down and the alpha up
+  const unsigned k = static_cast<unsigned>( ( 1.0f - t ) * 256.0f );
+  const unsigned addA = static_cast<unsigned>( t * 255.0f );
+  for ( auto& p : _fb ) {
+    const unsigned a = p >> 24;
+    const unsigned r = ( ( p >> 16 ) & 0xFF ) * k >> 8, g = ( ( p >> 8 ) & 0xFF ) * k >> 8, b = ( p & 0xFF ) * k >> 8;
+    const unsigned na = std::min( 255u, a + ( ( 255 - a ) * addA >> 8 ) + ( addA == 255 ? 1 : 0 ) );
+    p = ( na << 24 ) | ( r << 16 ) | ( g << 8 ) | b;
+  }
+}
+
 void PixelRenderer::endFrame() {
   ++_frame;
+  applyTransition();
   presentFramebuffer();
   saveScreenshotIfDue();
   std::fill( _fb.begin(), _fb.end(), frameClearColor() );

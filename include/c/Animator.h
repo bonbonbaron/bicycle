@@ -23,6 +23,7 @@ class Animator : public Controllable {
     void newStrip( const Entity entity, const std::string& stripName, const bool repeat );
     void addFrame( const Entity entity, const std::string& stripName, const unsigned durationMs, const Rect& srcRect );
     auto getFrameIdx( const Entity entity ) const -> unsigned;
+    void forget( const Entity entity );  // drops a despawned entity's strips (its timers stop with Timer::stopEntity)
 
   private:
     Animator() = default;

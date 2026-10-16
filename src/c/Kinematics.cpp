@@ -228,6 +228,27 @@ void Kinematics::setBounds( Entity e, float minX, float minY, float maxX, float 
   d.hi = { std::max( minX, maxX ), std::max( minY, maxY ) };
 }
 
+void Kinematics::forget( Entity e ) {
+  if ( e < _driven.size() ) {
+    _driven[e].path.clear();
+    _driven[e] = Driven{};
+  }
+  for ( auto& d : _driven ) {
+    if ( d.on && ( ( d.type == FOLLOW_LERP && d.tgt == e ) || ( d.type == ORBITAL && d.center == e ) ) ) d.on = false;
+  }
+  if ( e < _tracks.size() ) _tracks[e] = 0;
+  for ( auto& t : _tracks ) {
+    if ( t == e ) t = 0;
+  }
+  if ( e < _vels.size() ) {
+    _vels[e] = {};
+    _accs[e] = {};
+  }
+}
+
+void Kinematics::snap( Entity e ) {
+  if ( e < _driven.size() ) _driven[e].started = false;
+}
 void Kinematics::stopMotion( Entity e ) {
   if ( e < _driven.size() ) {
     _driven[e].on = false;

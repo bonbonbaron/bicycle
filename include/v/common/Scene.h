@@ -77,6 +77,7 @@ class Grid {
   public:
     // Adds entity to the latest created layer.
     void addEntity( const Entity entity );
+    void addEntityTo( const Entity entity, unsigned layerIdx );  // e.g. a persistent entity arriving in a scene
     void addLayer( const Layer& layer );
     auto getLayers() -> std::vector<Layer>&;
     void setFocusedLayerIdx( const unsigned layerIdx );
@@ -92,6 +93,7 @@ class Scene : public Window {
   public:
     Scene();
     Scene( const int x, const int y, const int w, const int h );
+    ~Scene() override;  // frees the layers' images and the camera (entities in it are despawned by Lua first)
     // TODO make addGrid() or something to replace Scene( const Grid& grid );
 
     void render() override;
