@@ -4,7 +4,7 @@ local Hud = require('Hud')
 require('Dialogue')
 -- The player: an animated Aseprite character (see scripts/aseprite/sprite.lua) who walks with WASD,
 -- is blocked by solid things, gets hurt by enemies (health bar up top), and talks to NPCs with E or Space.
--- model: in 3D mode the hero is the Blender character test/genome/models/pilgrim3d (tools/blender/make_scene.py).
+-- model: in 3D mode the hero is the Blender character test/genome/models/pilgrim3d (scripts/blender/make_scene.py).
 local hero = { sprite="pilgrim", model="pilgrim3d", initAnim="walk_down", coll={ type="hero" } }
 
 local STEP = 256  -- one cell in fixed-point (FIXEDPT_DEC_BITS = 8)

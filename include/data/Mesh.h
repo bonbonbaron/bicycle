@@ -1,5 +1,5 @@
 #pragma once
-// .bmesh: a compressed triangle mesh (tools/pack makes them from Blender's OBJ exports; see tools/blender).
+// .bmesh: a compressed triangle mesh (tools/pack makes them from Blender's OBJ exports; see scripts/blender).
 //   connectivity  Edgebreaker CLERS symbols + S offsets (include/data/Edgebreaker.h)
 //   positions     quantized to qbits per axis over the bounding box, predicted with the parallelogram rule
 //                 (w ~ u + v - o across the gate) in Edgebreaker order; residuals zigzag-varint coded

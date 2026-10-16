@@ -150,8 +150,8 @@ The pixel modes use the `.bimg` files when a sprite has them, and a genome can n
 
 ### 3D art: Blender
 
-See `tools/blender/README.md`: `make_scene.py` authors the test scene headless, `export.py` exports it
-(`blender -b scene.blend --python tools/blender/export.py -- test/genome/models`), and the pack turns the OBJs
+See `scripts/blender/README.md`: `make_scene.py` authors the test scene headless, `export.py` exports it
+(`blender -b scene.blend --python scripts/blender/export.py -- test/genome/models`), and the pack turns the OBJs
 into `.bmesh`. Genomes pick a mesh with `model = "<object>"`.
 
 ## Environment variables

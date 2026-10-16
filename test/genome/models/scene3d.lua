@@ -1,4 +1,4 @@
--- written by tools/blender/export.py from meadow3d.blend
+-- written by scripts/blender/export.py from meadow3d.blend
 return {
   objects = {
     { name = "pilgrim3d", mesh = "models/pilgrim3d", role = "character" },

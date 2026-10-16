@@ -1,5 +1,5 @@
 # Exports a .blend's meshes for bicycle's 3D mode. Run headless (from the repo root):
-#   blender -b test/blender/meadow3d.blend --python tools/blender/export.py -- [out_dir]
+#   blender -b test/blender/meadow3d.blend --python scripts/blender/export.py -- [out_dir]
 # out_dir defaults to test/genome/models. For each mesh object it writes:
 #   <object>.obj + <object>.mtl   triangulated geometry with per-corner normals and UVs, Y up (Blender's Z up is
 #                                 converted: x, y, z -> x, z, -y), materials as usemtl groups
@@ -9,7 +9,7 @@
 #                                 everything else ("static") has its world transform baked in.
 # bicycle-pack (the 'assets' build target) then turns each .obj into an Edgebreaker-compressed .bmesh.
 # Armatures: modifiers are applied, so a rigged mesh exports in its current pose; skeletal animation isn't
-# exported yet (see tools/blender/README.md).
+# exported yet (see scripts/blender/README.md).
 import bpy
 import bmesh
 import os
@@ -117,7 +117,7 @@ def export_object(obj, depsgraph):
 depsgraph = bpy.context.evaluated_depsgraph_get()
 objects = [export_object(o, depsgraph) for o in bpy.context.scene.objects if o.type == "MESH"]
 with open(os.path.join(OUT, "scene3d.lua"), "w") as f:
-    f.write("-- written by tools/blender/export.py from %s\nreturn {\n  objects = {\n" % os.path.basename(bpy.data.filepath))
+    f.write("-- written by scripts/blender/export.py from %s\nreturn {\n  objects = {\n" % os.path.basename(bpy.data.filepath))
     for o in objects:
         f.write('    { name = "%s", mesh = "models/%s", role = "%s" },\n' % (o["name"], o["name"], o["role"]))
     f.write("  }\n}\n")

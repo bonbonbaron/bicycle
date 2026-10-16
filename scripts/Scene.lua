@@ -127,7 +127,7 @@ function Scene.new( tbl )
   return instance
 end
 
--- 3D mode: static scenery from tools/blender/export.py's scene3d.lua (ground, props). Characters in it are placed
+-- 3D mode: static scenery from scripts/blender/export.py's scene3d.lua (ground, props). Characters in it are placed
 -- by their genomes' model genes instead.
 function Scene:loadScenery3d(Genome)
   if Genome.Sprite.renderMode() ~= "3d" then return end

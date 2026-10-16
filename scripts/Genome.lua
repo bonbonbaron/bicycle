@@ -483,7 +483,7 @@ Gene["GeneLoader"] = {
   end,
   initAnim = 0,  -- do nothing; read by the sprite loader
   -- model = "<Blender object>": in 3D mode the entity is drawn as test/genome/models/<name>.bmesh (exported by
-  -- tools/blender/export.py) instead of its sprite; other modes ignore it.
+  -- scripts/blender/export.py) instead of its sprite; other modes ignore it.
   model = function(entity, gene)
     if Sprite.renderMode() ~= "3d" then return end
     if not ffi.C.setModel( entity, "./"..gameName.."/genome/models/"..gene.val..".bmesh" ) then

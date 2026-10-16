@@ -1,6 +1,6 @@
 // 3D mode: OpenGL 3.3 core through SDL3. The scene's camera box picks what the 3D camera follows; entities with a
 // model (setModel, the Lua "model" gene) are drawn as meshes (.bmesh, Edgebreaker-compressed, from Blender via
-// tools/blender/export.py), other entities as camera-facing billboards of their current sprite frame, and static
+// scripts/blender/export.py), other entities as camera-facing billboards of their current sprite frame, and static
 // scenery (addStaticModel) around them. Windows, the HUD and dialogue are PixelRenderer's 2D framebuffer composited
 // over the 3D world as an overlay.
 //

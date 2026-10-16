@@ -1,7 +1,7 @@
 # Authors test/blender/meadow3d.blend, the 3D mode's test scene: a pilgrim-like character, a textured ground
 # plane and a crate prop. Run headless (from the repo root):
-#   blender -b --factory-startup --python tools/blender/make_scene.py
-# Then export it for the engine with tools/blender/export.py (see tools/blender/README.md).
+#   blender -b --factory-startup --python scripts/blender/make_scene.py
+# Then export it for the engine with scripts/blender/export.py (see scripts/blender/README.md).
 import bpy
 import math
 import os
