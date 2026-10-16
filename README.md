@@ -298,6 +298,35 @@ aseprite -b --script-param game=test --script-param scene=house --script-param s
   --script-param transition=cut --script scripts/aseprite/addsong.lua
 ```
 
+### Placing entities in Aseprite
+
+A scene's entities live on its background sprite, on a layer named `entities` (`test/aseprite/meadow.aseprite`
+for `intro`, `house.aseprite` for `house`). Each entity is a slice named `<genome>#<n>` whose top-left is its
+position (1 sprite pixel = 2x1 cells) and whose properties hold `genome`, `fg` (the scene's fg layer), `order` (spawn
+order) and `extra` (other fields as Lua, e.g. `focus = true, persist = true` or `door = { to = "house", spawn =
+"entry" }`). The entities layer draws an outline for each so you can see them; it's never exported as art.
+
+* `scripts/aseprite/addentity.lua`: select a spot, pick a genome (the game's `genome/*.lua`, the same names as
+  `ids.genome`), the fg layer, persist/focus, a motion preset (linear, orbital, spin) and any more fields.
+* `scripts/aseprite/adddoor.lua` with the scene's background open makes the door a slice there too (its size is
+  the door's `w`/`h`); without it, it edits the scene file as before.
+* Move or resize slices in Aseprite, then re-run either script (`--script-param sync=1`) or export with
+  `sprite.lua`: the scene file's entities are rewritten.
+
+They're written into `genome/scene/<scene>.lua` between `-- BEGIN entities (generated ...)` and `-- END entities`
+in each fg layer; entries you write by hand outside those markers are kept, and re-exporting gives the same text.
+`--script-param import=1` moves a scene's hand-written entries onto slices once (that's how intro and house were
+converted, with identical output). Batch:
+
+```sh
+aseprite -b test/aseprite/meadow.aseprite --script-param genome=coin --script-param x=30 --script-param y=42 \
+  [--script-param fg=4] [--script-param persist=1] [--script-param motion=spin] --script scripts/aseprite/addentity.lua
+aseprite -b test/aseprite/meadow.aseprite --script-param list=1 --script scripts/aseprite/addentity.lua
+```
+
+plat3d and fps3d build their 3D scenes in Lua (`world3d.build`), with no Aseprite background, so they have no
+entities layer.
+
 `ctest -R aseprite-scene-scripts` runs both on a copy of the test game (configure with
 `-DBICYCLE_ASEPRITE=/path/to/aseprite`).
 

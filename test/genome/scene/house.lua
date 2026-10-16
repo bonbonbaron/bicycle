@@ -6,10 +6,12 @@ house.scenery3d = "house3d"   -- 3D: test/genome/level/house3d.lua (floor + wall
 house.spawns = { entry = { 20, 40 } }
 house.fg = {
   [2] = {
-    { genome = "hero", pos = { 20, 40 }, focus = true },  -- only used if you start here; else the hero walks in
+    -- BEGIN entities (generated from the entities layer of house.aseprite: place them there)
+    { genome = "hero", pos = { 20, 40 }, focus = true },
     { genome = "fairy", pos = { 10, 35 } },
     { genome = "keepsake", pos = { 120, 42 }, key = "keepsake" },
-    { genome = "door", pos = { 2, 36 }, door = { to = "intro", spawn = "from_house", w = 8, h = 12 } },
+    { genome = "door", pos = { 2, 36 }, door = { h = 12, spawn = "from_house", to = "intro", w = 8 } },
+    -- END entities
   }
 }
 house.music = { soundfont = "music/meadow.sf2", song = "music/house.mid" }

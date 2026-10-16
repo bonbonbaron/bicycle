@@ -49,9 +49,26 @@ local function returnSpawnPos(d)
   return math.max(0, d.x - 10), math.max(0, d.y - 2)
 end
 
+local E = require("sceneentities")
+
 local function apply(game, scene, d, returnName)
-  local entry = L.addDoor(game, scene, d)
-  print("adddoor: " .. L.sceneFile(game, scene) .. ": " .. entry)
+  local sg, ss = nil, nil
+  if sprite then sg, ss = E.sceneOf(sprite) end
+  if sprite and sg == game and ss == scene then
+    -- The scene's own background is open: the door is a slice on its entities layer (README, "Placing entities").
+    local f = { to = d.to }
+    if d.spawn and d.spawn ~= "" then f.spawn = d.spawn end
+    if d.on and d.on ~= "touch" then f.on = d.on end
+    if d.transition and d.transition ~= "" then f.transition = d.transition end
+    local fg = d.layer or L.sceneInfo(game, scene).fgLayers[1] or 1
+    local slice = E.add(sprite, game, "door", d.x, d.y, { w = d.w, h = d.h, fg = fg, extra = "door = " .. E.ser(f) })
+    E.sync(sprite)
+    if not (app and app.isUIAvailable) then sprite:saveAs(sprite.filename) end
+    print("adddoor: " .. slice.name .. " on " .. E.LAYER .. "; " .. L.sceneFile(game, scene) .. " rewritten")
+  else
+    local entry = L.addDoor(game, scene, d)
+    print("adddoor: " .. L.sceneFile(game, scene) .. ": " .. entry)
+  end
   if returnName and returnName ~= "" then
     local x, y = returnSpawnPos(d)
     if L.addSpawn(game, scene, returnName, x, y) then

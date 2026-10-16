@@ -231,7 +231,7 @@ local function makeSprite(ctr, globAnim)
 		if cfg.pixels then colorpal:add(TRANSPARENT) end  -- index 0
 		local cmIdx
 		local outputLayer = {}
-		if layer.isReference then
+		if layer.isReference or layer.name == "entities" then  -- entities: scene placement (sceneentities.lua)
 			dbgp("skipping reference layer "..layer.name)
 			goto continue
 		end
@@ -467,9 +467,11 @@ local function makeSprite(ctr, globAnim)
 			end  -- whether layer is a tileset or an image
 		end  -- if layer is group, recurse
 		::continue::
-		g.serialize_table(colorpalName, colorpal, DEBUG)
-		outputLayer.colorpal = colorpalName
-		table.insert( luaSprite.layers, outputLayer )
+		if layer.name ~= "entities" then  -- not art: no palette, not in the manifest
+			g.serialize_table(colorpalName, colorpal, DEBUG)
+			outputLayer.colorpal = colorpalName
+			table.insert( luaSprite.layers, outputLayer )
+		end
 	end  -- for each layer
 end  -- function makeSprite()
 
@@ -488,4 +490,9 @@ if colorMode == ColorMode.RGB or colorMode == ColorMode.INDEXED then
 end
 
 -- New tags/sprites: refresh gen/ids.lua now (the build does it too; README, "IDs").
+-- A scene background with an entities layer: rewrite the scene's entities (sceneentities.lua).
+do
+	local ok, err = pcall(function() require("sceneentities").sync(s) end)
+	if not ok then print("sceneentities: " .. tostring(err)) end
+end
 require("refreshids")()
