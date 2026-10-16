@@ -57,6 +57,8 @@ void PixelRenderer::init( const std::string& gameName ) {
   if ( const char* s = std::getenv( "BICYCLE_WINDOW_SIZE" ) ) {
     std::sscanf( s, "%dx%d", &w, &h );
   }
+  _gameName = gameName;
+  beforeWindowCreated();
   _window = SDL_CreateWindow( ( "bicycle - " + gameName ).c_str(), w, h, windowFlags() );
   if ( !_window ) {
     std::fprintf( stderr, "SDL_CreateWindow failed: %s\n", SDL_GetError() );
@@ -232,14 +234,21 @@ void PixelRenderer::setAttr( WinHandle win, int attr, bool on ) {
   else WIN( win )->attr &= ~attr;
 }
 
-void PixelRenderer::saveScreenshotIfDue() {
-  // BICYCLE_SCREENSHOT=<file.bmp> saves frame BICYCLE_SCREENSHOT_FRAME (default 90); BICYCLE_EXIT_AFTER_SCREENSHOT=1
-  // then quits. For headless runs (Xvfb) and docs.
+// BICYCLE_SCREENSHOT=<file.bmp> saves frame BICYCLE_SCREENSHOT_FRAME (default 90); BICYCLE_EXIT_AFTER_SCREENSHOT=1
+// then quits. For headless runs (Xvfb) and docs.
+auto PixelRenderer::screenshotDue() const -> bool {
   static const char* path = std::getenv( "BICYCLE_SCREENSHOT" );
-  if ( !path || !*path ) return;
   static const int when = envInt( "BICYCLE_SCREENSHOT_FRAME", 90 );
-  if ( _frame != when ) return;
-  SDL_Surface* s = SDL_CreateSurfaceFrom( _fbW, _fbH, SDL_PIXELFORMAT_ARGB8888, _fb.data(), _fbW * 4 );
+  return path && *path && _frame == when;
+}
+
+void PixelRenderer::saveScreenshotIfDue() {
+  if ( !screenshotDue() ) return;
+  const char* path = std::getenv( "BICYCLE_SCREENSHOT" );
+  std::vector<uint32_t> shot;
+  captureFrame( shot );
+  if ( shot.size() != _fb.size() ) return;
+  SDL_Surface* s = SDL_CreateSurfaceFrom( _fbW, _fbH, SDL_PIXELFORMAT_ARGB8888, shot.data(), _fbW * 4 );
   if ( s ) {
     if ( !SDL_SaveBMP( s, path ) ) std::fprintf( stderr, "screenshot failed: %s\n", SDL_GetError() );
     SDL_DestroySurface( s );

@@ -229,6 +229,16 @@ namespace bicycle {
       return true;
     }
 
+    // 3D mode: draw the entity as this mesh (an asset path of a .bmesh). False in other modes or if it's missing.
+    bool setModel( Entity entity, const char* bmeshPath ) {
+      return gfx::renderer().setModel( entity, bmeshPath );
+    }
+
+    // 3D mode: static scenery (ground, props) exported from Blender with its world transform baked in.
+    bool addStaticModel( const char* bmeshPath ) {
+      return gfx::renderer().addStaticModel( bmeshPath );
+    }
+
     void setPos( Entity entity, Position pos ) {
       auto& box = World::get<Box>( entity );
       box.pos = pos << FIXEDPT_DEC_BITS;

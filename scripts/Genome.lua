@@ -482,6 +482,14 @@ Gene["GeneLoader"] = {
     ffi.C.addCollider( entity, c.layer or 0, collType, box[1], box[2], box[3], box[4] )
   end,
   initAnim = 0,  -- do nothing; read by the sprite loader
+  -- model = "<Blender object>": in 3D mode the entity is drawn as test/genome/models/<name>.bmesh (exported by
+  -- tools/blender/export.py) instead of its sprite; other modes ignore it.
+  model = function(entity, gene)
+    if Sprite.renderMode() ~= "3d" then return end
+    if not ffi.C.setModel( entity, "./"..gameName.."/genome/models/"..gene.val..".bmesh" ) then
+      error( "Couldn't load model '"..gene.val.."' (meshes come from the asset pack: build the 'assets' target)." )
+    end
+  end,
   sprite2d = 0,  -- read by Genome.new: the sprite pixel modes use instead of img/sprite (ASCII keeps its own art)
   onSpawn = 0,  -- do nothing; called by Scene once the entity is placed
   onUncollision = 0,  -- do nothing, just allow it to exist

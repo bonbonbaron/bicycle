@@ -65,6 +65,10 @@ class Renderer {
     // Brackets one scene's layers and entities (the 3D renderer draws its world here).
     virtual void beginScene( WinHandle win, const Box& camBox ) {}
     virtual void endScene( WinHandle win ) {}
+    // 3D mode: an entity drawn as a mesh instead of its sprite, and static scenery (other modes ignore both).
+    // Paths are asset paths of .bmesh files (see include/data/Mesh.h).
+    virtual auto setModel( Entity entity, const std::string& bmeshPath ) -> bool { return false; }
+    virtual auto addStaticModel( const std::string& bmeshPath ) -> bool { return false; }
 };
 
 auto renderer() -> Renderer&;  // the build's renderer (BICYCLE_RENDER)

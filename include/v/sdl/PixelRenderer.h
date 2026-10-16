@@ -51,6 +51,7 @@ class PixelRenderer : public Renderer {
     };
     // Window flags for SDL_CreateWindow (3D adds SDL_WINDOW_OPENGL) and hooks for the subclass.
     virtual auto windowFlags() const -> uint64_t;
+    virtual void beforeWindowCreated() {}   // e.g. GL attributes
     virtual void onWindowCreated() = 0;
     virtual void onWindowDestroyed() = 0;
     virtual void presentFramebuffer() = 0;  // show _fb (ARGB8888, _fbW x _fbH)
@@ -63,6 +64,10 @@ class PixelRenderer : public Renderer {
     void glyph( const Win* win, int px, int py, unsigned char c, uint32_t fg, uint32_t bg );
     void drawTextImage( const Win* win, const Image& img, int srcX, int srcY, int srcW, int srcH, int dstX, int dstY );
     void saveScreenshotIfDue();
+    auto screenshotDue() const -> bool;  // this frame will be saved (BICYCLE_SCREENSHOT)
+    // The finished frame as ARGB, top row first (3D reads it back from GL before swapping).
+    virtual void captureFrame( std::vector<uint32_t>& out ) { out = _fb; }
+    std::string _gameName;
 
     SDL_Window* _window{};
     std::vector<uint32_t> _fb;
