@@ -16,7 +16,8 @@ class Kinematics : public Controllable {
     void pause( const Entity entity ) override;
     void unpause( const Entity entity ) override;
     void track( Entity follower, Entity tgt );  // tgt=0 to disable tracking
-    void untrack( Entity follower );  // tgt=0 to disable tracking
+    void untrack( Entity follower );
+    void setVelocity( const Entity entity, const Position& vel );  // constant velocity (fixed point per frame)  // tgt=0 to disable tracking
   private:
     Kinematics() = default;
     Kinematics(const Kinematics&) = delete;

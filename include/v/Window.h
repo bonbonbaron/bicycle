@@ -20,6 +20,7 @@ class Window {
     void move( int y, int x );
     virtual void render() = 0;
     virtual void onInput( Input& input ) = 0;
+    virtual void onTermResize() {}  // the terminal changed size (LINES and COLS are already updated)
     void repaint();
     const char* getCurrItemName() const;
     const char* getCurrItemDesc() const;

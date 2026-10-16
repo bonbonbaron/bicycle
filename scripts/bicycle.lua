@@ -66,9 +66,9 @@ ffi.cdef([[
       COUNT     // ← use this to know how many we defined (not a real key)
   } LogicalKey;
 
-  typedef struct { 
-    unsigned h;
+  typedef struct {  // same field order as include/m/Size.h
     unsigned w;
+    unsigned h;
     unsigned d;
   } Size;
 
@@ -185,16 +185,22 @@ ffi.cdef([[
   } CollisionArr;
 
   typedef struct {
-    LogicalKey lastPressed;
-    // int millisSinceLast;  // i don't like making input dependent on Timer.
+    uint8_t lastPressed;  // C++'s LogicalKey is a uint8_t enum
+    int millisSinceLast;
     // int currKeysPressed;
     // int deltaKeysPressed;
   } Input;
+
+  typedef struct {
+    uint8_t arr[32];
+    unsigned len;
+  } KeyQueue;
 
 	typedef struct {
 		TimeoutArr timeouts;
 		CollisionArr collisions;
 		CollisionArr uncollisions;
+		KeyQueue keys;  // every key since the last getUpdates(), in order
 		Input input; // Input is just a scalar.  // TODO should this be initialized?
 	} Bridge;
 
@@ -202,19 +208,30 @@ ffi.cdef([[
   typedef enum { RECT, COLLRECT, IMAGE } Component;
   typedef enum { SYS_TIMER, SYS_MOTION } System;
   Entity pushDialogue( const char* text, int x, int y, int w, int h );
+  bool isDialogueDone();
+  int getScreenWidth();
+  int getScreenHeight();
   Entity pushTextMenu( int x, int y, int w, int h );
   void addItem( const char* text );
   unsigned getSelection();
   Entity pushScene();
   Entity popWindow();
 
-  enum LayerType { FIXED, GLUED, PARALLAX, AUTOLOOP };
+  // Background layer types (C++'s LayerType): 0 FIXED, 1 GLUED, 2 PARALLAX, 3 LOOP, 4 AUTOLOOP. See Genome.lua's Sprite.BG_MODES.
   Entity newEntity();
   Entity delEntity();
   void addBgLayer( const char* bgStr );
+  void addBgLayerEx( const char* bgStr, int type, int parallaxPct, int parallaxPctY, int vx, int vy, int x, int y );
   void addFgEntity( Entity entity );
   void newImage( Entity entity, const char* imgStr );
   void setPos( Entity entity, Position pos );
+  void addCollider( Entity entity, unsigned layer, unsigned type, int x, int y, int w, int h );
+  void setVelocity( Entity entity, int vx, int vy );
+  void newAnimStrip( Entity entity, const char* stripName, bool repeat );
+  void addAnimFrame( Entity entity, const char* stripName, unsigned durationMs, int x, int y, int w, int h );
+  bool setAnim( Entity entity, const char* stripName );
+  void stopAnim( Entity entity );
+  unsigned getAnimFrameIdx( Entity entity );
   void focusCamOn( Entity entity );
   void sys(const Action action, const System system, Entity entity);
 
@@ -227,8 +244,13 @@ ffi.cdef([[
   void stopSong();
   void pauseSong();
   void unpauseSong();
-  void loadMidi( const char* midiFilepath );
-  void loadSoundfont( const char* sfFilepath );
+  bool loadMidi( const char* midiFilepath );
+  int loadSoundfont( const char* sfFilepath );
+  bool selectProgram( const int chan, const int sfontId, const int bank, const int program );
+  int getSfxChannel();
+  int addHudBar( const char* label, int max, int len, int x, int y );
+  void setHudBar( int id, int val );
+  void setHidden( Entity entity, bool hidden );
 
   Entity pop() {
     auto& wm = WindowManager::getInstance();
@@ -240,6 +262,15 @@ ffi.cdef([[
 
   int rollDice( const int min, const int max );
 ]])
+
+-- Set BICYCLE_DEBUG_LOG=<file> to have games log events (dbglog) for testing; otherwise a no-op.
+local debugLogFile = os.getenv( "BICYCLE_DEBUG_LOG" ) and io.open( os.getenv( "BICYCLE_DEBUG_LOG" ), "w" )
+function dbglog( fmt, ... )
+  if debugLogFile then
+    debugLogFile:write( string.format( "%.3f ", os.clock() ), string.format( fmt, ... ), "\n" )
+    debugLogFile:flush()
+  end
+end
 
 function checkType( arg, expType )
   if type(arg) ~= expType then 
@@ -267,6 +298,10 @@ function focusOn( entity )
   focus = entity
 end
 
+function getFocus()
+  return focus
+end
+
 --TODO write wrappers for menu and dialogue that 1) don't require dimensions and 2) auto-focus on them, 3) send moveCursorUp/Down()
 --TODO write wrappers for system calls
 
@@ -290,38 +325,42 @@ end
 function getUpdates()
   -- Collisions
   if bridge.collisions.len > 0 then
-    for i = 0, bridge.collisions.len do
+    for i = 0, bridge.collisions.len - 1 do
       coll = bridge.collisions.arr[i]
       entity = entities[coll.lhs]
       if not entity then error("Collision recorded for nonexistent entity "..tostring(coll.lhs)..".") end
-      entity:onCollision( coll.rhs, coll.type )
+      if entity.onCollision then entity:onCollision( coll.rhs, coll.type ) end
     end
+    bridge.collisions.len = 0  -- consumed; C++ appends from len
   end
   -- Uncollisions
   if bridge.uncollisions.len > 0 then
-    for i = 0, bridge.uncollisions.len do
+    for i = 0, bridge.uncollisions.len - 1 do
       coll = bridge.uncollisions.arr[i]
       entity = entities[coll.lhs]
       if not entity then error("Un-collision recorded for nonexistent entity "..tostring(coll.lhs)..".") end
-      entity:onCollision( coll.rhs, coll.type )
+      if entity.onUncollision then entity:onUncollision( coll.rhs, coll.type ) end
     end
+    bridge.uncollisions.len = 0  -- consumed; C++ appends from len
   end
   -- Time-outs
   if bridge.timeouts.len > 0 then
-    for i = 0, bridge.timeouts.len do
-      timeout = bridge.timeouts[i]
+    for i = 0, bridge.timeouts.len - 1 do
+      timeout = bridge.timeouts.arr[i]
       entity = entities[timeout.entity]
       if not entity then error("Timeout recorded for nonexistent entity "..tostring(timeout.entity)..".") end
-      entity:onTimeout( timeout.id, timeout.type )
+      if entity.onTimeout then entity:onTimeout( timeout.id, timeout.type ) end
     end
+    bridge.timeouts.len = 0  -- consumed; C++ appends from len
   end
-  -- Inputs
-  if bridge.input.lastPressed ~= ffi.C.NOTHING then
+  -- Inputs (every key since last frame, in order)
+  if bridge.keys.len > 0 then
     entity = entities[focus]
     if not entity then error("We're focused on nonexistent entity "..tostring(focus)..".") end
-    if entity and bridge.input.lastPressed then
-      entity:onInput( bridge.input.lastPressed )
-      bridge.input.lastPressed = ffi.C.NOTHING
+    for i = 0, bridge.keys.len - 1 do
+      entity:onInput( bridge.keys.arr[i] )
     end
+    bridge.keys.len = 0
+    bridge.input.lastPressed = ffi.C.NOTHING
   end
 end

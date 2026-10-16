@@ -12,7 +12,8 @@ Menu.new = function( x, y, w, h )
   local instance = { id=id, x=x, y=y, w=w, h=h, cbs = {} }
   setmetatable( instance, Menu )
   setmetatable( Menu, Window )
-  Window.push(id, instance)
+  Window.register(id, instance)
+  Window.focusOnEntity(id)
   return instance
 end
 

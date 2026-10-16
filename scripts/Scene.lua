@@ -10,7 +10,8 @@ Scene.__newindex = function() error( "You can't create new attributes for Scene.
 
 function Scene:getFileIter(path)
   -- Open a pipe to read ("r") from the command.
-  local handle = io.popen("ls "..path)
+  local isWindows = package.config:sub(1, 1) == "\\"
+  local handle = io.popen(isWindows and ('dir /b "'..path:gsub("/", "\\")..'"') or ("ls "..path))
   if not handle then
     error("failed to execute ls for "..self.name)
   end
@@ -71,10 +72,26 @@ function Scene:addFg( Genome, fg )
     genome.tbl.id = genome.id
 
     register( genome.id, genome.tbl )
+    if genome.tbl.onSpawn then genome.tbl:onSpawn() end
   end
 end
 
+-- bg is either an Aseprite background sprite exported by scripts/aseprite/sprite.lua (one tilemap layer per
+-- background layer, each with its mode) or a directory of .txt layers under genome/scene/bg/.
+-- fg[i] holds the entities that live in background layer i.
 function Scene:readLayers(Genome)
+  local Sprite = Genome.Sprite
+  if Sprite.exists( self.bg ) then
+    local spr = Sprite.load( self.bg )
+    if spr.kind ~= Sprite.TILEMAP then error( "Scene background '"..self.bg.."' isn't a tilemap sprite." ) end
+    for bgIdx, tm in ipairs( spr.layers ) do
+      Sprite.addBgLayer( tm )
+      if self.fg[bgIdx] then
+        self:addFg( Genome, self.fg[bgIdx] )
+      end
+    end
+    return
+  end
   -- TODO later don't require backgrounds to allow for entities without 
   local bg = self:getBg( "./"..gameName.."/genome/scene/bg/"..self.bg.."/*.txt"  )
   local bgIdx = 1
@@ -92,6 +109,7 @@ function Scene.new( tbl )
   local id = ffi.C.pushScene()  -- bicycle::pushScene() returns an entity ID of that scene
   local instance = { name=tbl.name, id=tbl.id, bg=tbl.bg, fg=tbl.fg }
   local Genome = require("Genome")
+  require("Sound").load( tbl.music, tbl.sfx )
   setmetatable( instance, Scene )  -- inherit Scene
   setmetatable( Scene, Window )    -- have Scene in turn inherit Window (its supertype)
   -- Push window to bicycle's internal stack of window

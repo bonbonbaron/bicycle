@@ -67,7 +67,7 @@ auto Timer::create( const unsigned timeMs, Entity entity, const unsigned timeout
     unsigned nFrames{ (Constants::FRAMES_PER_SECOND * timeMs) / 1000 };
     _times.at( timerId ) = nFrames;
     _decrementers.at(timerId) = 1;
-    _msgs.at(timerId)  = Timeout{ timerId, entity, timeoutType, addr };
+    _msgs.at(timerId)  = Timeout{ entity, timerId, timeoutType, addr };
     _cfgs.at(timerId) = { repeat, nFrames };
   }
   return timerId;

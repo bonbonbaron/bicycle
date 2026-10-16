@@ -1,5 +1,9 @@
+#ifdef _WIN32
+#include <conio.h>  // _kbhit(), _getch(): unbuffered, unechoed console keys
+#else
 #include <termios.h>
 #include <unistd.h>
+#endif
 #include <iostream>
 #include "c/Input.h"
 
@@ -19,7 +23,9 @@ class SshInput {
     SshInput operator=(const SshInput&&) = delete;
     // Most importantly...
     Input _inputState{};
+#ifndef _WIN32
     struct termios origTerm;  // let's us restore terminal to its original state before starting the game in dtor
+#endif
     auto convertCodeToLogicalInt(int code) -> LogicalKey;
 };
 

@@ -1,5 +1,5 @@
 #pragma once
-#include <cursesw.h>
+#include "curses_compat.h"
 #include <unordered_map>
 #include <string>
 

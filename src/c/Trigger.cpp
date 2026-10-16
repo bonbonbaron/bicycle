@@ -5,6 +5,7 @@
 #include <cassert>
 #include <iostream>
 #include "bicycle.h"
+#include "c/Animator.h"
 
 extern "C" {
   Bridge bridge;
@@ -12,6 +13,7 @@ extern "C" {
 
 Trigger::Trigger() {
   bridge.collisions.set( _collisions );
+  bridge.uncollisions.set( _uncollisions );
   bridge.timeouts.set( _timeouts );
 }
 
@@ -84,6 +86,7 @@ void Trigger::sendInput( Input& input ) {
   assert( currWindow != nullptr );
   currWindow->onInput( input );
   bridge.input = input;
+  bridge.keys.add( input.lastPressed );
 }
 
 // Notice timeouts are only sent to outputs.
@@ -93,6 +96,7 @@ void Trigger::sendTimeout( const Timeout& timeout ) {
       bridge.timeouts.add( timeout );
       break;
     case TimeoutAddr::ANIMATION:
+      Animator::getInstance().tick( timeout.entity );
       break;
     case TimeoutAddr::RENDERING:
       break;

@@ -13,12 +13,18 @@ void Kinematics::run() {
   // Trackers need to know where they're going before we move them.
   for ( Entity follower = 0; follower < _tracks.size(); ++follower ) {
     auto& target = _tracks.at( follower );
+    if ( target == 0 || target == follower ) {
+      continue;  // not tracking anything
+    }
     auto& trackerPos = World::get<Box>( follower ).pos;
     auto& targetPos = boxes.at( target ).pos;
     // If motion is acceleration-based, accelerate toward target.
     auto& trkrAcc = _accs.at( follower ).pos;
     auto& trkrVel = _vels.at( follower ).pos;
     // unit vector from tracker to target
+    if ( ( targetPos - trackerPos ).hasZeroMag() ) {
+      continue;  // already there; normalizing would divide by zero
+    }
     auto direction = ( targetPos - trackerPos ).normalize();  
     // Acceleration-based tracking
     if ( ! trkrAcc.hasZeroMag() ) {
@@ -83,6 +89,15 @@ void Kinematics::pause( const Entity entity ) {
 
 void Kinematics::unpause( const Entity entity ) {
   start(entity);
+}
+
+void Kinematics::setVelocity( const Entity entity, const Position& vel ) {
+  _vels.at( entity ) = Box();
+  _vels.at( entity ).pos = vel;
+  _accs.at( entity ) = Box();
+  auto& term = _terminalVels.at( entity );
+  term.pos.x = std::max( term.pos.x, std::abs( vel.x ) );
+  term.pos.y = std::max( term.pos.y, std::abs( vel.y ) );
 }
 
 void Kinematics::track( Entity follower, Entity tgt ) {

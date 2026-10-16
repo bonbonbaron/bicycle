@@ -86,14 +86,12 @@ function gen.serialize_table (fileBasename, tbl, dbg, indent)
     end
   end
 
+  local table_literal
   if #parts == 0 then
-    if dbg then
-      print("returning empty for "..fileBasename)
-    end
-    return "{}"
+    table_literal = "{}"  -- still write top-level files, since sprite tables reference them by name
+  else
+    table_literal = "{\n" .. table.concat(parts, ",\n") .. "\n" .. indent .. "}"
   end
-
-  local table_literal = "{\n" .. table.concat(parts, ",\n") .. "\n" .. indent .. "}"
   if indent ~= "" then
     return table_literal
   end

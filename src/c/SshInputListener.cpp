@@ -1,4 +1,6 @@
+#ifndef _WIN32
 #include <fcntl.h>
+#endif
 #include "c/SshInputListener.h"
 #include "c/Trigger.h"
 
@@ -9,6 +11,10 @@ auto SshInput::getInstance() -> SshInput& {
   return kbListener;
 }
 
+#ifdef _WIN32
+// The Windows console hands _getch() keys unbuffered and unechoed already.
+SshInput::SshInput() {}
+#else
 SshInput::SshInput() {
   tcgetattr( 0, &origTerm );
   struct termios raw = origTerm;
@@ -30,6 +36,7 @@ SshInput::SshInput() {
   int flags = fcntl( STDIN_FILENO, F_GETFL, 0 );
   fcntl( STDIN_FILENO, F_SETFL, flags | O_NONBLOCK );
 }
+#endif
 
 auto SshInput::convertCodeToLogicalInt(int code) -> LogicalKey {
   switch (code)
@@ -93,15 +100,22 @@ auto SshInput::convertCodeToLogicalInt(int code) -> LogicalKey {
 } // SshInput::convertCodeToLogicalInt()
 
 void SshInput::_listen() {
-  char buffer[static_cast<unsigned>(LogicalKey::COUNT)] = {};  
-  // TODO i put "LogicalKey::COUNT" abvoe so i can support multiple button presses per frame later... 
-  // for now, i'm happy with actually only working wiht one byte
-  // Reads 1 byte from fd 0 into a buffer.
-  read( STDIN_FILENO, buffer, 1 );
-  if ( buffer[0] != '\0' ) {
-    auto lkey = convertCodeToLogicalInt( buffer[0] );
-    _inputState.currKeysPressed.reset(); // SSH mode doesn't support key press/release distinctions. Press-detections only.
+  // Drain everything typed since last frame and send every key, in order. Reading only one byte per frame
+  // let key bursts queue up and land frames late; keeping only the newest key dropped presses.
+#ifdef _WIN32
+  while ( _kbhit() ) {
+    int c = _getch();
+    if ( c == 0 || c == 0xE0 ) {  // arrow/function keys arrive as two codes; skip them for now
+      _getch();
+      continue;
+    }
+#else
+  char c{};
+  while ( read( STDIN_FILENO, &c, 1 ) == 1 ) {
+#endif
+    auto lkey = convertCodeToLogicalInt( c );
     if ( lkey != LogicalKey::COUNT ) {
+      _inputState.currKeysPressed.reset(); // SSH mode doesn't support key press/release distinctions. Press-detections only.
       _inputState.currKeysPressed.set( static_cast<unsigned>( lkey ) );
       _inputState.lastPressed = lkey;
       Trigger::sendInput( _inputState );

@@ -15,6 +15,18 @@
 // Because then there are fewer collisions to check in bigger tiles.
 // However, that erases the meaning of "number of tiles high/wide".
 // What this means is getting the smallest tile dim, or rather, a flat-out 1x1 tile size, and creating a grid on that.
+// An entity's collision box is its CollBox offset by its position, or its whole box if the CollBox is empty.
+static auto getCollBox( const Entity entity ) -> CollBox {
+  const auto& box = World::get<Box>( entity );
+  auto coll = World::get<CollBox>( entity );
+  if ( coll.size.w == 0 || coll.size.h == 0 ) {
+    coll.size = box.size;
+    coll.pos = Position{};
+  }
+  coll.pos += box.pos;
+  return coll;
+}
+
 auto CollisionDetector::getInstance() -> CollisionDetector& {
   static CollisionDetector cd;
   return cd;
@@ -35,17 +47,11 @@ void CollisionDetector::check() {
   // Foreground collision detection
   for ( const auto& collLayer : collLayers ) {
     for ( auto e1 = collLayer.begin(); e1 != collLayer.end(); ++e1 ) {
-      const auto& b1 = World::get<Box>( *e1 );
-      auto& c1 = World::get<CollBox>( *e1 );
-      auto f1 = c1;  // copy collision box so the next line doesn't affect it
-      f1.pos += b1.pos;
+      const auto f1 = getCollBox( *e1 );
       for ( auto e2 = std::next(e1); e2 != collLayer.end(); ++e2 ) {
 				auto wereCollided = cd.recordedCollision( *e1, *e2 );
-        const auto& b2 = World::get<Box>( *e2 );
-        auto& c2 = World::get<CollBox>( *e2 );
-        auto f2 = c2;  // copy collision box so the next line doesn't affect it
-        f2.pos += b2.pos;
-        if ( b1.overlaps( b2 ) ) {
+        const auto f2 = getCollBox( *e2 );
+        if ( f1.overlaps( f2 ) ) {
           if ( !wereCollided ) {
             // TODO send both collisions in one function call by including both types
             trig.sendCollision( { *e1, *e2, f2.type } );

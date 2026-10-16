@@ -59,6 +59,7 @@ class Trigger {
     static constexpr unsigned MAX_COLLS_PER_ENTITY{10};  // this is arbitrary; surely there's a better data structure for this that can be safely shared with Lua.
     std::vector<Timeout> _timeouts{ MAX_NUM_TIMERS };
     std::vector<Collision> _collisions{ MAX_COLLS_PER_ENTITY * NUM_SUPPORTED_ENTITIES };
+    std::vector<Collision> _uncollisions{ MAX_COLLS_PER_ENTITY * NUM_SUPPORTED_ENTITIES };
 
     // Orchestra (TODO)
     struct Activity {
@@ -92,9 +93,22 @@ struct BridgedArray {
   }
 };
 
+// Every key pressed since Lua's last getUpdates(), in order, so no press is lost or merged.
+struct KeyQueue {
+  static constexpr unsigned CAP{32};
+  uint8_t arr[CAP];
+  unsigned len;
+  void add( const LogicalKey key ) {
+    if ( len < CAP ) {
+      arr[ len++ ] = static_cast<uint8_t>( key );
+    }
+  }
+};
+
 struct Bridge {
   BridgedArray<Timeout> timeouts;
   BridgedArray<Collision> collisions;
   BridgedArray<Collision> uncollisions;
+  KeyQueue keys;  // must precede input: Lua only declares input's first fields
   Input input; // Input is just a scalar.  // TODO should this be initialized?
 };

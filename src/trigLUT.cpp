@@ -1,6 +1,6 @@
 #include <array>
 
-constexpr unsigned LUT_RSHIFT{16};
+[[maybe_unused]] constexpr unsigned LUT_RSHIFT{16};
 std::array<int, 256> sineLUT{ 
 	0,	// 0
 	1608,	// 1

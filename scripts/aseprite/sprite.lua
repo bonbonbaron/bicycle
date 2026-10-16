@@ -59,7 +59,7 @@ local spritePal = app.sprite.palettes[1]
 require("debug")
 require("table")
 --local g = require("gentable")  -- TODO get require() to work later
-local g = dofile("gentable.lua")
+local g = dofile(current_dir .. "gentable.lua")
 
 local Set = {}
 Set.__index = Set
@@ -152,6 +152,34 @@ local function getAnimTag(sprite, frameIdx)
 	return nil
 end
 
+-- Parses "key=value key=value" from a layer's user data into background settings for the engine.
+--   mode      fixed (default) | glued | parallax | loop | autoloop
+--   parallax  percent of the camera's horizontal motion this layer follows (default 100; 50 for mode=parallax)
+--   parallaxy percent of the camera's vertical motion this layer follows (default: same as parallax)
+--   vx, vy    autoloop drift in cells per second (default vx=4 for autoloop)
+--   x, y      layer offset in cells (default 0)
+local BG_MODES = { fixed = true, glued = true, parallax = true, loop = true, autoloop = true }
+function parseBgSettings(data)
+	local bg = {}
+	for key, val in (data or ""):gmatch("(%w+)%s*=%s*([%w%.%-]+)") do
+		bg[key:lower()] = tonumber(val) or val:lower()
+	end
+	bg.mode = bg.mode or "fixed"
+	if not BG_MODES[bg.mode] then
+		error("Layer user data has unknown mode '"..tostring(bg.mode).."'. Use fixed, glued, parallax, loop or autoloop.")
+	end
+	bg.parallax = bg.parallax or (bg.mode == "parallax" and 50 or 100)
+	bg.parallaxy = bg.parallaxy or bg.parallax
+	if bg.mode == "autoloop" and not bg.vx and not bg.vy then
+		bg.vx = 4
+	end
+	bg.vx = bg.vx or 0
+	bg.vy = bg.vy or 0
+	bg.x = bg.x or 0
+	bg.y = bg.y or 0
+	return bg
+end
+
 -- This is going to bundle together everything you output. 
 local luaSprite = { layers = {}, anim = nil}
 local spriteName = getBasename(s.filename)
@@ -163,9 +191,14 @@ local function makeSprite(ctr, globAnim)
 	end
 	-- For each layer in sprite...
 	for i, layer in ipairs(ctr.layers) do
-		local colorpalName = layer.name.." palette"
-		local colorpal = Set.new(colorpalName)
+		-- Output files are named after the layer, prefixed with the sprite's name (unless the layer name already
+		-- starts with it) so layers with common names (e.g. "Layer 1", "sky") in different sprites don't collide.
 		local layerName = layer.name:gsub("%s+", "_")
+		if layerName:sub(1, #spriteName) ~= spriteName then
+			layerName = spriteName.."_"..layerName
+		end
+		local colorpalName = layerName.."_palette"
+		local colorpal = Set.new(colorpalName)
 		local cmIdx
 		local outputLayer = {}
 		if layer.isReference then
@@ -188,7 +221,7 @@ local function makeSprite(ctr, globAnim)
 				local outputTilesetImg = Image(TILE_W * #layer.tileset, TILE_H, ColorMode.INDEXED)
 				local outputTileIdx = 0
 				local outputTilemap = {}
-				local outputTileset = { anim = {}, colormap = layerName.."_tileset_colormap" }
+				local outputTileset = { anim = {}, colormap = layerName.."_tileset_colormap", ascii = {} }
 				local outputCollmap = {}
 				local outputCollset = {}
 				-- Generate the tileset.
@@ -208,6 +241,8 @@ local function makeSprite(ctr, globAnim)
 					end
 					-- Tile image
 					local tileImg = tile.image -- the image of a cel within tileset
+					-- ASCII version of the tile, same 2-chars-per-pixel scheme as colormaps. ascii[tileIdx + 1] is tile tileIdx.
+					outputTileset.ascii[tileIdx + 1] = ascii.image_to_ascii(s, tileImg, nil, "detailed", false, TILE_W, TILE_H)
 					for pixel in tileImg:pixels() do
 						local srcX, srcY, pixelValue = getPixelValues(pixel, colorMode, spritePal)
 						colorpal:add(pixelValue)
@@ -216,28 +251,33 @@ local function makeSprite(ctr, globAnim)
 					end  -- for each pixel in the current cel
 					outputTileIdx = outputTileIdx + 1
 				end  -- for each tile's cel
-				-- Generate the tilemap and animation.
+				-- Generate the tilemap from frame 1: tile indices, row-major and 1-based: tilemap[(row - 1) * numTilesWide + col].
+				-- The map covers the whole canvas; the cel may be smaller and offset, so place it by its position.
 				outputTilemap["tileWidth"] = TILE_W
 				outputTilemap["tileHeight"] = TILE_H
-				outputTilemap["numTilesWide"] = 0
-				outputTilemap["numTilesHigh"] = 0
-				local cumulativeTilesWide = 0
-				-- Write tile indices to output tilemap.
-				for _, cel in ipairs(layer.cels) do  -- for each frame
-					for row = 1, cel.image.height do  -- for each row in current tile
-						local curr = cumulativeTilesWide + (row * (cumulativeTilesWide + cel.image.width))
-						for col = 1, cel.image.width do  -- for each column in current tile
-							curr = curr + col
-							outputTilemap[curr] = cel.image:getPixel(col, row)
+				local W = math.ceil(s.width / TILE_W)
+				local H = math.ceil(s.height / TILE_H)
+				outputTilemap["numTilesWide"] = W
+				outputTilemap["numTilesHigh"] = H
+				for i = 1, W * H do
+					outputTilemap[i] = 0  -- tile 0 is Aseprite's empty tile
+				end
+				local cel = layer:cel(1)
+				if cel then
+					local col0 = cel.position.x // TILE_W
+					local row0 = cel.position.y // TILE_H
+					for row = 0, cel.image.height - 1 do
+						for col = 0, cel.image.width - 1 do
+							local mapRow, mapCol = row0 + row, col0 + col
+							if mapRow >= 0 and mapRow < H and mapCol >= 0 and mapCol < W then
+								outputTilemap[mapRow * W + mapCol + 1] = app.pixelColor.tileI(cel.image:getPixel(col, row))
+							end
 						end
 					end
-					outputTilemap["numTilesWide"] = outputTilemap["numTilesWide"] + cel.image.width
-					if outputTilemap["numTilesHigh"] < cel.image.height then
-						outputTilemap["numTilesHigh"] = cel.image.height
-					end
-					-- While we're at it, let's add the source rectangle to the animation frame.
-					cumulativeTilesWide = cumulativeTilesWide + cel.image.width
 				end
+				-- Background settings come from the layer's user data (Layer Properties > user data), e.g.
+				-- "mode=parallax parallax=50" or "mode=autoloop vx=4". See README.txt.
+				outputLayer.bg = parseBgSettings(layer.data)
 				local layerTilemapName = layerName.."_tilemap"
 				local layerTilesetName = layerName.."_tileset"
 				local layerCollmapName = layerName.."_collmap"
@@ -268,29 +308,28 @@ local function makeSprite(ctr, globAnim)
 				local outputH = 0
 				-- Get maximum cel height to determine output image size.
 				-- Width can just be added together. Anim strips are horizontal in our engine.
-				for _, cel in ipairs(layer.cels) do
-					outputW = outputW + cel.image.width
-					if cel.image.height > outputH then
-						outputH = cel.image.height
-					end
-				end
+				-- Every layer gets one full-canvas frame per sprite frame (blank where it has no cel),
+				-- so layers stay frame-aligned and can be composited.
+				outputW = s.width * #s.frames
+				outputH = s.height
 				local outputFullImg
 				if cfg.ascii then
-					outputFullImg = Image(outputW, outputH, ColorMode.INDEXED)
-				else
 					outputFullImg = ""
+				else
+					outputFullImg = Image(outputW, outputH, ColorMode.INDEXED)
 				end
 				local cumulativeWidth = 0
 				local outputCollRects = {}
 				local outputCollSet = {}
 				local asciiFrames = {}
-				for frameIdx, cel in ipairs(layer.cels) do
+				for frameIdx = 1, #s.frames do
+					local cel = layer:cel(frameIdx)
 					local collType = nil
 					-- Frame image
 					if cfg.ascii then
-							local currCelAsAscii = ascii.image_to_ascii(s, cel.image, cel, "detailed", false)
+							local currCelAsAscii = ascii.image_to_ascii(s, cel and cel.image, cel, "detailed", false)
 							table.insert(asciiFrames, currCelAsAscii)
-					else
+					elseif cel then
 						for pixel in cel.image:pixels() do  -- TODO support animation (multiple cels)
 							local srcX, srcY, pixelValue = getPixelValues(pixel, colorMode, spritePal)
 							colorpal:add(pixelValue)
@@ -307,7 +346,7 @@ local function makeSprite(ctr, globAnim)
 					end
 					-- Frame animation
 					-- The reason we do this separately from global animation is each layer has different source rects.
-					local srcRect = { x = cumulativeWidth, y = 0, w = cel.image.width, h = cel.image.height }
+					local srcRect = { x = cumulativeWidth, y = 0, w = s.width, h = s.height }
 					local animTag = getAnimTag(s, frameIdx)
 					if animTag and outputAnimSrcRects.strips[animTag] then
 						table.insert(outputAnimSrcRects.strips[animTag], srcRect)
@@ -319,9 +358,9 @@ local function makeSprite(ctr, globAnim)
 						end
 						table.insert(outputAnimSrcRects.strips["DEFAULT"], srcRect)
 					end
-					cumulativeWidth = cumulativeWidth + cel.image.width
+					cumulativeWidth = cumulativeWidth + s.width
 					-- Frame collision (rectangle-based, at least for now in our engine)
-					if layer.name == "collision" then
+					if layer.name == "collision" and cel then
 						local label = animTag or "default"
 						-- Start a new animation strip if this is a new one (or anim'd at all).	
 						local collRect = {
@@ -350,7 +389,7 @@ local function makeSprite(ctr, globAnim)
 				if next(outputAnimSrcRects) then
 					local animSrcRectsName = layerName.."_anim_src_rects"
 					outputLayer.animSrcRects = animSrcRectsName
-					outputAnimSrcRects.refGlobalAnim = globAnim.name  -- TODO  put this at sprite's top level
+					outputAnimSrcRects.refGlobalAnim = globAnim and globAnim.name  -- TODO  put this at sprite's top level
 					g.serialize_table(animSrcRectsName, outputAnimSrcRects, DEBUG)  -- reusable per sprite, so name after layer
 				end
 				-- Collision rects
@@ -388,7 +427,7 @@ end  -- function makeSprite()
 
 
 local globAnim = getGlobalAnimData(s)
-luaSprite.anim = globAnim.name
+luaSprite.anim = globAnim and globAnim.name
 if colorMode == ColorMode.RGB or colorMode == ColorMode.INDEXED then
 	makeSprite(s, globAnim)
 	if globAnim ~= nil then

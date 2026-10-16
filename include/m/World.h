@@ -25,7 +25,7 @@ class World {
     // Allows you to more easily make an event mapping
     template <typename T>
     static void add( const Entity entity, const T& val ) {
-      auto& world = getInstance();
+      [[maybe_unused]] auto& world = getInstance();
       //world.
     }
 
@@ -117,6 +117,10 @@ class World {
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-function"
+#ifdef __clang__
+// LWorldArr is a plain struct (pointer + length) that LuaJIT's FFI reads; it's fine to return from C functions.
+#pragma clang diagnostic ignored "-Wreturn-type-c-linkage"
+#endif
 template<typename T>
 struct LWorldArr {
   T* arr;

@@ -15,12 +15,14 @@ class Animator : public Controllable {
   public:
     static auto getInstance() -> Animator&;
     void tick( const Entity entity );
-    void set( const Entity entity, const std::string& stripName );
+    auto set( const Entity entity, const std::string& stripName ) -> bool;
     void start( const Entity entity ) override;
     void stop( const Entity entity ) override;
     void pause( const Entity entity ) override;
     void unpause( const Entity entity ) override;
-    void newStrip( Entity follower, const std::string& stripName );
+    void newStrip( const Entity entity, const std::string& stripName, const bool repeat );
+    void addFrame( const Entity entity, const std::string& stripName, const unsigned durationMs, const Rect& srcRect );
+    auto getFrameIdx( const Entity entity ) const -> unsigned;
 
   private:
     Animator() = default;
@@ -31,7 +33,7 @@ class Animator : public Controllable {
 
     struct AnimFrame {
       unsigned durationMs{};   // total duration -- don't decrement here, tell timer to
-      Rect srcRect{};          // source portion of origin iamge for destination image
+      Rect srcRect{};          // source portion of the entity's image (the whole strip), in character cells
       CollBox collisionBox{};  // collision boxes may change from frame to frame
     };
 
@@ -51,10 +53,12 @@ class Animator : public Controllable {
       unsigned frameIdx{};
       int increment{1};
       TimerId timerId{};
+      bool running{};
       std::shared_ptr<AnimStrip> currStrip{};
     };
 
     void startTimer( const Entity entity, AnimState& state );
+    void showFrame( const Entity entity, AnimState& state );
 
     // TODO make matching entities map to the same animation set
     std::array<AnimState, NUM_SUPPORTED_ENTITIES> _animStates{};

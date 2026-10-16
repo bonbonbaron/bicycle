@@ -1,0 +1,30 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "default",
+      "displayName": "Ninja (Linux, MSYS2, MinGW); dependencies fetched and built",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build"
+    },
+    {
+      "name": "system",
+      "displayName": "Ninja, using installed packages only (BICYCLE_USE_SYSTEM_DEPS=ON)",
+      "inherits": "default",
+      "binaryDir": "${sourceDir}/build/system",
+      "cacheVariables": { "BICYCLE_USE_SYSTEM_DEPS": "ON" }
+    },
+    {
+      "name": "msvc",
+      "displayName": "Visual Studio 2022 x64 (run from a Developer Command Prompt)",
+      "generator": "Visual Studio 17 2022",
+      "architecture": "x64",
+      "binaryDir": "${sourceDir}/build/msvc"
+    }
+  ],
+  "buildPresets": [
+    { "name": "default", "configurePreset": "default" },
+    { "name": "system", "configurePreset": "system" },
+    { "name": "msvc", "configurePreset": "msvc", "configuration": "Release" }
+  ]
+}
