@@ -155,6 +155,23 @@ namespace bicycle {
       return Animator::getInstance().getFrameIdx( entity );
     }
 
+    // COLLISION
+    // Registers an entity for collision checks against others on the same layer. x/y/w/h is its collision
+    // box relative to its position, in cells; w or h of 0 means "use the entity's whole box".
+    void addCollider( Entity entity, unsigned layer, unsigned type, int x, int y, int w, int h ) {
+      World::set<CollBox>( entity, CollBox( Box( Position( x, y ), Size( w, h ) ), type ) );
+      CollisionDetector::registerEntity( entity, layer );
+    }
+
+    // MOTION
+    // Constant velocity in fixed-point cells per frame (256 = one cell per frame).
+    void setVelocity( Entity entity, int vx, int vy ) {
+      Position vel{};
+      vel.x = vx;
+      vel.y = vy;
+      Kinematics::getInstance().setVelocity( entity, vel );
+    }
+
     Entity popWindow() {
       return pop();
     }
@@ -205,13 +222,20 @@ namespace bicycle {
       auto& player = MidiPlayer::getInstance();
       player.unpauseSong();
     }
-    void loadMidi( const char* midiFilepath ) {
+    bool loadMidi( const char* midiFilepath ) {
       auto& player = MidiPlayer::getInstance();
-      player.loadMidi( midiFilepath );
+      return player.loadMidi( midiFilepath );
     }
-    void loadSoundfont( const char* sfFilepath ) {
+    int loadSoundfont( const char* sfFilepath ) {
       auto& player = MidiPlayer::getInstance();
-      player.loadSoundfont( sfFilepath );
+      return player.loadSoundfont( sfFilepath );
+    }
+    bool selectProgram( const int chan, const int sfontId, const int bank, const int program ) {
+      auto& player = MidiPlayer::getInstance();
+      return player.selectProgram( chan, sfontId, bank, program );
+    }
+    int getSfxChannel() {
+      return MidiPlayer::SFX_CHANNEL;
     }
 
     // Timer
@@ -240,6 +264,7 @@ namespace bicycle {
       // Inputs
       Timer::run();
       SshInput::listen();
+      Kinematics::getInstance().run();
       CollisionDetector::check();
       // Process inputs
       trigger.send();

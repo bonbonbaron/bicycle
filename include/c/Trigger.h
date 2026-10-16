@@ -59,6 +59,7 @@ class Trigger {
     static constexpr unsigned MAX_COLLS_PER_ENTITY{10};  // this is arbitrary; surely there's a better data structure for this that can be safely shared with Lua.
     std::vector<Timeout> _timeouts{ MAX_NUM_TIMERS };
     std::vector<Collision> _collisions{ MAX_COLLS_PER_ENTITY * NUM_SUPPORTED_ENTITIES };
+    std::vector<Collision> _uncollisions{ MAX_COLLS_PER_ENTITY * NUM_SUPPORTED_ENTITIES };
 
     // Orchestra (TODO)
     struct Activity {

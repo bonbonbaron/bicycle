@@ -13,6 +13,7 @@ extern "C" {
 
 Trigger::Trigger() {
   bridge.collisions.set( _collisions );
+  bridge.uncollisions.set( _uncollisions );
   bridge.timeouts.set( _timeouts );
 }
 
