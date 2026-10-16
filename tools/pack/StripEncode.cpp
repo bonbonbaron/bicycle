@@ -12,13 +12,13 @@ auto stripEncode( const BImg& img, int n ) -> std::string {
   const size_t count = img.indices.size();
   const size_t nIdx = ( count + n - 1 ) / n;
   // Deduplicate strips (the last one is padded with index 0).
-  std::map<std::vector<uint8_t>, uint16_t> seen;
+  std::map<std::string, uint16_t> seen;  // strip bytes -> index (a string key: GCC 14 misfires on vector<uint8_t>)
   std::vector<uint8_t> units;
   std::string sm;
   for ( size_t k = 0; k < nIdx; ++k ) {
-    std::vector<uint8_t> s( n, 0 );
+    std::string s( n, '\0' );
     for ( int u = 0; u < n; ++u ) {
-      if ( k * n + u < count ) s[u] = img.indices[k * n + u];
+      if ( k * n + u < count ) s[u] = static_cast<char>( img.indices[k * n + u] );
     }
     auto it = seen.find( s );
     if ( it == seen.end() ) {

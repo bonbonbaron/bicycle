@@ -1,7 +1,18 @@
 # bicycle
 
-A terminal game engine: ncurses (PDCurses on Windows) graphics, LuaJIT game scripts, fluidsynth music and
-sound effects. The engine is one executable, `o`, that runs a game folder: `./o test` runs `test/main.lua`.
+A game engine with three render modes, LuaJIT game scripts and fluidsynth music and sound effects. The engine is
+one executable that runs a game folder: `./o test` runs `test/main.lua`.
+
+| `BICYCLE_RENDER` | executable | draws with | art |
+|---|---|---|---|
+| `ASCII` (default) | `o` | curses in a terminal (ncurses, PDCurses on Windows) | ASCII exports of Aseprite sprites, text images |
+| `2D` | `o-2d` | SDL3 window, software framebuffer | pixel (`.bimg`) exports of the same Aseprite sprites |
+| `3D` | `o-3d` | SDL3 + OpenGL 3.3 core | Blender meshes (`model` gene), sprites as billboards, 2D overlay |
+
+The game code is the same in every mode: everything is laid out in character cells (a sprite pixel is 2x1 cells,
+as in the ASCII export), so positions, collisions, the camera, the HUD and dialogue don't change. See
+`include/v/common/Renderer.h` for the interface each mode implements (`src/v/ascii`, `src/v/2d`, `src/v/3d`, with
+`src/v/sdl` shared by the pixel modes).
 
 ## Building
 
@@ -13,6 +24,18 @@ You only need CMake (3.21+), a C/C++ compiler and an internet connection; git is
 cmake -B build && cmake --build build
 ./o test            # o.exe test on Windows
 ```
+
+Pick the render mode at configure time, one build folder per mode:
+
+```sh
+cmake -B build -DBICYCLE_RENDER=ASCII && cmake --build build && ./o test
+cmake -B build/2d -DBICYCLE_RENDER=2D && cmake --build build/2d && ./o-2d test
+cmake -B build/3d -DBICYCLE_RENDER=3D && cmake --build build/3d && ./o-3d test
+```
+
+The pixel modes fetch SDL3 (static). On Linux they need the X11 and/or Wayland development headers
+(`libx11-dev libxext-dev`, `libwayland-dev`) and, for 3D, an OpenGL 3.3 driver (Mesa's llvmpipe works). Window
+size: `BICYCLE_WINDOW_SIZE=1280x720` (a cell is 8x16 screen pixels). Arrow keys work like WASD.
 
 The first configure takes a minute or two (it builds the dependencies into `build/_deps`); later builds don't
 repeat it. The executable lands in the repository root because games and `scripts/` are found relative to the
@@ -56,6 +79,8 @@ o test
 * `BICYCLE_FETCH_NCURSES` (OFF): on Linux/macOS, build ncurses instead of using the system one.
 * `BICYCLE_DOWNLOAD_GM_SF2` (ON): download GeneralUser GS (32 MB) to `sf2/default-GM.sf2`, the music fallback.
 * `BICYCLE_DEPS_DIR` (`build/_deps`): where downloads and dependency builds go.
+* `BICYCLE_RENDER` (`ASCII`): `ASCII`, `2D` or `3D`.
+* `BICYCLE_GAMES` (`test`): game folders whose assets the `assets` target packs.
 
 ### Music
 
@@ -83,9 +108,56 @@ cmake -B build/clang64 -G Ninja -DCMAKE_TOOLCHAIN_FILE=cmake/mingw-w64.cmake \
       -DMINGW_CC=x86_64-w64-mingw32-clang -DMINGW_CXX=x86_64-w64-mingw32-clang++ && cmake --build build/clang64
 ```
 
-The resulting `o.exe` runs under Wine.
+Add `-DBICYCLE_RENDER=2D` or `3D` for `o-2d.exe` / `o-3d.exe`. The resulting executables run under Wine.
+
+## Assets
+
+### Packing and compression
+
+Every build runs the `assets` target (`tools/pack`, a host tool, also when cross-compiling), which compresses each
+game folder's `main.lua` and `genome/**` into `<game>/assets.bpak`. The engine mounts the pack at start-up and
+reads everything through it (`include/data/Pack.h`): Lua modules (a `package.loaders` searcher), Aseprite exports,
+MIDI, SoundFonts, images and meshes. Files missing from the pack are read from disk, and `BICYCLE_LOOSE_ASSETS=1`
+ignores the pack (handy while editing).
+
+| entry | stored as | decoded with |
+|---|---|---|
+| `.lua`, `.txt`, `.mid`, `.sf2`, ... | zlib (miniz at level 10 when packing) | jollybean's `tinfl` (`src/data/tinfl.c`) |
+| `.bimg` (indexed) | jollybean's strip codec (deduplicated runs of N pixels, bit-packed indices, deflated), or deflate if smaller | `src/data/Strip.cpp` |
+| `.obj` (Blender) | `.bmesh`: Edgebreaker connectivity, quantized + parallelogram-predicted positions, octahedral normals, delta UVs, all deflated | `src/data/Mesh.cpp`, `src/data/Edgebreaker.cpp` |
+
+Game SoundFonts are handed to fluidsynth from memory (a custom SoundFont loader whose file callbacks read a
+buffer; names start with `bicycle-mem://`), and MIDI files with `fluid_player_add_mem`, so neither touches the
+disk. The 32 MB General MIDI fallback (`sf2/default-GM.sf2`) stays a plain file outside the pack: it's shared by
+every game and barely compresses (SoundFont samples are PCM).
+
+`ctest` (or `build/bicycle-tests test`) round-trips every codec and every pack entry, including the Blender meshes.
+
+### 2D art: Aseprite
+
+`scripts/aseprite/sprite.lua` exports an `.aseprite` file to `test/genome/` (see `scripts/aseprite/README.txt`):
+
+```sh
+aseprite -b test/aseprite/pilgrim.aseprite --script scripts/aseprite/sprite.lua
+```
+
+`BICYCLE_EXPORT=ascii|pixels|both` (default `both`) picks the outputs. ASCII writes `<layer>_colormap.lua` (ASCII
+art) and per-tile ASCII; pixels writes `<layer>_pixels.bimg` (an indexed frame strip, frame f at x = (f-1) * canvas
+width, index 0 transparent) and `<layer>_tileset_pixels.bimg`, and records each layer's palette in
+`<layer>_palette.lua`. Animation src rects, tags, tilemaps, background modes and collision data are shared by both.
+The pixel modes use the `.bimg` files when a sprite has them, and a genome can name different art for them with
+`sprite2d` (e.g. the horse keeps its hand-drawn ASCII `img` and uses `horse_sprite` in 2D/3D).
+
+### 3D art: Blender
+
+See `tools/blender/README.md`: `make_scene.py` authors the test scene headless, `export.py` exports it
+(`blender -b scene.blend --python tools/blender/export.py -- test/genome/models`), and the pack turns the OBJs
+into `.bmesh`. Genomes pick a mesh with `model = "<object>"`.
 
 ## Environment variables
 
-`BICYCLE_AUDIO_DRIVER`, `BICYCLE_AUDIO_FILE`, `BICYCLE_GM_SF2`, `BICYCLE_MUTE_MUSIC`, `BICYCLE_PROFILE` (audio
+`BICYCLE_LOOSE_ASSETS`, `BICYCLE_WINDOW_SIZE`, `BICYCLE_SCREENSHOT=<file.bmp>` (+ `BICYCLE_SCREENSHOT_FRAME`,
+default 90, and `BICYCLE_EXIT_AFTER_SCREENSHOT=1`) and `BICYCLE_GL_INFO` for the pixel modes;
+
+and `BICYCLE_AUDIO_DRIVER`, `BICYCLE_AUDIO_FILE`, `BICYCLE_GM_SF2`, `BICYCLE_MUTE_MUSIC`, `BICYCLE_PROFILE` (audio
 start-up timings) and `BICYCLE_DEBUG_LOG` (Lua `dbglog`): see `include/c/MidiPlayer.h` and `tools/audio/README.md`.

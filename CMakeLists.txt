@@ -44,13 +44,21 @@ target_include_directories( bicycle_data PUBLIC include )
 set( MINIZ_DIR "${BICYCLE_MINIZ_DIR}" )
 if ( CMAKE_CROSSCOMPILING )
   # The packer runs during the build, so build it for this machine, not the target.
+  # Its compilers are the host's (BICYCLE_HOST_CC/CXX), never the cross compilers in CC/CXX.
+  set( BICYCLE_HOST_CC cc CACHE STRING "Host C compiler for build-time tools when cross-compiling" )
+  set( BICYCLE_HOST_CXX c++ CACHE STRING "Host C++ compiler for build-time tools when cross-compiling" )
   set( hostBin "${BICYCLE_DEPS_DIR}/build/bicycle-pack-host" )
-  if ( NOT EXISTS "${hostBin}/CMakeCache.txt" )
-    bicycle_run( "configuring the host asset packer" "${CMAKE_COMMAND}" -S "${CMAKE_SOURCE_DIR}/tools/pack" -B "${hostBin}"
-      -G "${CMAKE_GENERATOR}" -DCMAKE_BUILD_TYPE=Release "-DMINIZ_DIR=${MINIZ_DIR}" )
+  set( hostExe "" )
+  if ( CMAKE_HOST_WIN32 )
+    set( hostExe ".exe" )
   endif()
-  add_custom_target( bicycle-pack-host COMMAND "${CMAKE_COMMAND}" --build "${hostBin}" --config Release BYPRODUCTS "${hostBin}/bicycle-pack" )
-  set( BICYCLE_PACKER "${hostBin}/bicycle-pack" )
+  if ( NOT EXISTS "${hostBin}/CMakeCache.txt" )
+    bicycle_run( "configuring the host asset packer" "${CMAKE_COMMAND}" -E env --unset=CC --unset=CXX --unset=CMAKE_TOOLCHAIN_FILE
+      "${CMAKE_COMMAND}" -S "${CMAKE_SOURCE_DIR}/tools/pack" -B "${hostBin}" -G "${CMAKE_GENERATOR}" -DCMAKE_BUILD_TYPE=Release
+      "-DCMAKE_C_COMPILER=${BICYCLE_HOST_CC}" "-DCMAKE_CXX_COMPILER=${BICYCLE_HOST_CXX}" "-DMINIZ_DIR=${MINIZ_DIR}" )
+  endif()
+  add_custom_target( bicycle-pack-host COMMAND "${CMAKE_COMMAND}" --build "${hostBin}" --config Release BYPRODUCTS "${hostBin}/bicycle-pack${hostExe}" )
+  set( BICYCLE_PACKER "${hostBin}/bicycle-pack${hostExe}" )
   set( BICYCLE_PACKER_TARGET bicycle-pack-host )
 else()
   add_subdirectory( tools/pack )
