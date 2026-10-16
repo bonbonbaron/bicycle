@@ -181,10 +181,22 @@ void Scene::onInput( Input& input ) {
 }
 
 // A full-screen scene grows or shrinks with the terminal, e.g. when a terminal is maximized after the game started.
+// The camera's view follows the window; its limits, dead zone and position are refit right away so the next frame
+// (which curses fully repaints after a resize) shows the focus in view.
 void Scene::onTermResize() {
-  setWidth( gfx::cols() - 4 );  // same size the default constructor gives
-  setHeight( gfx::lines() );
+  place( 0, 0, std::max( 1, gfx::cols() - 4 ), gfx::lines() );  // same size the default constructor gives
   _camera.setDims( getHeight(), getWidth() );
+  updateCameraLimits();
+  auto& cam = World::get<Box>( _camera.getId() );
+  cam.pos.x = std::clamp<int>( cam.pos.x, 0, _camera.getMaxX() );
+  cam.pos.y = std::clamp<int>( cam.pos.y, 0, _camera.getMaxY() );
+  if ( const Entity focus = _camera.getFocus() ) {
+    // Keep the focus at least 2 cells inside each edge: the dead zone can't be wider than the view allows.
+    constexpr float ONE = 1 << FIXEDPT_DEC_BITS;
+    const auto& tgt = World::get<Box>( focus );
+    Kinematics::getInstance().capDeadZone( _camera.getId(), ( float( cam.size.w ) - tgt.size.w ) / ( 2 * ONE ) - 2,
+                                           ( float( cam.size.h ) - tgt.size.h ) / ( 2 * ONE ) - 2 );
+  }
 }
 
 void Scene::setFocus( Entity entity ) {

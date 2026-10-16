@@ -52,6 +52,9 @@ class Renderer {
     virtual auto lines() const -> int = 0;
     // Whether the screen changed size since the last call (cols()/lines() are already updated).
     virtual auto checkResize() -> bool = 0;
+    // The screen is below the smallest usable size: WindowManager skips the windows and the renderer shows a
+    // "too small" notice until it grows again (ASCII; pixel windows scale instead).
+    virtual auto tooSmall() const -> bool { return false; }
 
     // Reads pending key presses and hands them to the Trigger system.
     virtual void pollInput() = 0;

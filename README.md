@@ -286,6 +286,17 @@ fraction (green, then yellow/amber, then red), take optional bar sprites (`hp:sp
 `scripts/Hud.lua`), and render text with TrueType (`fonts/ui.ttf`, stb_truetype). In the pixel modes, ASCII-art
 images that have no pixel version are drawn as solid cell blocks, not characters.
 
+ASCII follows the terminal's size. Each frame the renderer polls it: `TIOCGWINSZ` on Linux/macOS, PDCurses'
+`is_termresized()` on Windows. On a change it resizes curses (`resize_term`) and tells every window
+(`Window::onTermResize`):
+* The scene refits its view.
+* The camera's limits and dead zone are recomputed and the camera is clamped.
+* A bottom dialogue stays full width at the bottom and rewraps its text.
+* Other windows are pulled back on screen.
+
+Curses' screen cache is invalidated, so the next frame repaints every cell. Below 32x10 the game shows a "too
+small" notice until the terminal grows again.
+
 ## Texture atlas (2D and 3D)
 
 Every sprite and tileset image is registered as it loads and packed into one atlas (`src/v/sdl/SpriteAtlas.cpp`)

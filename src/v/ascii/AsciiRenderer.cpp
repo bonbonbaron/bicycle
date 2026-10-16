@@ -14,6 +14,7 @@
 #include <clocale>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #ifdef _WIN32
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -61,6 +62,7 @@ void AsciiRenderer::init( const std::string& ) {
   init_pair( WHITE, COLOR_WHITE, COLOR_BLACK );
   ::clear();
   ::refresh();
+  _tooSmall = COLS < MIN_COLS || LINES < MIN_LINES;
   _up = true;
 }
 
@@ -84,15 +86,15 @@ auto AsciiRenderer::lines() const -> int {
   return LINES;
 }
 
-// ncurses only notices a resized terminal through getch(), which bicycle doesn't use, so check for it here.
+// curses reports a resize as KEY_RESIZE from getch(), which bicycle doesn't call (SshInputListener reads stdin
+// itself), so poll for it once a frame instead: PDCurses' is_termresized() on Windows, the terminal size (what
+// ncurses' SIGWINCH handler would read) elsewhere. Neither opens a file, so release builds stay I/O-free.
 auto AsciiRenderer::checkResize() -> bool {
 #ifdef _WIN32
-  CONSOLE_SCREEN_BUFFER_INFO info{};
-  if ( !GetConsoleScreenBufferInfo( GetStdHandle( STD_OUTPUT_HANDLE ), &info ) ) {
+  if ( !is_termresized() ) {
     return false;
   }
-  const int rows = info.srWindow.Bottom - info.srWindow.Top + 1;
-  const int cols = info.srWindow.Right - info.srWindow.Left + 1;
+  resize_term( 0, 0 );  // PDCurses: adopt the console's new size
 #else
   winsize ws{};
   if ( ioctl( STDOUT_FILENO, TIOCGWINSZ, &ws ) != 0 ) {
@@ -100,11 +102,15 @@ auto AsciiRenderer::checkResize() -> bool {
   }
   const int rows = ws.ws_row;
   const int cols = ws.ws_col;
-#endif
   if ( rows <= 0 || cols <= 0 || ( rows == LINES && cols == COLS ) ) {
     return false;
   }
-  resize_term( rows, cols );
+  resize_term( rows, cols );  // ncurses: resizes stdscr, curscr and every window that would stick out
+#endif
+  _tooSmall = COLS < MIN_COLS || LINES < MIN_LINES;
+  // Forget what curses thinks is on screen: the terminal may have reflowed or dropped it, so the next doupdate()
+  // repaints every cell instead of diffing against stale contents.
+  clearok( curscr, TRUE );
   ::clear();
   wnoutrefresh( stdscr );
   return true;
@@ -116,7 +122,13 @@ void AsciiRenderer::pollInput() {
 
 // Each window is an off-screen buffer: frames werase() and redraw it, wnoutrefresh() copies it to curses' virtual
 // screen, and the one doupdate() per frame sends only the cells that changed.
+// curses refuses windows that stick out of the screen, so one asked for while the terminal is small is clipped to it
+// (it's re-fit by Window::onTermResize when the terminal grows).
 auto AsciiRenderer::createWindow( int x, int y, int w, int h ) -> WinHandle {
+  w = std::clamp( w, 1, std::max( 1, COLS ) );
+  h = std::clamp( h, 1, std::max( 1, LINES ) );
+  x = std::clamp( x, 0, std::max( 0, COLS - w ) );
+  y = std::clamp( y, 0, std::max( 0, LINES - h ) );
   WINDOW* win = newwin( h, w, y, x );
   if ( win ) {
     leaveok( win, TRUE );
@@ -195,6 +207,17 @@ void AsciiRenderer::presentWindow( WinHandle win ) {
 }
 
 void AsciiRenderer::endFrame() {
+  if ( _tooSmall ) {  // WindowManager drew nothing: say why, centered as far as it fits
+    char msg[64];
+    std::snprintf( msg, sizeof msg, "Terminal too small (%dx%d), need %dx%d", COLS, LINES, MIN_COLS, MIN_LINES );
+    if ( static_cast<int>( std::strlen( msg ) ) > COLS ) {
+      std::snprintf( msg, sizeof msg, "Too small" );
+    }
+    const int len = static_cast<int>( std::strlen( msg ) );
+    werase( stdscr );
+    mvwaddnstr( stdscr, LINES / 2, std::max( 0, ( COLS - len ) / 2 ), msg, COLS );
+    wnoutrefresh( stdscr );
+  }
   doupdate();  // displays results of the window painting
 #ifndef BICYCLE_RELEASE
   // BICYCLE_SCREENSHOT(_FRAMES) (include/v/common/Capture.h): the screen's text.

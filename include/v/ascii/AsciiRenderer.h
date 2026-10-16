@@ -12,6 +12,9 @@ class AsciiRenderer : public Renderer {
     auto cols() const -> int override;
     auto lines() const -> int override;
     auto checkResize() -> bool override;
+    auto tooSmall() const -> bool override { return _tooSmall; }
+    // Smallest terminal the game lays out in (the HUD bar and a dialogue page fit); below it a notice shows.
+    static constexpr int MIN_COLS = 32, MIN_LINES = 10;
     void pollInput() override;
     auto createWindow( int x, int y, int w, int h ) -> WinHandle override;
     void destroyWindow( WinHandle win ) override;
@@ -31,6 +34,7 @@ class AsciiRenderer : public Renderer {
     void drawEntity( WinHandle win, Entity entity, const Box& camBox ) override;
   private:
     bool _up{};
+    bool _tooSmall{};
     bool _inFrame{};
     long long _frameStart{}, _renderNs{}, _maxNs{};
     long _frames{};

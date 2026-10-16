@@ -207,13 +207,18 @@ void Kinematics::follow( Entity e, Entity tgt, float offX, float offY, float rat
   d.bobRows = bobRows;
   d.bobHz = bobHz;
   d.mirror = mirror;
-  d.dead = { std::max( 0.f, deadX ), std::max( 0.f, deadY ) };
+  d.dead = d.deadWant = { std::max( 0.f, deadX ), std::max( 0.f, deadY ) };
   if ( !retarget ) {
     d.t = 0;
     d.started = false;
     d.lastTgtX = centerOf( World::get<Box>( tgt ) ).x;
   }
   setVelocity( e, Position() );
+}
+
+void Kinematics::capDeadZone( Entity e, float maxX, float maxY ) {
+  auto& d = driven( e );
+  d.dead = { std::clamp( d.deadWant.x, 0.f, std::max( 0.f, maxX ) ), std::clamp( d.deadWant.y, 0.f, std::max( 0.f, maxY ) ) };
 }
 
 void Kinematics::setBounds( Entity e, float minX, float minY, float maxX, float maxY ) {

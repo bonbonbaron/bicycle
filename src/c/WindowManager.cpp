@@ -34,7 +34,20 @@ Entity WindowManager::pop() {
 
 void WindowManager::refreshAll() {
   auto& r = gfx::renderer();
-  if ( r.checkResize() ) {
+  if ( r.checkResize() && !r.tooSmall() ) {
+    for ( unsigned i = 0; i < _population; ++i ) {
+      if ( _windows.at(i) != nullptr ) {
+        _windows.at(i)->onTermResize();
+      }
+    }
+  }
+  if ( r.tooSmall() ) {  // windows keep their last good layout; they're re-fit once the screen grows back
+    _pendingResize = true;
+    r.endFrame();
+    return;
+  }
+  if ( _pendingResize ) {
+    _pendingResize = false;
     for ( unsigned i = 0; i < _population; ++i ) {
       if ( _windows.at(i) != nullptr ) {
         _windows.at(i)->onTermResize();

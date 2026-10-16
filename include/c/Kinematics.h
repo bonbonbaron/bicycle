@@ -34,6 +34,9 @@ class Kinematics : public Controllable {
     void follow( Entity e, Entity tgt, float offX, float offY, float rate, float bobRows, float bobHz, bool mirror,
                  float deadX, float deadY );
     // Keeps a driven entity's top-left within [minX, maxX] x [minY, maxY] cells (e.g. the camera in its world).
+    // Caps a follower's dead zone (cells, each side) without forgetting the one it asked for, e.g. when the camera
+    // shrinks with the terminal; a larger cap later gives back up to the requested size.
+    void capDeadZone( Entity e, float maxX, float maxY );
     void setBounds( Entity e, float minX, float minY, float maxX, float maxY );
     void stopMotion( Entity e );
     auto motionType( Entity e ) const -> int;  // -1 if not driven
@@ -77,7 +80,7 @@ class Kinematics : public Controllable {
       float lastTgtX{};
       int facing{ 1 };
       bool mirror{}, bounded{}, started{};
-      motion::Vec2 dead{}, lo{}, hi{};
+      motion::Vec2 dead{}, deadWant{}, lo{}, hi{};
     };
     auto driven( Entity e ) -> Driven&;
     void runDriven();

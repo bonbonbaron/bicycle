@@ -21,6 +21,8 @@ class Camera {
     }
     void focusOn( const Entity entity );  // default tracking (hard, dead zone = margins) via Kinematics
     auto getFocus() const -> Entity;
+    auto getMaxX() const -> int { return _maxX; }
+    auto getMaxY() const -> int { return _maxY; }
     void setDims( const unsigned h, const unsigned w);
     void setLims( const int y, const int x);
     // Margins tell us how close the focused-on entity can come to the 
