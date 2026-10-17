@@ -69,6 +69,7 @@ void Kinematics::run() {
   auto& w3 = phys3d::World3D::get();
   w3.step( static_cast<float>( Constants::MILLISECONDS_PER_FRAME / 1000.0 ) );
   runCamera3D( static_cast<float>( Constants::MILLISECONDS_PER_FRAME / 1000.0 ) );
+  runViews3D( static_cast<float>( Constants::MILLISECONDS_PER_FRAME / 1000.0 ) );
 }
 
 // --- scripted motions -----------------------------------------------------------------------------------------------
@@ -122,6 +123,7 @@ void Kinematics::runDriven() {
         xf.pos = c + m3::Vec3{ d.radius3 * std::cos( a ), motion::bob( d.bobAmp, d.bobHz, d.t ), d.radius3 * std::sin( a ) };
         break;
       }
+      case VIEW3D: break;  // runViews3D(), after the camera
       case FOLLOW3D: {
         const m3::Vec3 goal = phys3d::World3D::get().transform( d.tgt ).pos + d.offset3;
         if ( !d.started ) { d.pos3 = goal; d.started = true; }
@@ -385,6 +387,39 @@ void Kinematics::follow3D( Entity e, Entity tgt, m3::Vec3 offset, float rate ) {
   if ( !retarget ) { d.t = 0; d.started = false; }
 }
 
+void Kinematics::view3D( Entity e, Entity tgt, m3::Vec3 offset ) {
+  auto& d = driven( e );
+  d.on = true;
+  d.type = VIEW3D;
+  d.tgt = tgt;
+  d.offset3 = offset;
+  d.t = 0;
+}
+
+void Kinematics::kick3D( Entity e, float back, float pitchDeg, float rate ) {
+  auto& d = driven( e );
+  d.kickBack = back;
+  d.kickPitch = pitchDeg * m3::PI / 180.f;
+  d.kickRate = rate;
+  d.kick = 1;
+}
+
+void Kinematics::runViews3D( float dt ) {
+  auto& w3 = phys3d::World3D::get();
+  for ( Entity e = 0; e < _driven.size(); ++e ) {
+    auto& d = _driven[e];
+    if ( !d.on || d.type != VIEW3D ) continue;
+    const auto& v = w3.transform( d.tgt );
+    auto& xf = w3.transform( e );
+    const float back = d.kick * d.kickBack;
+    const m3::Vec3 f = m3::forward( v.yaw, v.pitch ), r = m3::flatRight( v.yaw );
+    xf.pos = v.pos + r * d.offset3.x + m3::Vec3{ 0, d.offset3.y, 0 } + f * ( d.offset3.z - back );
+    xf.yaw = v.yaw;
+    xf.pitch = v.pitch + d.kick * d.kickPitch;
+    d.kick = std::max( 0.f, d.kick - d.kickRate * dt );
+  }
+}
+
 void Kinematics::spin3D( Entity e, float yawDegPerSec ) {
   driven( e ).spin = yawDegPerSec * m3::PI / 180.f;
 }
@@ -397,6 +432,8 @@ void Kinematics::runCamera3D( float dt ) {
   auto& cx = w3.transform( cam );
   cx.on = true;
   cx.visible = false;
+  rig.yaw += rig.yawRate * dt;
+  rig.pitch += rig.pitchRate * dt;
   rig.pitch = std::clamp( rig.pitch, rig.minPitch, rig.maxPitch );
   rig.yaw = m3::wrapAngle( rig.yaw );
   const bool haveTgt = rig.target != 0 && w3.transform( rig.target ).on;

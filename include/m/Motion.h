@@ -13,7 +13,8 @@ using Acceleration = Box;
 // See Kinematics::linear/orbit/combo/follow and include/c/MotionMath.h.
 // LINEAR3D/ORBITAL3D/FOLLOW3D: the same on a 3D entity's transform (include/c/Physics3D.h), in meters; 2D boxes
 // are untouched by them.
-enum MotionType { LINEAR, ORBITAL, COMBO, FOLLOW_LERP, LINEAR3D, ORBITAL3D, FOLLOW3D };
+// VIEW3D: rides along in another entity's view (its yaw and pitch: e.g. a gun in front of the camera).
+enum MotionType { LINEAR, ORBITAL, COMBO, FOLLOW_LERP, LINEAR3D, ORBITAL3D, FOLLOW3D, VIEW3D };
 
 // Advantageous to use an AoS instead of SoA for vectorized additions.
 

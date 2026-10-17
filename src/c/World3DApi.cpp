@@ -83,7 +83,19 @@ EXPORT_API void bodyTune( Entity e, float gravity, float jumpSpeed, float accelG
   b.maxSlopeCos = std::cos( maxSlopeDeg * DEG );
   b.stepHeight = stepHeight;
 }
-EXPORT_API void bodyWish( Entity e, float vx, float vz ) { w3().body( e ).wish = { vx, 0, vz }; }
+EXPORT_API void bodyWish( Entity e, float vx, float vz ) {
+  auto& b = w3().body( e );
+  b.wish = { vx, 0, vz };
+  b.steerCam = false;
+}
+// Camera-relative movement (m/s right and forward of the camera's yaw), kept until changed: Body3D:move.
+EXPORT_API void bodyMove( Entity e, float right, float fwd ) {
+  auto& b = w3().body( e );
+  b.steerCam = true;
+  b.moveRight = right;
+  b.moveFwd = fwd;
+}
+EXPORT_API void bodyTurnRate( Entity e, float rate ) { w3().body( e ).turnRate = rate; }
 EXPORT_API void bodyJump( Entity e ) { w3().body( e ).jumpReq = true; }
 EXPORT_API void bodySetVel( Entity e, float x, float y, float z ) { w3().body( e ).vel = { x, y, z }; }
 EXPORT_API Vec3f bodyGetVel( Entity e ) {
@@ -109,6 +121,12 @@ EXPORT_API void motionLinear3D( Entity e, float speed, bool pingPong ) { Kinemat
 EXPORT_API void motionWaypoint3D( Entity e, float x, float y, float z ) { Kinematics::getInstance().addWaypoint3D( e, x, y, z ); }
 EXPORT_API void motionOrbit3D( Entity e, Entity center, float cx, float cy, float cz, float r, float degPerSec, float phaseDeg, float bobAmp, float bobHz ) {
   Kinematics::getInstance().orbit3D( e, center, { cx, cy, cz }, r, degPerSec, phaseDeg, bobAmp, bobHz );
+}
+EXPORT_API void motionView3D( Entity e, Entity tgt, float right, float up, float fwd ) {
+  Kinematics::getInstance().view3D( e, tgt, { right, up, fwd } );
+}
+EXPORT_API void motionKick3D( Entity e, float back, float pitchDeg, float rate ) {
+  Kinematics::getInstance().kick3D( e, back, pitchDeg, rate );
 }
 EXPORT_API void motionFollow3D( Entity e, Entity tgt, float ox, float oy, float oz, float rate ) {
   Kinematics::getInstance().follow3D( e, tgt, { ox, oy, oz }, rate );
@@ -146,6 +164,10 @@ EXPORT_API void cam3dLook( float dYawDeg, float dPitchDeg ) {
 EXPORT_API void cam3dSetAngles( float yawDeg, float pitchDeg ) {
   w3().rig().yaw = yawDeg * DEG;
   w3().rig().pitch = pitchDeg * DEG;
+}
+EXPORT_API void cam3dTurn( float yawDegPerSec, float pitchDegPerSec ) {
+  w3().rig().yawRate = yawDegPerSec * DEG;
+  w3().rig().pitchRate = pitchDegPerSec * DEG;
 }
 EXPORT_API float cam3dYaw() { return w3().rig().yaw / DEG; }
 EXPORT_API float cam3dPitch() { return w3().rig().pitch / DEG; }

@@ -53,6 +53,11 @@ class Kinematics : public Controllable {
     // The entity's position eases to tgt's + offset (rate 0 = hard).
     void follow3D( Entity e, Entity tgt, m3::Vec3 offset, float rate );
     void spin3D( Entity e, float yawDegPerSec );  // continuous yaw (pickups), with any motion or none
+    // Rides in tgt's view: offset is (right, up, forward) meters in tgt's yaw/pitch frame (up is world up) and the
+    // entity takes tgt's yaw and pitch, every frame after the camera moved (tgt is usually the camera: a held gun).
+    void view3D( Entity e, Entity tgt, m3::Vec3 offset );
+    // A recoil kick for a VIEW3D rider: pushed back `back` meters and pitched up `pitchDeg`, decaying at rate 1/s.
+    void kick3D( Entity e, float back, float pitchDeg, float rate );
     // The 3D camera: a kinematic body driven by the rig in World3D (Physics3D.h) toward its target, like any
     // follower; Lua sets the mode and feeds yaw/pitch, the camera never positions itself.
     void runCamera3D( float dt );
@@ -102,7 +107,9 @@ class Kinematics : public Controllable {
       m3::Vec3 pos3{}, center3{}, offset3{};
       mem::Vector<m3::Vec3> path3{ mem::Allocator<m3::Vec3>( mem::GENERAL ) };
       float radius3{}, bobAmp{}, spin{};
+      float kickBack{}, kickPitch{}, kickRate{}, kick{};  // VIEW3D recoil: kick 1 -> 0
     };
+    void runViews3D( float dt );  // VIEW3D riders, after the camera rig
     auto driven( Entity e ) -> Driven&;
     void runDriven();
     mem::Vector<Driven> _driven{ mem::Allocator<Driven>( mem::GENERAL ) };

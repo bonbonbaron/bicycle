@@ -733,6 +733,10 @@ Genome.PLACEMENT = PLACEMENT
 --            { type = "orbital", radius = 2, speed = 45, around = "<genome>" | { x, y, z }, bob, bobHz }
 --            { type = "follow", target = "hero", offset = { x, y, z }, rate = 6 }
 --   door   = { to = "bonus", spawn = "entry", radius = 1, height = 2.5, on = "touch" | "press" }   a scene change
+--   body.turnRate = 14                          turns to face the way it moves (1/s), e.g. after self:move( r, f )
+--   killY = -15                                   below it: onFallOut( self ); landing: onLand( self )
+--   listen = true                                 gets every onInput( self, key, pressed, dx, dy ), focused or not
+--   onLevelReady( self )                          after the whole level is placed (find another placed genome)
 --   sfx, timer, persist, onSpawn, onCollision, onUncollision, onTimer, onInput, onSceneEnter, onDespawn as in 2D.
 -- entry = { genome = "coin", pos = { x, y, z }, yaw = <deg>, key = "<saved-state key>", focus = true (the player),
 --           persist = true, <any genome field, e.g. door = { to = "bonus" } or motion = { path = {...} }> }.
@@ -762,11 +766,12 @@ function Genome.spawn3d( name, entry )
     pitch = b.pitch, radius = b.radius or ( tbl.door and tbl.door.radius ), height = b.height or ( tbl.door and tbl.door.height ),
     half = b.half, solid = b.solid, collType = collType, model = tbl.model, modelYaw = b.modelYaw, scale = b.scale,
     image = b.image, gravity = b.gravity, jumpSpeed = b.jumpSpeed, accel = b.accel, airAccel = b.airAccel,
-    maxSlope = b.maxSlope, step = b.step, persist = persist, player = player }
+    maxSlope = b.maxSlope, step = b.step, turnRate = b.turnRate, persist = persist, player = player }
   for k, v in pairs( tbl ) do if body[k] == nil then rawset( body, k, v ) end end
   body.key = entry.key or ( name.."@"..p[1]..","..p[2]..","..p[3] )
   body.spawnPos = { p[1], p[2], p[3] }
   register( body.id, body )
+  if tbl.listen then listenInput( body.id ) end  -- every input event, focused or not (e.g. a camera)
   Genome.byName[name] = Genome.byName[name] or body.id
   if persist then W.persistentByName[name] = body end
   Scene.withScope( not persist, function()
