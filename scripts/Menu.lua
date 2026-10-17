@@ -26,7 +26,8 @@ end
 
 -- TODO function Menu::remove(), good for item menus in RPGs
 
-function Menu:onInput( input )
+function Menu:onInput( input, pressed )
+  if pressed == false then return end
   if input == ffi.C.Space then
     selIdx = ffi.C.getSelection()
     self.cbs[selIdx+1]()

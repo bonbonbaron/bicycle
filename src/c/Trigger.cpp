@@ -196,13 +196,21 @@ void Trigger::init( const std::string& gameName ) {
 	}
 }
 
-void Trigger::sendInput( Input& input ) {
-  const auto& wm = WindowManager::getInstance();
-  auto currWindow = wm.back();
-  assert( currWindow != nullptr );
-  currWindow->onInput( input );
+void Trigger::sendInput( Input& input, bool pressed ) {
+  input.pressed = pressed;
+  if ( pressed ) {  // dialogues and menus page and select on presses
+    const auto& wm = WindowManager::getInstance();
+    auto currWindow = wm.back();
+    assert( currWindow != nullptr );
+    currWindow->onInput( input );
+  }
   bridge.input = input;
-  bridge.keys.add( input.lastPressed );
+  bridge.keys.add( input.lastPressed, pressed );
+}
+
+void Trigger::sendLook( float dx, float dy ) {
+  bridge.lookDx += dx;
+  bridge.lookDy += dy;
 }
 
 // Notice timeouts are only sent to outputs.

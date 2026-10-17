@@ -63,6 +63,12 @@
       RightAlt  ,     // Right Option / AltGr
       RightMeta ,     // Right Win / Right Cmd
 
+      // Mouse buttons (pressed and released like keys) and mouse look (once per frame with the motion: dx, dy)
+      MouseLeft ,
+      MouseRight,
+      MouseMiddle,
+      Look      ,
+
       COUNT     // ← use this to know how many we defined (not a real key)
   };  // enum LogicalKey
 
@@ -130,9 +136,10 @@ constexpr auto MASK_RSHIFT = getbs( LogicalKey::RightShift);
 constexpr auto MASK_RMETA  = getbs( LogicalKey::RightMeta);
 
 struct Input {
-  LogicalKey lastPressed{};
+  LogicalKey lastPressed{};  // the key (or button) this event is about
   int millisSinceLast{};  // i don't like making input dependent on Timer.
   Bitset currKeysPressed{};
   Bitset deltaKeysPressed{};
+  bool pressed{ true };      // true: it went down; false: it was released (Trigger::sendInput)
 };
 

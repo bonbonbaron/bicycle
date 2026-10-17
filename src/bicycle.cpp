@@ -690,7 +690,9 @@ namespace bicycle {
 
     // BICYCLE_SCRIPTED_INPUT="d@30-60/3,a@70-90/2": press D every 3rd frame from frame 30 to 60, then A every 2nd
     // from 70 to 90 (WASD/E/space), through the same path as real keys. For headless captures and tests, any mode.
-    struct Press { LogicalKey key; long from, to, every; };
+    // "/1" (or no step) holds the key: pressed on the first frame, released after the last. A step taps: each
+    // occurrence presses and the next frame releases.
+    struct Press { LogicalKey key; long from, to, every; bool down; };
     std::vector<Press> script;
     if ( const char* s = std::getenv( "BICYCLE_SCRIPTED_INPUT" ) ) {
       std::stringstream ss( s );
@@ -701,7 +703,7 @@ namespace bicycle {
         if ( std::sscanf( item.c_str(), "%c@%ld-%ld/%ld", &k, &from, &to, &every ) >= 3 && every > 0 ) {
           const char c = static_cast<char>( std::tolower( static_cast<unsigned char>( k ) ) );
           const LogicalKey key = c == ' ' ? LogicalKey::Space : c >= 'a' && c <= 'z' ? static_cast<LogicalKey>( c - 'a' + 1 ) : LogicalKey::NOTHING;
-          if ( key != LogicalKey::NOTHING ) script.push_back( { key, from, to, every } );
+          if ( key != LogicalKey::NOTHING ) script.push_back( { key, from, to, every, false } );
         }
       }
     }
@@ -733,26 +735,37 @@ namespace bicycle {
       // Inputs
       Timer::run();
       auto& held = inputState();
-      if ( gfx::renderer().mode() == gfx::Mode::Ascii ) {  // terminals report presses only: no held state
+      if ( gfx::renderer().mode() == gfx::Mode::Ascii ) {  // the terminal listener re-marks the keys it holds down
         held.beginFrame();
         held.held.reset();
       }
       gfx::renderer().pollInput();
-      for ( const auto& p : script ) {
-        if ( frames >= p.from && frames <= p.to && ( frames - p.from ) % p.every == 0 ) {
+      for ( auto& p : script ) {
+        const bool down = frames >= p.from && frames <= p.to && ( frames - p.from ) % p.every == 0;
+        if ( down != p.down ) {
           Input in{};
-          in.currKeysPressed.set( static_cast<unsigned>( p.key ) );
+          if ( down ) in.currKeysPressed.set( static_cast<unsigned>( p.key ) );
           in.lastPressed = p.key;
-          Trigger::sendInput( in );
-          if ( frames == p.from || p.every > 1 ) held.pressed.set( static_cast<unsigned>( p.key ) );
-          held.held.set( static_cast<unsigned>( p.key ) );
+          Trigger::sendInput( in, down );
+          if ( down ) held.pressed.set( static_cast<unsigned>( p.key ) );
+          p.down = down;
         }
+        if ( down ) held.held.set( static_cast<unsigned>( p.key ) );
       }
       unsigned buttons{};
+      float lookDx{}, lookDy{};
       for ( const auto& m : mouseScript ) {
         if ( frames < m.from || frames > m.to ) continue;
-        if ( m.button < 0 ) { held.mouseDx += m.dx; held.mouseDy += m.dy; }
+        if ( m.button < 0 ) { held.mouseDx += m.dx; held.mouseDy += m.dy; lookDx += m.dx; lookDy += m.dy; }
         else buttons |= 1u << m.button;
+      }
+      if ( lookDx != 0 || lookDy != 0 ) Trigger::sendLook( lookDx, lookDy );
+      for ( unsigned b = 0; b < 3; ++b ) {  // scripted buttons are events too (MouseLeft/Right/Middle)
+        const bool now = buttons & ( 1u << b ), before = scriptedButtons & ( 1u << b );
+        if ( now == before ) continue;
+        Input in{};
+        in.lastPressed = static_cast<LogicalKey>( static_cast<int>( LogicalKey::MouseLeft ) + static_cast<int>( b ) );
+        Trigger::sendInput( in, now );
       }
       held.mouseButtons = ( held.mouseButtons & ~scriptedButtons ) | buttons;
       held.mousePressed |= buttons & ~scriptedButtons;

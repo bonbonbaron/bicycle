@@ -8,6 +8,8 @@ require('Dialogue')
 -- persist: the hero survives scene changes (Scene.go in scripts/Scene.lua): carried through doors, HUD and camera kept.
 -- timer: the flash/invulnerability tick (onTimer); sfx: the hero's own sounds.
 local TICK_MS = 100             -- flash/invulnerability timer period
+local WALK_MS = 90              -- while a direction key is held: one step this often (the first on the press)
+local WALK_TIMER = 7            -- its timer type (the timer gene's is 0)
 local hero = {
   sprite = "pilgrim", model = "pilgrim3d", initAnim = "walk_down", coll = { type = "hero" }, persist = true,
   timer = { ms = TICK_MS },
@@ -70,8 +72,24 @@ function hero:speakerInReach()
   end
 end
 
-function hero:onInput(input)
+-- Input: a direction key steps once when pressed and keeps stepping (a walk timer) until it's released; the newest
+-- held direction wins. Releases of other keys mean nothing here.
+function hero:onInput(input, pressed)
   input = tonumber( input )
+  if DIRS[input] then
+    self.held = self.held or {}
+    for i = #self.held, 1, -1 do if self.held[i] == input then table.remove( self.held, i ) end end
+    if pressed then table.insert( self.held, input ) end
+    if #self.held == 0 and self.walkTimer then
+      self:stopTimer( self.walkTimer )
+      self.walkTimer = nil
+    elseif #self.held > 0 and not self.walkTimer then
+      self.walkTimer = self:every( WALK_MS, WALK_TIMER )
+    end
+    if pressed then self:step( DIRS[input] ) end
+    return
+  end
+  if not pressed then return end
   if input == ffi.C.Q then
     ffi.C.popWindow()
     return
@@ -87,12 +105,14 @@ function hero:onInput(input)
     end
     return
   end
-  local dir = DIRS[input]
-  if dir and self:blockedBy( dir ) then
+end
+
+function hero:step( dir )
+  if self:blockedBy( dir ) then
     self.anim:set( dir.strip )
     self:sound( "bump" )
     dbglog( "hero blocked" )
-  elseif dir then
+  else
     self.anim:set( dir.strip )  -- no-op if already walking this way
     local pos = box( self.id ).pos
     self.prevPos = { x = pos.x, y = pos.y }  -- where to step back to if this move bumps into something solid
@@ -140,8 +160,19 @@ function hero:onSceneEnter( sceneName, spawnName )
   dbglog( "hero entered %s (spawn %s)", sceneName, tostring( spawnName ) )
 end
 
--- Flash while invulnerable.
+-- The walk timer steps in the newest held direction; the timer gene's tick flashes while invulnerable.
 function hero:onTimer(timerId, timeoutType)
+  if timeoutType == WALK_TIMER then
+    local held = self.held or {}
+    if getFocus() ~= self.id then  -- a dialogue took the input (and will get the key's release): stop walking
+      self.held = {}
+      self:stopTimer( timerId )
+      self.walkTimer = nil
+    elseif #held > 0 then
+      self:step( DIRS[held[#held]] )
+    end
+    return
+  end
   if self.invulnerable > 0 then
     self.invulnerable = self.invulnerable - 1
     ffi.C.setHidden( self.id, self.invulnerable % 2 == 1 )

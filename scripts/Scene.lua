@@ -192,17 +192,23 @@ function Scene:loadWorld3d( tbl )
   if w.light then W.View.light( w.light[1], w.light[2], w.light[3], w.light[4] ) end
   Scene.world3d = w
   local Genome = require( "Genome" )
+  local spawned = {}
   for _, list in ipairs( { level and level.entities or {}, w.entities or {} } ) do
     for _, e in ipairs( list ) do
       local key = Scene.keyOf( e )
       if not W.persistentByName[e.genome] and not Scene.state.removed[key] then
         local entry = { key = key }
         for k, v in pairs( e ) do if k ~= "key" then entry[k] = v end end
-        Genome.spawn3d( e.genome, entry )
+        table.insert( spawned, Genome.spawn3d( e.genome, entry ) )
       end
     end
   end
   if w.build then w.build( self ) end
+  -- Everything the level places exists now: onLevelReady( self ) for what needs another placed entity (a camera
+  -- genome finding its target, whichever was spawned first).
+  for _, b in ipairs( spawned ) do
+    if b.onLevelReady and not b.removed then Scene.withScope( not b.persist, function() b:onLevelReady() end ) end
+  end
 end
 
 -- A 3D scene's level file (bare name or old path), read once per scene table, for its spawn points.
@@ -237,7 +243,8 @@ end
 
 -- TODO function Scene::remove(), good for item menus in RPGs
 
-function Scene:onInput( input )
+function Scene:onInput( input, pressed )
+  if pressed == false then return end
   if input == ffi.C.Q then
     self.pop(self.id)
   end

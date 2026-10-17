@@ -32,7 +32,12 @@ class Trigger {
 		void init( const std::string& gameName );
 
     // Le trifecta
-    static void sendInput( Input& input );  // straightforward feeding to whatever holds context
+    // A key or mouse button going down (pressed) or up: windows (dialogues, menus) see presses; Lua's onInput( self,
+    // input, pressed ) sees both, in order. Callers that only know presses keep calling sendInput( input ).
+    static void sendInput( Input& input, bool pressed = true );
+    // Mouse look: motion since the last frame (pixels), delivered to Lua once per frame as onInput( self, Look, true,
+    // dx, dy ) when nonzero.
+    static void sendLook( float dx, float dy );
     static void sendTimeout( const Timeout& timeout );  
     static void sendCollision( const Collision& collision );
     static void sendUncollision( const Collision& uncollision );
@@ -97,13 +102,15 @@ struct BridgedArray {
   }
 };
 
-// Every key pressed since Lua's last getUpdates(), in order, so no press is lost or merged.
+// Every key pressed or released since Lua's last getUpdates(), in order, so no event is lost or merged.
 struct KeyQueue {
   static constexpr unsigned CAP{32};
   uint8_t arr[CAP];
+  uint8_t down[CAP];  // 1: pressed, 0: released
   unsigned len;
-  void add( const LogicalKey key ) {
+  void add( const LogicalKey key, const bool pressed = true ) {
     if ( len < CAP ) {
+      down[ len ] = pressed ? 1 : 0;
       arr[ len++ ] = static_cast<uint8_t>( key );
     }
   }
@@ -114,5 +121,6 @@ struct Bridge {
   BridgedArray<Collision> collisions;
   BridgedArray<Collision> uncollisions;
   KeyQueue keys;  // must precede input: Lua only declares input's first fields
+  float lookDx, lookDy;  // mouse look since the last getUpdates()
   Input input; // Input is just a scalar.  // TODO should this be initialized?
 };

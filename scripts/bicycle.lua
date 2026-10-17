@@ -63,6 +63,11 @@ ffi.cdef([[
       RightAlt  ,     // Right Option / AltGr
       RightMeta ,     // Right Win / Right Cmd
 
+      MouseLeft ,
+      MouseRight,
+      MouseMiddle,
+      Look      ,     // mouse look: onInput( self, Look, true, dx, dy ) once per frame when the mouse moved
+
       COUNT     // ← use this to know how many we defined (not a real key)
   } LogicalKey;
 
@@ -193,6 +198,7 @@ ffi.cdef([[
 
   typedef struct {
     uint8_t arr[32];
+    uint8_t down[32];  // 1 pressed, 0 released
     unsigned len;
   } KeyQueue;
 
@@ -201,6 +207,7 @@ ffi.cdef([[
 		CollisionArr collisions;
 		CollisionArr uncollisions;
 		KeyQueue keys;  // every key since the last getUpdates(), in order
+		float lookDx, lookDy;  // mouse look since the last getUpdates()
 		Input input; // Input is just a scalar.  // TODO should this be initialized?
 	} Bridge;
 
@@ -376,7 +383,19 @@ function unregister( id )
     error( debug.traceback( "unregister: no entity id" ), 2 )
   end
   entities[id] = nil
+  listeners[id] = nil
 end
+
+-- Input goes to the focused entity, and also to listeners: entities that asked for every input event (a camera
+-- genome orbiting on mouse look while the hero has the focus). Genomes listen with the field listen = true.
+listeners = {}
+function listenInput( id, on )
+  listeners[id] = ( on ~= false ) and true or nil
+end
+
+-- Engine per-frame work that turns state into events (World3D: onLand, onFallOut). Not for game code: games react
+-- to events (onInput, onTimer, onCollision, ...).
+engineFrameHooks = {}
 
 -- Tracking, for any entity and the camera alike (Kinematics FOLLOW_LERP; the camera is just a kinematic body):
 --   opts = { mode = "lerp" | "hard", rate = 8, offset = { x, y }, deadzone = { x, y }, mirror = false,
@@ -487,19 +506,48 @@ function getUpdates()
     bridge.timeouts.len = 0  -- consumed; C++ appends from len
   end
   -- Inputs (every key since last frame, in order)
-  if bridge.keys.len > 0 and sceneHooks and sceneHooks.inputFrozen() then  -- mid scene transition: keys are dropped
-    bridge.keys.len = 0
+  if bridge.keys.len > 0 and sceneHooks and sceneHooks.inputFrozen() then
+    -- Mid scene transition: presses are dropped, releases still go through (a key held through a door is let go).
+    local n = 0
+    for i = 0, bridge.keys.len - 1 do
+      if bridge.keys.down[i] == 0 then
+        bridge.keys.arr[n], bridge.keys.down[n] = bridge.keys.arr[i], 0
+        n = n + 1
+      end
+    end
+    bridge.keys.len = n
     bridge.input.lastPressed = ffi.C.NOTHING
   end
-  if bridge.keys.len > 0 then
+  if ( bridge.lookDx ~= 0 or bridge.lookDy ~= 0 ) and sceneHooks and sceneHooks.inputFrozen() then
+    bridge.lookDx, bridge.lookDy = 0, 0
+  end
+  if bridge.keys.len > 0 or bridge.lookDx ~= 0 or bridge.lookDy ~= 0 then
     entity = entities[focus]
     if not entity then error("We're focused on nonexistent entity "..tostring(focus)..".") end
+    local function deliver( key, pressed, dx, dy )
+      if inputLog then
+        inputLog:write( string.format( "input %d %s\n", key, pressed and "down" or "up" ) )
+        inputLog:flush()
+      end
+      if entity.onInput then entity:onInput( key, pressed, dx, dy ) end
+      for id in pairs( listeners ) do
+        local l = entities[id]
+        if l and id ~= focus and l.onInput then l:onInput( key, pressed, dx, dy ) end
+      end
+    end
     for i = 0, bridge.keys.len - 1 do
-      entity:onInput( bridge.keys.arr[i] )
+      deliver( bridge.keys.arr[i], bridge.keys.down[i] ~= 0 )
     end
     bridge.keys.len = 0
     bridge.input.lastPressed = ffi.C.NOTHING
+    -- Mouse look: once per frame, the motion since the last one (pixels; the gamepad's right stick adds to it).
+    local dx, dy = bridge.lookDx, bridge.lookDy
+    if dx ~= 0 or dy ~= 0 then
+      bridge.lookDx, bridge.lookDy = 0, 0
+      deliver( ffi.C.Look, true, dx, dy )
+    end
   end
+  for _, hook in ipairs( engineFrameHooks ) do hook( frameDt ) end
   -- Real-time games: a per-frame hook after the events (Constants::MILLISECONDS_PER_FRAME apart).
   if onFrame then onFrame( frameDt ) end
   -- The frame's end, after every callback: queued scene changes and transitions run here (scripts/Scene.lua).
@@ -508,3 +556,7 @@ function getUpdates()
 end
 
 frameDt = 1 / 30
+-- BICYCLE_INPUT_LOG=1 prints every input event ("input <key> down|up") to stderr; =<path> appends them to a file.
+inputLog = os.getenv( "BICYCLE_INPUT_LOG" )
+if inputLog and inputLog ~= "1" and inputLog ~= "" then inputLog = io.open( inputLog, "a" ) or nil
+elseif inputLog then inputLog = io.stderr end

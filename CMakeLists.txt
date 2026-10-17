@@ -222,6 +222,10 @@ if ( NOT CMAKE_CROSSCOMPILING )
   set_tests_properties( pack-assets PROPERTIES FIXTURES_SETUP packed )
   add_test( NAME codecs COMMAND bicycle-tests "test=${codecsPack}" WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}" )
   add_test( NAME motion COMMAND bicycle-motion-tests )
+  # Terminal input (include/c/TermInput.h): escape sequences, kitty/SGR events, the key-release heuristic.
+  add_executable( bicycle-term-input-tests tests/term_input_test.cpp )
+  target_include_directories( bicycle-term-input-tests PRIVATE include )
+  add_test( NAME term-input COMMAND bicycle-term-input-tests )
   add_executable( bicycle-mem-scene-tests tests/mem_scene_test.cpp src/data/Mem.cpp )
   target_include_directories( bicycle-mem-scene-tests PRIVATE include )
   add_test( NAME mem-scene COMMAND bicycle-mem-scene-tests )
@@ -407,6 +411,16 @@ if ( NOT CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_NAME STREQUAL "Linux" )
     add_test( NAME scene-lifecycle COMMAND sh "${CMAKE_SOURCE_DIR}/tests/scene_lifecycle_test.sh" "${BICYCLE_TEST_EXE}" ${modeLowerLc} 20
               ${lifecycleGame} ${lifecyclePair} WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}" )
     set_tests_properties( scene-lifecycle PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 400 )
+  endif()
+  # Terminal key events end to end (tests/tty_input_test.py): auto-repeat bytes, an arrow, SGR mouse and kitty
+  # keyboard events into the ASCII build through a pty, each hold one press and one release in Lua's onInput.
+  if ( BICYCLE_RENDER STREQUAL "ASCII" AND lifecycleGame STREQUAL "test" )
+    find_package( Python3 COMPONENTS Interpreter QUIET )
+    if ( Python3_FOUND )
+      add_test( NAME tty-input COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tests/tty_input_test.py" "${BICYCLE_TEST_EXE}"
+                WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}" )
+      set_tests_properties( tty-input PROPERTIES TIMEOUT 120 )
+    endif()
   endif()
   # The Aseprite door/song scripts in batch mode (skipped unless BICYCLE_ASEPRITE points at an aseprite binary).
   set( BICYCLE_ASEPRITE "$ENV{BICYCLE_ASEPRITE}" CACHE FILEPATH "Aseprite binary for the aseprite-scene-scripts test" )
