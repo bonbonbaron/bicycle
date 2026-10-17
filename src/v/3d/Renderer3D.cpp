@@ -9,6 +9,7 @@
 // Z = 0 for models, slightly behind for billboards. The ground row is the lowest entity bottom in view.
 #include "v/sdl/PixelRenderer.h"
 #include <cstring>
+#include <unordered_map>
 #include <string>
 #include "v/common/Image.h"
 #include "data/Mesh.h"
@@ -67,7 +68,8 @@ enum : GLenum {
   GL_DEPTH_COMPONENT24 = 0x81A6, GL_NONE = 0, GL_POLYGON_OFFSET_FILL = 0x8037, GL_LINEAR = 0x2601,
   GL_TEXTURE_COMPARE_MODE = 0x884C, GL_COMPARE_REF_TO_TEXTURE = 0x884E, GL_TEXTURE_COMPARE_FUNC = 0x884D,
   GL_CLAMP_TO_BORDER = 0x812D, GL_TEXTURE_BORDER_COLOR = 0x1004, GL_TEXTURE1 = 0x84C1, GL_FRAMEBUFFER_COMPLETE = 0x8CD5,
-  GL_CULL_FACE = 0x0B44, GL_BACK = 0x0405,
+  GL_CULL_FACE = 0x0B44, GL_BACK = 0x0405, GL_DEPTH_COMPONENT16 = 0x81A5, GL_UNSIGNED_SHORT = 0x1403, GL_EXTENSIONS = 0x1F03,
+  GL_READ_FRAMEBUFFER = 0x8CA8, GL_DRAW_FRAMEBUFFER = 0x8CA9,
 };
 
 #define BGL_FUNCS( X ) \
@@ -117,6 +119,9 @@ enum : GLenum {
   X( void, FramebufferTexture2D, GLenum, GLenum, GLenum, GLuint, GLint ) \
   X( GLenum, CheckFramebufferStatus, GLenum ) \
   X( void, DrawBuffer, GLenum ) \
+  X( void, Finish ) \
+  X( void, TexSubImage2D, GLenum, GLint, GLint, GLint, GLsizei, GLsizei, GLenum, GLenum, const void* ) \
+  X( void, BlitFramebuffer, GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLbitfield, GLenum ) \
   X( void, ReadBuffer, GLenum ) \
   X( void, PolygonOffset, GLfloat, GLfloat ) \
   X( void, TexParameterfv, GLenum, GLenum, const GLfloat* ) \
@@ -132,7 +137,7 @@ struct GL {
 #undef BGL_DECL
   // Not in OpenGL ES 2.0 (the GLES2 path does without them).
   static auto optional( const char* n ) -> bool {
-    for ( const char* o : { "GenVertexArrays", "DeleteVertexArrays", "BindVertexArray", "DrawBuffer", "ReadBuffer", "TexParameterfv" } )
+    for ( const char* o : { "GenVertexArrays", "DeleteVertexArrays", "BindVertexArray", "DrawBuffer", "ReadBuffer", "TexParameterfv", "BlitFramebuffer" } )
       if ( std::strcmp( n, o ) == 0 ) return true;
     return false;
   }
@@ -248,17 +253,25 @@ uniform float uAmbient;
 uniform int uShadows;
 uniform sampler2DShadow uShadowMap;
 uniform float uShadowTexel;
+uniform int uShadowTaps;  // 1 (low), 4 (med), 9 (high): depth compares per pixel, each bilinear-filtered where supported
 uniform vec3 uCamPos;
 uniform vec3 uFogColor;
 uniform vec2 uFog;  // near, far
 out vec4 o;
+float tap(vec2 uv, float z) { return texture(uShadowMap, vec3(uv, z)); }
 float shadow(vec3 n) {
   vec3 p = vLight.xyz / vLight.w * 0.5 + 0.5;
   if (p.x < 0.0 || p.x > 1.0 || p.y < 0.0 || p.y > 1.0 || p.z > 1.0) return 1.0;
   float bias = max(0.0025 * (1.0 - dot(n, -uLightDir)), 0.0008);
+  float z = p.z - bias;
+  if (uShadowTaps == 1) return tap(p.xy, z);
+  if (uShadowTaps == 4) {
+    float h = 0.5 * uShadowTexel;
+    return 0.25 * (tap(p.xy + vec2(-h, -h), z) + tap(p.xy + vec2(h, -h), z) + tap(p.xy + vec2(-h, h), z) + tap(p.xy + vec2(h, h), z));
+  }
   float s = 0.0;
   for (int y = -1; y <= 1; ++y)
-    for (int x = -1; x <= 1; ++x) s += texture(uShadowMap, vec3(p.xy + vec2(x, y) * uShadowTexel, p.z - bias));
+    for (int x = -1; x <= 1; ++x) s += tap(p.xy + vec2(x, y) * uShadowTexel, z);
   return s / 9.0;
 }
 void main() {
@@ -545,33 +558,26 @@ class Renderer3D final : public PixelRenderer {
       gl.UseProgram( _prog );
       gl.Uniform1i( gl.GetUniformLocation( _prog, "tex" ), 0 );
       gl.Uniform1i( gl.GetUniformLocation( _prog, "uShadowMap" ), 1 );
-      // Shadow map: a depth texture compared in the shader (sampler2DShadow, hardware PCF where available).
-      // GLES2: none (no depth textures or shadow samplers in core ES 2.0).
-      if ( !s_es2 ) {
-      gl.GenTextures( 1, &_shadowTex );
-      gl.BindTexture( GL_TEXTURE_2D, _shadowTex );
-      gl.TexImage2D( GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, SHADOW_SIZE, SHADOW_SIZE, 0, GL_DEPTH_COMPONENT, s_tier == GLES3 ? GL_UNSIGNED_INT : GL_FLOAT, nullptr );
-      gl.TexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
-      gl.TexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
-      // ES 3.0 has no border clamp; the shader treats lookups outside the map as lit anyway.
-      const GLenum shadowWrap = s_tier == GLES3 ? GL_CLAMP_TO_EDGE : GL_CLAMP_TO_BORDER;
-      gl.TexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, shadowWrap );
-      gl.TexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, shadowWrap );
-      const float border[4] = { 1, 1, 1, 1 };
-      if ( s_tier == CORE ) gl.TexParameterfv( GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, border );
-      gl.TexParameteri( GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE );
-      gl.TexParameteri( GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL );
-      gl.GenFramebuffers( 1, &_shadowFbo );
-      gl.BindFramebuffer( GL_FRAMEBUFFER, _shadowFbo );
-      gl.FramebufferTexture2D( GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, _shadowTex, 0 );
-      if ( s_tier == CORE ) {  // ES 3.0: a depth-only framebuffer is complete as is
-        gl.DrawBuffer( GL_NONE );
-        gl.ReadBuffer( GL_NONE );
+      // Shadow map: a depth texture compared in the shader (sampler2DShadow, hardware PCF where available), made on
+      // first use at the quality's size (ensureShadowMap). GLES2: none (no depth textures or shadow samplers).
+      _shadowOk = !s_es2;
+      {
+        const char* r = reinterpret_cast<const char*>( gl.GetString( GL_RENDERER ) );
+        const std::string rs = r ? r : "";
+        // Tile-based / software GPUs where a 2048 9-tap map costs a lot: Raspberry Pi (v3d, vc4), Mali, llvmpipe.
+        bool slow = false;
+        for ( const char* k : { "V3D", "v3d", "VC4", "vc4", "Mali", "llvmpipe", "softpipe", "Adreno", "PowerVR" } )
+          if ( rs.find( k ) != std::string::npos ) slow = true;
+        _autoQuality = slow ? Q_LOW : Q_HIGH;
+        const char* ext = s_tier != CORE ? reinterpret_cast<const char*>( gl.GetString( GL_EXTENSIONS ) ) : nullptr;
+        s_bgraExt = ext && std::strstr( ext, "GL_EXT_texture_format_BGRA8888" );
       }
-      _shadowOk = gl.CheckFramebufferStatus( GL_FRAMEBUFFER ) == GL_FRAMEBUFFER_COMPLETE;
-      gl.BindFramebuffer( GL_FRAMEBUFFER, 0 );
-      if ( !_shadowOk ) std::fprintf( stderr, "bicycle 3D: no shadow map framebuffer; shadows off\n" );
-      }
+      _envQuality = parseQuality( std::getenv( "BICYCLE_SHADOWS" ) );
+      if ( std::getenv( "BICYCLE_NO_SHADOWS" ) ) _envQuality = Q_OFF;
+      s_fps = std::getenv( "BICYCLE_FPS" ) && *std::getenv( "BICYCLE_FPS" ) && *std::getenv( "BICYCLE_FPS" ) != '0';
+      if ( _shadowOk )
+        std::fprintf( stderr, "bicycle 3D: shadows %s%s\n", qualityName( _envQuality >= 0 ? _envQuality : _autoQuality ),
+                      _envQuality >= 0 ? " (BICYCLE_SHADOWS)" : " (auto; BICYCLE_SHADOWS=off|low|med|high)" );
       _overlayProg = program( OVERLAY_VS, OVERLAY_FS );
       // Billboard quad: rewritten per sprite. Overlay quad: the whole screen.
       if ( !s_es2 ) gl.GenVertexArrays( 1, &_quadVao );
@@ -597,6 +603,7 @@ class Renderer3D final : public PixelRenderer {
     }
 
     void presentFramebuffer() override {
+      fpsBegin();
       gl.Viewport( 0, 0, _fbW, _fbH );
       auto& w3 = phys3d::World3D::get();
       const m3::Vec3 sky = w3.active() ? w3.view().sky : m3::Vec3{ 0.45f, 0.65f, 0.90f };
@@ -606,9 +613,13 @@ class Renderer3D final : public PixelRenderer {
         if ( w3.active() ) drawWorld3D();
         else drawWorld();
       }
+      fpsMark( P_MAIN );  // 2.5D scenes: all of it
       drawOverlay();
+      fpsMark( P_OVERLAY );
       if ( screenshotDue() ) readBack();
       SDL_GL_SwapWindow( _window );
+      fpsMark( P_SWAP );
+      fpsEnd();
       _drawn.clear();
       _haveScene = false;
     }
@@ -631,22 +642,30 @@ class Renderer3D final : public PixelRenderer {
       gl.EnableVertexAttribArray( 0 );
       if ( s_es2 ) for ( GLuint a = 1; a < 5; ++a ) gl.DisableVertexAttribArray( a );
     }
-    // A VAO where there are VAOs; on GLES2 the buffer and its attribute layout, every time.
+    // A VAO where there are VAOs; on GLES2 the buffer and its attribute layout, every time. The buffer is bound either
+    // way (GL_ARRAY_BUFFER isn't VAO state): the billboard BufferData that follows must not land in the last mesh's VBO.
     static void bindVertices( GLuint vao, GLuint vbo, void ( *layout )() ) {
-      if ( !s_es2 ) { gl.BindVertexArray( vao ); return; }
+      if ( !s_es2 ) { gl.BindVertexArray( vao ); gl.BindBuffer( GL_ARRAY_BUFFER, vbo ); return; }
       gl.BindBuffer( GL_ARRAY_BUFFER, vbo );
       layout();
     }
     // Textures from ARGB words (BGRA bytes): GLES has no BGRA upload, so swap to RGBA first.
-    static void uploadBGRA( int w, int h, const uint32_t* px ) {
-      if ( s_tier == CORE ) { gl.TexImage2D( GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_BGRA, GL_UNSIGNED_BYTE, px ); return; }
+    // GL_EXT_texture_format_BGRA8888 (most Mesa GLES drivers, v3d and vc4 included) takes BGRA as is.
+    // sub: the bound texture already has this size, so update it in place instead of reallocating.
+    static void uploadBGRA( int w, int h, const uint32_t* px, bool sub = false ) {
+      if ( s_tier == CORE || s_bgraExt ) {
+        if ( sub ) gl.TexSubImage2D( GL_TEXTURE_2D, 0, 0, 0, w, h, GL_BGRA, GL_UNSIGNED_BYTE, px );
+        else gl.TexImage2D( GL_TEXTURE_2D, 0, s_tier == CORE ? GL_RGBA8 : GL_BGRA, w, h, 0, GL_BGRA, GL_UNSIGNED_BYTE, px );
+        return;
+      }
       static std::vector<uint32_t> tmp;
       tmp.resize( static_cast<size_t>( w ) * h );
       for ( size_t i = 0; i < tmp.size(); ++i ) {
         const uint32_t c = px[i];
         tmp[i] = ( c & 0xFF00FF00u ) | ( ( c >> 16 ) & 0xFFu ) | ( ( c & 0xFFu ) << 16 );
       }
-      gl.TexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, tmp.data() );
+      if ( sub ) gl.TexSubImage2D( GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, tmp.data() );
+      else gl.TexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, tmp.data() );
     }
 
     // Meshes: pos3 nrm3 uv2 joints4 weights4.
@@ -681,7 +700,7 @@ class Renderer3D final : public PixelRenderer {
       replaceAll( " o = ", " gl_FragColor = " );
       replaceAll( "uniform sampler2DShadow uShadowMap;", "" );
       // shadow(): sampler2DShadow lookups -> lit (no shadow map on GLES2)
-      replaceAll( "s += texture2D(uShadowMap, vec3(p.xy + vec2(x, y) * uShadowTexel, p.z - bias));", "s += 1.0;" );
+      replaceAll( "return texture2D(uShadowMap, vec3(uv, z));", "return 1.0;" );
       return src;
     }
     // GLSL 330 -> GLSL ES 3.00 (GLES3): the same language, plus default precisions (sampler2DShadow has none).
@@ -846,22 +865,30 @@ class Renderer3D final : public PixelRenderer {
       return g;
     }
 
+    // drawMesh's uniform locations, looked up once per program (not per draw).
+    struct MeshLocs { GLint skinned, bones, mvp, model, lit, color, tex; };
+    auto meshLocs( GLuint prog ) -> const MeshLocs& {
+      auto it = _meshLocs.find( prog );
+      if ( it != _meshLocs.end() ) return it->second;
+      auto u = [&]( const char* n ) { return gl.GetUniformLocation( prog, n ); };
+      return _meshLocs[prog] = { u( "uSkinned" ), u( "uBones" ), u( "uMvp" ), u( "uModel" ), u( "uLit" ), u( "uColor" ), u( "uTex" ) };
+    }
     void drawMesh( const GpuMesh& m, const Mat4& viewProj, const Mat4& model, const float* bones = nullptr, GLuint prog = 0 ) {
       if ( !prog ) prog = _prog;
+      const MeshLocs& l = meshLocs( prog );
       const Mat4 mvp = mul( viewProj, model );
-      gl.Uniform1i( gl.GetUniformLocation( prog, "uSkinned" ), bones && m.skin ? 1 : 0 );
-      if ( bones && m.skin ) {
-        gl.UniformMatrix4fv( gl.GetUniformLocation( prog, "uBones" ), static_cast<GLsizei>( m.skin->joints.size() ), 0, bones );
-      }
-      gl.UniformMatrix4fv( gl.GetUniformLocation( prog, "uMvp" ), 1, 0, mvp.data() );
-      gl.UniformMatrix4fv( gl.GetUniformLocation( prog, "uModel" ), 1, 0, model.data() );
-      gl.Uniform1i( gl.GetUniformLocation( prog, "uLit" ), 1 );
+      gl.Uniform1i( l.skinned, bones && m.skin ? 1 : 0 );
+      if ( bones && m.skin ) gl.UniformMatrix4fv( l.bones, static_cast<GLsizei>( m.skin->joints.size() ), 0, bones );
+      gl.UniformMatrix4fv( l.mvp, 1, 0, mvp.data() );
+      gl.UniformMatrix4fv( l.model, 1, 0, model.data() );
+      gl.Uniform1i( l.lit, 1 );
       bindVertices( m.vao, m.vbo, meshLayout );
       for ( const auto& r : m.ranges ) {
-        gl.Uniform4fv( gl.GetUniformLocation( prog, "uColor" ), 1, r.rgba.data() );
-        gl.Uniform1i( gl.GetUniformLocation( prog, "uTex" ), r.tex ? 1 : 0 );
+        gl.Uniform4fv( l.color, 1, r.rgba.data() );
+        gl.Uniform1i( l.tex, r.tex ? 1 : 0 );
         gl.BindTexture( GL_TEXTURE_2D, r.tex );
         gl.DrawArrays( GL_TRIANGLES, r.first, r.count );
+        ++_frameDraws;
       }
     }
 
@@ -989,7 +1016,8 @@ class Renderer3D final : public PixelRenderer {
       gl.Uniform1f( u( "uAmbient" ), v.ambient );
       gl.Uniform1i( u( "uShadows" ), shadows ? 1 : 0 );
       gl.Uniform1i( u( "uShadowMap" ), 1 );
-      gl.Uniform1f( u( "uShadowTexel" ), 1.0f / SHADOW_SIZE );
+      gl.Uniform1f( u( "uShadowTexel" ), 1.0f / std::max( 1, _shadowSize ) );
+      gl.Uniform1i( u( "uShadowTaps" ), QUALITY[_quality].taps );
       gl.Uniform3fv( u( "uCamPos" ), 1, &eye.x );
       gl.Uniform3fv( u( "uFogColor" ), 1, &v.fogColor.x );
       const float fog[2] = { v.fogNear, v.fogFar };
@@ -1050,46 +1078,112 @@ class Renderer3D final : public PixelRenderer {
         r = it.mesh->radius * std::max( { sx, sy, sz } );
       };
 
-      // Shadow pass: an orthographic light view around what the camera looks at.
-      static const bool noShadows = std::getenv( "BICYCLE_NO_SHADOWS" ) != nullptr;  // debugging / slow GPUs
-      const bool shadows = v.shadows && _shadowOk && !noShadows;
+      // Shadow pass: an orthographic light view around what the camera looks at. Quality (BICYCLE_SHADOWS, else
+      // W.View.shadows, else auto by GPU) picks the map size, PCF taps and how far it reaches. The map is re-rendered
+      // only when the light view or a caster changed: level statics go into their own map (redrawn only when the light
+      // view moves) that is copied in before the moving casters are drawn.
+      _quality = _envQuality >= 0 ? _envQuality : v.shadowQuality >= 0 ? v.shadowQuality : _autoQuality;
+      if ( !v.shadows ) _quality = Q_OFF;
+      const Quality& Q = QUALITY[_quality];
+      const bool shadows = _quality != Q_OFF && _shadowOk && ensureShadowMap( Q.size );
       m3::Mat4 lightVP = m3::identity();
       if ( shadows ) {
-        const phys3d::Transform* focus = w3.rig().target ? &w3.transform( w3.rig().target ) : nullptr;
-        const m3::Vec3 center = focus && focus->on ? focus->pos + fwd * 6.f : eye + fwd * 12.f;
         const m3::Vec3 ld = m3::normalize( v.lightDir );
         const m3::Vec3 up = std::fabs( ld.y ) > 0.99f ? m3::Vec3{ 0, 0, 1 } : m3::Vec3{ 0, 1, 0 };
-        const float ext = SHADOW_EXTENT;
+        m3::Vec3 center;
+        float ext = SHADOW_EXTENT;
+        if ( Q.reach <= 0 ) {  // high: a fixed square around the focus (the player, else ahead of the camera)
+          const phys3d::Transform* focus = w3.rig().target ? &w3.transform( w3.rig().target ) : nullptr;
+          center = focus && focus->on ? focus->pos + fwd * 6.f : eye + fwd * 12.f;
+        }
+        else {  // low/med: the bounding sphere of the camera frustum from the eye out to the reach (and the fog)
+          const float reach = std::min( { Q.reach, v.farZ, std::max( v.fogFar, 1.f ) } );
+          const float ty = std::tan( v.fovDeg * m3::PI / 360.f ), tx = ty * static_cast<float>( vw ) / std::max( 1, vh );
+          // Sphere through the far corners, centered on the view axis (radius independent of the camera's turn).
+          const float far2 = reach * reach * ( 1 + tx * tx + ty * ty );
+          const float d = std::min( reach, far2 / ( 2 * reach ) );
+          center = eye + fwd * d;
+          ext = std::sqrt( std::max( far2 - 2 * d * reach + d * d, d * d ) );
+          ext = std::ceil( ext * 2 ) / 2;  // steady radius: half-meter steps
+        }
         // Snap the center to shadow-map texels so the shadows don't shimmer as the camera moves.
         const m3::Mat4 lv0 = m3::lookAt( { 0, 0, 0 }, ld, up );
         m3::Vec3 lc = m3::transformPoint( lv0, center );
-        const float texel = 2 * ext / SHADOW_SIZE;
+        const float texel = 2 * ext / Q.size;
         lc.x = std::floor( lc.x / texel ) * texel;
         lc.y = std::floor( lc.y / texel ) * texel;
         const m3::Mat4 lightProj = m3::ortho( lc.x - ext, lc.x + ext, lc.y - ext, lc.y + ext, -lc.z - 80, -lc.z + 80 );
         lightVP = m3::mul( lightProj, lv0 );
         const m3::Planes lp = m3::frustumPlanes( lightVP );
-        gl.BindFramebuffer( GL_FRAMEBUFFER, _shadowFbo );
-        gl.Viewport( 0, 0, SHADOW_SIZE, SHADOW_SIZE );
-        gl.Clear( GL_DEPTH_BUFFER_BIT );
-        gl.Enable( GL_DEPTH_TEST );
-        gl.DepthFunc( GL_LEQUAL );
-        gl.Enable( GL_POLYGON_OFFSET_FILL );
-        gl.PolygonOffset( 1.5f, 3.0f );
-        gl.UseProgram( _depthProg );
-        gl.ActiveTexture( GL_TEXTURE0 );
-        gl.Uniform1i( gl.GetUniformLocation( _depthProg, "tex" ), 0 );
-        gl.UniformMatrix4fv( gl.GetUniformLocation( _depthProg, "uLightVP" ), 1, 0, lightVP.data() );
-        for ( const auto& it : _items ) {
+        // What changed since the map was drawn: the light view (statics), the moving casters (pose included).
+        auto fnv = []( uint64_t h, const void* p, size_t n ) {
+          for ( size_t i = 0; i < n; ++i ) h = ( h ^ static_cast<const unsigned char*>( p )[i] ) * 1099511628211ull;
+          return h;
+        };
+        const uint64_t viewHash = fnv( 1469598103934665603ull ^ static_cast<uint64_t>( Q.size ), lightVP.data(), 16 * sizeof( float ) );
+        uint64_t dynHash = viewHash;
+        _casters.clear();
+        const size_t nStatic = _statics.size();
+        for ( size_t i = 0; i < _items.size(); ++i ) {
+          const auto& it = _items[i];
           m3::Vec3 c;
           float r;
           worldSphere( it, c, r );
           if ( !m3::sphereVisible( lp, c, r ) ) continue;
-          drawMesh( *it.mesh, lightVP, it.model, it.skinned ? it.bones->data() : nullptr, _depthProg );
+          if ( i >= nStatic ) {
+            dynHash = fnv( dynHash, &it.mesh, sizeof it.mesh );
+            dynHash = fnv( dynHash, it.model.data(), 16 * sizeof( float ) );
+            if ( it.skinned && it.mesh->skin ) dynHash = fnv( dynHash, it.bones->data(), it.mesh->skin->joints.size() * 16 * sizeof( float ) );
+          }
+          _casters.push_back( i );
         }
-        gl.Disable( GL_POLYGON_OFFSET_FILL );
-        gl.BindFramebuffer( GL_FRAMEBUFFER, 0 );
+        const bool split = _staticFbo != 0;  // a separate statics map (GL 3.3 / ES 3.0 blit)
+        const bool staticsDirty = !_shadowValid || viewHash != _shadowViewHash;
+        const bool dirty = staticsDirty || dynHash != _shadowDynHash;
+        if ( dirty ) {
+          ++_fpsShadowRenders;
+          gl.Enable( GL_DEPTH_TEST );
+          gl.DepthFunc( GL_LEQUAL );
+          gl.Enable( GL_POLYGON_OFFSET_FILL );
+          gl.PolygonOffset( 1.5f, 3.0f );
+          gl.UseProgram( _depthProg );
+          gl.ActiveTexture( GL_TEXTURE0 );
+          gl.Uniform1i( gl.GetUniformLocation( _depthProg, "tex" ), 0 );
+          gl.Viewport( 0, 0, Q.size, Q.size );
+          auto drawCasters = [&]( bool statics, bool dynamics ) {
+            for ( size_t i : _casters ) {
+              const bool st = i < nStatic;
+              if ( ( st && !statics ) || ( !st && !dynamics ) ) continue;
+              const auto& it = _items[i];
+              drawMesh( *it.mesh, lightVP, it.model, it.skinned ? it.bones->data() : nullptr, _depthProg );
+            }
+          };
+          if ( split ) {
+            if ( staticsDirty ) {
+              ++_fpsStaticRenders;
+              gl.BindFramebuffer( GL_FRAMEBUFFER, _staticFbo );
+              gl.Clear( GL_DEPTH_BUFFER_BIT );
+              drawCasters( true, false );
+            }
+            gl.BindFramebuffer( GL_READ_FRAMEBUFFER, _staticFbo );
+            gl.BindFramebuffer( GL_DRAW_FRAMEBUFFER, _shadowFbo );
+            gl.BlitFramebuffer( 0, 0, Q.size, Q.size, 0, 0, Q.size, Q.size, GL_DEPTH_BUFFER_BIT, GL_NEAREST );
+            gl.BindFramebuffer( GL_FRAMEBUFFER, _shadowFbo );
+            drawCasters( false, true );
+          }
+          else {
+            gl.BindFramebuffer( GL_FRAMEBUFFER, _shadowFbo );
+            gl.Clear( GL_DEPTH_BUFFER_BIT );
+            drawCasters( true, true );
+          }
+          gl.Disable( GL_POLYGON_OFFSET_FILL );
+          gl.BindFramebuffer( GL_FRAMEBUFFER, 0 );
+          _shadowValid = true;
+          _shadowViewHash = viewHash;
+          _shadowDynHash = dynHash;
+        }
       }
+      fpsMark( P_SHADOW );
 
       // Main pass.
       gl.Viewport( 0, 0, vw, vh );
@@ -1111,6 +1205,7 @@ class Renderer3D final : public PixelRenderer {
         ++_stats3d.meshes;
       }
 
+      fpsMark( P_MAIN );
       // Billboards: 3D entities with a sprite and no model, upright and turned to the camera (cylindrical).
       const m3::Vec3 right = m3::flatRight( cam.yaw );
       for ( Entity e = 1; e < NUM_SUPPORTED_ENTITIES; ++e ) {
@@ -1157,8 +1252,10 @@ class Renderer3D final : public PixelRenderer {
         gl.Uniform1i( gl.GetUniformLocation( _prog, "uSkinned" ), 0 );
         gl.BindTexture( GL_TEXTURE_2D, _atlasTex );
         gl.DrawArrays( GL_TRIANGLES, 0, static_cast<GLsizei>( _bbVerts.size() / 8 ) );
+        ++_frameDraws;
         _bbVerts.clear();
       }
+      fpsMark( P_BILLBOARDS );
       if ( v.crosshair ) {
         const int cx = _fbW / 2, cy = _fbH / 2;
         for ( int d = -9; d <= 9; ++d ) {
@@ -1183,7 +1280,10 @@ class Renderer3D final : public PixelRenderer {
       gl.ActiveTexture( GL_TEXTURE0 );
       gl.BindTexture( GL_TEXTURE_2D, _overlayTex );
       gl.PixelStorei( GL_UNPACK_ALIGNMENT, 4 );
-      uploadBGRA( _fbW, _fbH, reinterpret_cast<const uint32_t*>( _fb.data() ) );  // ARGB words
+      const bool same = _overlayW == _fbW && _overlayH == _fbH;
+      uploadBGRA( _fbW, _fbH, reinterpret_cast<const uint32_t*>( _fb.data() ), same );  // ARGB words
+      _overlayW = _fbW;
+      _overlayH = _fbH;
       gl.Uniform1i( gl.GetUniformLocation( _overlayProg, "tex" ), 0 );
       bindVertices( _overlayVao, _overlayVbo, overlayLayout );
       gl.DrawArrays( GL_TRIANGLE_STRIP, 0, 4 );
@@ -1203,7 +1303,105 @@ class Renderer3D final : public PixelRenderer {
     static inline int s_tier = CORE;   // context tier (see contextAttributes)
     static inline bool s_es2 = false;  // OpenGL ES 2.0 context (see contextAttributes)
     SDL_GLContext _ctx{};
-    static constexpr int SHADOW_SIZE = 2048;
+    // Shadow quality: map size, depth compares per pixel, reach (meters; 0 = high's fixed square around the focus).
+    enum { Q_OFF, Q_LOW, Q_MED, Q_HIGH };
+    struct Quality { int size, taps; float reach; const char* name; };
+    static constexpr Quality QUALITY[4] = { { 0, 0, 0, "off" }, { 512, 1, 16, "low" }, { 1024, 4, 24, "med" }, { 2048, 9, 0, "high" } };
+    static auto qualityName( int q ) -> const char* { return QUALITY[q].name; }
+    static auto parseQuality( const char* e ) -> int {
+      if ( !e || !*e ) return -1;
+      for ( int q = 0; q < 4; ++q ) if ( std::strcmp( e, QUALITY[q].name ) == 0 ) return q;
+      if ( std::strcmp( e, "0" ) == 0 ) return Q_OFF;
+      if ( std::strcmp( e, "auto" ) != 0 ) std::fprintf( stderr, "bicycle 3D: BICYCLE_SHADOWS=%s unknown (off|low|med|high|auto)\n", e );
+      return -1;
+    }
+    // The depth texture(s) at this size; on ES 16-bit depth. A second statics-only map where depth blits work.
+    auto ensureShadowMap( int size ) -> bool {
+      if ( size == _shadowSize ) return _shadowOk;
+      const bool es = s_tier != CORE;
+      auto make = [&]( GLuint& tex, GLuint& fbo, bool compare ) {
+        if ( !tex ) gl.GenTextures( 1, &tex );
+        if ( !fbo ) gl.GenFramebuffers( 1, &fbo );
+        gl.BindTexture( GL_TEXTURE_2D, tex );
+        gl.TexImage2D( GL_TEXTURE_2D, 0, es ? GL_DEPTH_COMPONENT16 : GL_DEPTH_COMPONENT24, size, size, 0, GL_DEPTH_COMPONENT,
+                       es ? GL_UNSIGNED_SHORT : GL_FLOAT, nullptr );
+        gl.TexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, compare ? GL_LINEAR : GL_NEAREST );
+        gl.TexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, compare ? GL_LINEAR : GL_NEAREST );
+        // ES 3.0 has no border clamp; the shader treats lookups outside the map as lit anyway.
+        const GLenum wrap = es ? GL_CLAMP_TO_EDGE : GL_CLAMP_TO_BORDER;
+        gl.TexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap );
+        gl.TexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap );
+        const float border[4] = { 1, 1, 1, 1 };
+        if ( !es ) gl.TexParameterfv( GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, border );
+        if ( compare ) {
+          gl.TexParameteri( GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE );
+          gl.TexParameteri( GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL );
+        }
+        gl.BindFramebuffer( GL_FRAMEBUFFER, fbo );
+        gl.FramebufferTexture2D( GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, tex, 0 );
+        if ( !es ) {  // ES 3.0: a depth-only framebuffer is complete as is
+          gl.DrawBuffer( GL_NONE );
+          gl.ReadBuffer( GL_NONE );
+        }
+        const bool ok = gl.CheckFramebufferStatus( GL_FRAMEBUFFER ) == GL_FRAMEBUFFER_COMPLETE;
+        gl.BindFramebuffer( GL_FRAMEBUFFER, 0 );
+        gl.BindTexture( GL_TEXTURE_2D, 0 );
+        return ok;
+      };
+      _shadowOk = make( _shadowTex, _shadowFbo, true );
+      if ( !_shadowOk ) std::fprintf( stderr, "bicycle 3D: no shadow map framebuffer; shadows off\n" );
+      if ( _shadowOk && gl.BlitFramebuffer && !make( _staticTex, _staticFbo, false ) ) _staticFbo = 0;
+      _shadowSize = size;
+      _shadowValid = false;
+      return _shadowOk;
+    }
+    // BICYCLE_FPS=1: once a second, the average fps and ms per pass (glFinish at each pass end, so the numbers are
+    // GPU time too; that costs a little, so it's only on when asked).
+    enum { P_SHADOW, P_MAIN, P_BILLBOARDS, P_OVERLAY, P_SWAP, P_COUNT };
+    void fpsBegin() {
+      if ( !s_fps ) return;
+      _fpsLast = SDL_GetPerformanceCounter();
+      if ( !_fpsStart ) _fpsStart = _fpsLast;
+    }
+    void fpsMark( int pass ) {
+      if ( !s_fps || !_fpsLast ) return;
+      gl.Finish();
+      const uint64_t t = SDL_GetPerformanceCounter();
+      _fpsMs[pass] += 1000.0 * static_cast<double>( t - _fpsLast ) / static_cast<double>( SDL_GetPerformanceFrequency() );
+      _fpsLast = t;
+    }
+    void fpsEnd() {
+      if ( !s_fps ) return;
+      ++_fpsFrames;
+      _fpsDraws += _frameDraws;
+      _frameDraws = 0;
+      const double el = static_cast<double>( SDL_GetPerformanceCounter() - _fpsStart ) / static_cast<double>( SDL_GetPerformanceFrequency() );
+      if ( el < 1.0 ) return;
+      const double n = static_cast<double>( _fpsFrames );
+      std::fprintf( stderr, "fps %.1f | ms/frame: shadow %.2f main %.2f billboards %.2f overlay %.2f swap %.2f | shadow maps drawn %d/%d (statics %d) | draws %.0f | shadows %s | %s\n",
+                    n / el, _fpsMs[P_SHADOW] / n, _fpsMs[P_MAIN] / n, _fpsMs[P_BILLBOARDS] / n, _fpsMs[P_OVERLAY] / n, _fpsMs[P_SWAP] / n,
+                    _fpsShadowRenders, _fpsFrames, _fpsStaticRenders, static_cast<double>( _fpsDraws ) / n, _shadowOk ? qualityName( _quality ) : "none",
+                    tierName( s_tier ) );
+      _fpsFrames = 0;
+      _fpsDraws = 0;
+      _fpsShadowRenders = 0;
+      _fpsStaticRenders = 0;
+      for ( auto& m : _fpsMs ) m = 0;
+      _fpsStart = SDL_GetPerformanceCounter();
+    }
+    static inline bool s_fps = false;
+    static inline bool s_bgraExt = false;  // GLES: GL_EXT_texture_format_BGRA8888
+    uint64_t _fpsStart{}, _fpsLast{};
+    double _fpsMs[P_COUNT]{};
+    int _fpsFrames{}, _fpsShadowRenders{}, _fpsStaticRenders{};
+    size_t _fpsDraws{}, _frameDraws{};
+    int _quality{ Q_HIGH }, _autoQuality{ Q_HIGH }, _envQuality{ -1 }, _shadowSize{};
+    bool _shadowValid{};
+    uint64_t _shadowViewHash{}, _shadowDynHash{};
+    GLuint _staticTex{}, _staticFbo{};
+    std::vector<size_t> _casters;
+    std::unordered_map<GLuint, MeshLocs> _meshLocs;
+    int _overlayW{}, _overlayH{};
     static constexpr float SHADOW_EXTENT = 22.f;  // meters each side of the shadow focus
     std::vector<Item> _items;
     std::vector<std::array<float, 16 * skin::MAX_JOINTS>> _poses;

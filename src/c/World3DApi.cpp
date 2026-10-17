@@ -179,6 +179,7 @@ EXPORT_API void view3dLight( float dx, float dy, float dz, float r, float g, flo
   v.ambient = ambient;
   v.shadows = shadows;
 }
+EXPORT_API void view3dShadowQuality( int q ) { w3().view().shadowQuality = q < -1 || q > 3 ? -1 : q; }
 EXPORT_API void view3dCrosshair( bool on ) { w3().view().crosshair = on; }
 EXPORT_API void view3dBillboardPixel( float meters ) { w3().view().billboardPixel = meters; }
 

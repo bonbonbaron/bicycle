@@ -90,6 +90,7 @@ struct View {
   Vec3 lightColor{ 1.0f, 0.97f, 0.9f };
   float ambient{ 0.38f };
   bool shadows{ true };
+  int shadowQuality{ -1 };            // -1 auto (by GPU), 0 off, 1 low, 2 med, 3 high (BICYCLE_SHADOWS overrides)
   float billboardPixel{ 1.f / 16 };  // meters per sprite pixel (billboards)
   bool crosshair{};                  // a center-screen crosshair (first person)
 };
