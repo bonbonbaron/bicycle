@@ -61,7 +61,7 @@ enum : GLenum {
   GL_COMPILE_STATUS = 0x8B81, GL_LINK_STATUS = 0x8B82, GL_TEXTURE_2D = 0x0DE1, GL_RGBA = 0x1908, GL_BGRA = 0x80E1,
   GL_RGBA8 = 0x8058, GL_UNSIGNED_BYTE = 0x1401, GL_TEXTURE_MIN_FILTER = 0x2801, GL_TEXTURE_MAG_FILTER = 0x2800,
   GL_NEAREST = 0x2600, GL_TEXTURE_WRAP_S = 0x2802, GL_TEXTURE_WRAP_T = 0x2803, GL_REPEAT = 0x2901,
-  GL_CLAMP_TO_EDGE = 0x812F, GL_TRIANGLES = 0x0004, GL_TRIANGLE_STRIP = 0x0005, GL_TEXTURE0 = 0x84C0,
+  GL_UNSIGNED_INT = 0x1405, GL_CLAMP_TO_EDGE = 0x812F, GL_TRIANGLES = 0x0004, GL_TRIANGLE_STRIP = 0x0005, GL_TEXTURE0 = 0x84C0,
   GL_LEQUAL = 0x0203, GL_PACK_ALIGNMENT = 0x0D05, GL_UNPACK_ALIGNMENT = 0x0CF5, GL_VERSION = 0x1F02,
   GL_RENDERER = 0x1F01, GL_FRAMEBUFFER = 0x8D40, GL_DEPTH_ATTACHMENT = 0x8D00, GL_DEPTH_COMPONENT = 0x1902,
   GL_DEPTH_COMPONENT24 = 0x81A6, GL_NONE = 0, GL_POLYGON_OFFSET_FILL = 0x8037, GL_LINEAR = 0x2601,
@@ -480,40 +480,64 @@ class Renderer3D final : public PixelRenderer {
     auto windowFlags() const -> uint64_t override { return SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE; }
     auto frameClearColor() const -> uint32_t override { return 0u; }  // overlay: transparent where nothing's drawn
 
-    // OpenGL 3.3 core, else OpenGL ES 2.0 (Raspberry Pi vc4/v3d, Mesa on small GPUs): no VAOs, GLSL 100 shaders,
-    // no shadow map. BICYCLE_GLES2=1 (or -DBICYCLE_GLES2=ON) goes straight to ES 2.0.
-    static void contextAttributes( bool es2 ) {
-      SDL_GL_SetAttribute( SDL_GL_CONTEXT_MAJOR_VERSION, es2 ? 2 : 3 );
-      SDL_GL_SetAttribute( SDL_GL_CONTEXT_MINOR_VERSION, es2 ? 0 : 3 );
-      SDL_GL_SetAttribute( SDL_GL_CONTEXT_PROFILE_MASK, es2 ? SDL_GL_CONTEXT_PROFILE_ES : SDL_GL_CONTEXT_PROFILE_CORE );
+    // Context tiers, best first: OpenGL 3.3 core; OpenGL ES 3.0+ (Raspberry Pi 4 v3d: GLSL 300 es, VAOs, shadow map);
+    // OpenGL ES 2.0 (Pi Zero vc4: GLSL 100, no VAOs, no shadow map). BICYCLE_GL=core|gles3|gles2 picks the first tier
+    // to try (BICYCLE_GLES2=1 or -DBICYCLE_GLES2=ON means gles2). A failed tier's window is destroyed and recreated
+    // before the next is tried (X11/Wayland may fix a window's visual/config to the first context attempted).
+    enum Tier { CORE, GLES3, GLES2 };
+    static auto tierName( int t ) -> const char* { return t == CORE ? "OpenGL 3.3 core" : t == GLES3 ? "OpenGL ES 3.0" : "OpenGL ES 2.0"; }
+    static void contextAttributes( int t ) {
+      s_tier = t;
+      s_es2 = t == GLES2;
+      SDL_GL_SetAttribute( SDL_GL_CONTEXT_MAJOR_VERSION, t == GLES2 ? 2 : 3 );
+      SDL_GL_SetAttribute( SDL_GL_CONTEXT_MINOR_VERSION, t == CORE ? 3 : 0 );
+      SDL_GL_SetAttribute( SDL_GL_CONTEXT_PROFILE_MASK, t == CORE ? SDL_GL_CONTEXT_PROFILE_CORE : SDL_GL_CONTEXT_PROFILE_ES );
     }
     void beforeWindowCreated() override {
+      int t = CORE;
 #ifdef BICYCLE_GLES2
-      s_es2 = true;
+      t = GLES2;
 #endif
-      if ( const char* e = std::getenv( "BICYCLE_GLES2" ) ) s_es2 = *e && *e != '0';
-      contextAttributes( s_es2 );
+      if ( const char* e = std::getenv( "BICYCLE_GLES2" ) ) t = ( *e && *e != '0' ) ? GLES2 : CORE;
+      if ( const char* e = std::getenv( "BICYCLE_GL" ) ) {
+        const std::string v = e;
+        if ( v == "core" ) t = CORE;
+        else if ( v == "gles3" ) t = GLES3;
+        else if ( v == "gles2" ) t = GLES2;
+        else if ( !v.empty() ) std::fprintf( stderr, "bicycle 3D: BICYCLE_GL=%s unknown (core|gles3|gles2)\n", e );
+      }
+      contextAttributes( t );
       SDL_GL_SetAttribute( SDL_GL_DEPTH_SIZE, 24 );
       SDL_GL_SetAttribute( SDL_GL_DOUBLEBUFFER, 1 );
     }
 
     void onWindowCreated() override {
-      _ctx = SDL_GL_CreateContext( _window );
-      if ( !_ctx && !s_es2 ) {  // no GL 3.3 core: try OpenGL ES 2.0
-        std::fprintf( stderr, "bicycle 3D: no OpenGL 3.3 core context (%s); trying OpenGL ES 2.0\n", SDL_GetError() );
-        s_es2 = true;
-        contextAttributes( true );
+      for ( ;; ) {
         _ctx = SDL_GL_CreateContext( _window );
+        if ( _ctx && gl.load() ) break;
+        std::fprintf( stderr, "bicycle 3D: no %s context (%s)\n", tierName( s_tier ), SDL_GetError() );
+        if ( _ctx ) SDL_GL_DestroyContext( _ctx );
+        _ctx = nullptr;
+        if ( s_tier == GLES2 ) {
+          std::fprintf( stderr, "bicycle 3D: no OpenGL 3.3, ES 3.0 or ES 2.0 context\n" );
+          std::exit( 1 );
+        }
+        // Next tier, on a fresh window.
+        const std::string title = SDL_GetWindowTitle( _window );
+        int w{}, h{};
+        SDL_GetWindowSize( _window, &w, &h );
+        SDL_DestroyWindow( _window );
+        contextAttributes( s_tier + 1 );
+        _window = SDL_CreateWindow( title.c_str(), w, h, windowFlags() );
+        if ( !_window ) {
+          std::fprintf( stderr, "SDL_CreateWindow failed: %s\n", SDL_GetError() );
+          std::exit( 1 );
+        }
+        SDL_GetWindowSizeInPixels( _window, &_fbW, &_fbH );
       }
-      if ( !_ctx || !gl.load() ) {
-        std::fprintf( stderr, "bicycle 3D: no OpenGL 3.3 or ES 2.0 context: %s\n", SDL_GetError() );
-        std::exit( 1 );
-      }
+      std::fprintf( stderr, "bicycle 3D: %s tier (GL %s on %s)\n", tierName( s_tier ), gl.GetString( GL_VERSION ), gl.GetString( GL_RENDERER ) );
       SDL_GL_SetSwapInterval( 0 );
       startup::mark( "  window + GL context" );
-      if ( std::getenv( "BICYCLE_GL_INFO" ) ) {
-        std::fprintf( stderr, "GL %s on %s%s\n", gl.GetString( GL_VERSION ), gl.GetString( GL_RENDERER ), s_es2 ? " (GLES2 path)" : "" );
-      }
       _prog = program( VS, FS );
       _depthProg = program( VS, DEPTH_FS );
       startup::mark( "  shaders (compile + link)" );
@@ -526,20 +550,24 @@ class Renderer3D final : public PixelRenderer {
       if ( !s_es2 ) {
       gl.GenTextures( 1, &_shadowTex );
       gl.BindTexture( GL_TEXTURE_2D, _shadowTex );
-      gl.TexImage2D( GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, SHADOW_SIZE, SHADOW_SIZE, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr );
+      gl.TexImage2D( GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, SHADOW_SIZE, SHADOW_SIZE, 0, GL_DEPTH_COMPONENT, s_tier == GLES3 ? GL_UNSIGNED_INT : GL_FLOAT, nullptr );
       gl.TexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
       gl.TexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
-      gl.TexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER );
-      gl.TexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER );
+      // ES 3.0 has no border clamp; the shader treats lookups outside the map as lit anyway.
+      const GLenum shadowWrap = s_tier == GLES3 ? GL_CLAMP_TO_EDGE : GL_CLAMP_TO_BORDER;
+      gl.TexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, shadowWrap );
+      gl.TexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, shadowWrap );
       const float border[4] = { 1, 1, 1, 1 };
-      gl.TexParameterfv( GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, border );
+      if ( s_tier == CORE ) gl.TexParameterfv( GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, border );
       gl.TexParameteri( GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE );
       gl.TexParameteri( GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL );
       gl.GenFramebuffers( 1, &_shadowFbo );
       gl.BindFramebuffer( GL_FRAMEBUFFER, _shadowFbo );
       gl.FramebufferTexture2D( GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, _shadowTex, 0 );
-      gl.DrawBuffer( GL_NONE );
-      gl.ReadBuffer( GL_NONE );
+      if ( s_tier == CORE ) {  // ES 3.0: a depth-only framebuffer is complete as is
+        gl.DrawBuffer( GL_NONE );
+        gl.ReadBuffer( GL_NONE );
+      }
       _shadowOk = gl.CheckFramebufferStatus( GL_FRAMEBUFFER ) == GL_FRAMEBUFFER_COMPLETE;
       gl.BindFramebuffer( GL_FRAMEBUFFER, 0 );
       if ( !_shadowOk ) std::fprintf( stderr, "bicycle 3D: no shadow map framebuffer; shadows off\n" );
@@ -609,9 +637,9 @@ class Renderer3D final : public PixelRenderer {
       gl.BindBuffer( GL_ARRAY_BUFFER, vbo );
       layout();
     }
-    // Textures from ARGB words (BGRA bytes): GLES2 has no BGRA upload, so swap to RGBA first.
+    // Textures from ARGB words (BGRA bytes): GLES has no BGRA upload, so swap to RGBA first.
     static void uploadBGRA( int w, int h, const uint32_t* px ) {
-      if ( !s_es2 ) { gl.TexImage2D( GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_BGRA, GL_UNSIGNED_BYTE, px ); return; }
+      if ( s_tier == CORE ) { gl.TexImage2D( GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_BGRA, GL_UNSIGNED_BYTE, px ); return; }
       static std::vector<uint32_t> tmp;
       tmp.resize( static_cast<size_t>( w ) * h );
       for ( size_t i = 0; i < tmp.size(); ++i ) {
@@ -656,9 +684,18 @@ class Renderer3D final : public PixelRenderer {
       replaceAll( "s += texture2D(uShadowMap, vec3(p.xy + vec2(x, y) * uShadowTexel, p.z - bias));", "s += 1.0;" );
       return src;
     }
+    // GLSL 330 -> GLSL ES 3.00 (GLES3): the same language, plus default precisions (sampler2DShadow has none).
+    static auto toEs3( std::string src, bool vertex ) -> std::string {
+      const std::string from = "#version 330 core\n";
+      if ( src.rfind( from, 0 ) == 0 )
+        src.replace( 0, from.size(), vertex ? "#version 300 es\nprecision highp float;\nprecision highp int;\n"
+                                            : "#version 300 es\nprecision highp float;\nprecision highp int;\nprecision highp sampler2DShadow;\n" );
+      return src;
+    }
     static auto program( const char* vs, const char* fs ) -> GLuint {
       std::string vsEs, fsEs;
       if ( s_es2 ) { vsEs = toEs2( vs, true ); fsEs = toEs2( fs, false ); vs = vsEs.c_str(); fs = fsEs.c_str(); }
+      if ( s_tier == GLES3 ) { vsEs = toEs3( vs, true ); fsEs = toEs3( fs, false ); vs = vsEs.c_str(); fs = fsEs.c_str(); }
       auto compile = []( GLenum type, const char* src ) {
         GLuint s = gl.CreateShader( type );
         gl.ShaderSource( s, 1, &src, nullptr );
@@ -1155,14 +1192,15 @@ class Renderer3D final : public PixelRenderer {
     void readBack() {
       gfx::Pixels px( static_cast<size_t>( _fbW ) * _fbH );
       gl.PixelStorei( GL_PACK_ALIGNMENT, 4 );
-      gl.ReadPixels( 0, 0, _fbW, _fbH, s_es2 ? GL_RGBA : GL_BGRA, GL_UNSIGNED_BYTE, px.data() );
-      if ( s_es2 ) for ( auto& c : px ) c = ( c & 0xFF00FF00u ) | ( ( c >> 16 ) & 0xFFu ) | ( ( c & 0xFFu ) << 16 );
+      gl.ReadPixels( 0, 0, _fbW, _fbH, s_tier != CORE ? GL_RGBA : GL_BGRA, GL_UNSIGNED_BYTE, px.data() );
+      if ( s_tier != CORE ) for ( auto& c : px ) c = ( c & 0xFF00FF00u ) | ( ( c >> 16 ) & 0xFFu ) | ( ( c & 0xFFu ) << 16 );
       _capture.resize( px.size() );
       for ( int y = 0; y < _fbH; ++y )  // GL rows are bottom first
         for ( int x = 0; x < _fbW; ++x ) _capture[static_cast<size_t>( y ) * _fbW + x] = px[static_cast<size_t>( _fbH - 1 - y ) * _fbW + x] | 0xFF000000u;
     }
 
     static GL gl;
+    static inline int s_tier = CORE;   // context tier (see contextAttributes)
     static inline bool s_es2 = false;  // OpenGL ES 2.0 context (see contextAttributes)
     SDL_GLContext _ctx{};
     static constexpr int SHADOW_SIZE = 2048;
