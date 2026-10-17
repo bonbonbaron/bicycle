@@ -365,6 +365,11 @@ function register( entityId, entity )
   entities[entityId] = entity -- TODO check whether entity ID is already used in table later
 end
 
+-- The table registered for an entity id (a genome instance: e.g. the hero a coin was touched by), or nil.
+function entityOf( id )
+  return entities[id]
+end
+
 function unregister( id )
   if not id then
     error( debug.traceback( "unregister: no entity id" ), 2 )
@@ -473,7 +478,9 @@ function getUpdates()
       if timeout.entity ~= 0 then
       entity = entities[timeout.entity]
       if not entity then error("Timeout recorded for nonexistent entity "..tostring(timeout.entity)..".") end
-      if entity.onTimeout then entity:onTimeout( timeout.id, timeout.type ) end
+      -- onTimer (genomes' timer gene) or the older name onTimeout
+      local cb = entity.onTimer or entity.onTimeout
+      if cb then cb( entity, timeout.id, timeout.type ) end
       end
     end
     bridge.timeouts.len = 0  -- consumed; C++ appends from len

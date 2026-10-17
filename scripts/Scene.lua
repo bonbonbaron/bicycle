@@ -171,27 +171,51 @@ function Scene.new( tbl )
   return instance
 end
 
--- True-3D scenes (docs/true-3d.md): tbl.world3d = { level = "level/scene3d.lua" (collision + drawing),
+-- True-3D scenes (docs/true-3d.md, docs/blender-entities.md): tbl.world3d = {
+--   level = "courtyard"   genome/level/courtyard.lua from Blender (tools/blender): the level meshes (drawn +
+--                         collided), the entities placed in it and its spawn points
 --   sky = { r, g, b }, fog = { r, g, b, near, far }, light = { dir, color, ambient, shadows },
---   spawns = { <name> = { x, y, z, yaw } }, build = function( scene ) ... end  (makes the scene's own bodies,
---   doors (W.door) and anything else) }. Persistent bodies (W.Body.new{ persist = true }) are carried over.
+--   spawns = { <name> = { x, y, z, yaw } }     more spawn points (the level's own come from Blender)
+--   entities = { { genome = "coin", pos = { x, y, z }, ... } }   more entities, hand-placed (optional)
+--   build = function( scene ) ... end          (old: scripted bodies; prefer placing genomes in Blender) }
+-- Each entity is its genome (Genome.spawn3d): model, body, collision, sounds, motion and behavior come from
+-- genome/<name>.lua; the entry only adds where it goes and its per-instance parameters. Persistent genomes already
+-- alive (the hero, carried from the last scene) aren't spawned again; entities a script removed for good
+-- (Scene.removeForever, e.g. collected coins) stay gone when the player comes back.
 Scene.world3d = false  -- the current scene's world3d table (false for 2D / 2.5D scenes)
 function Scene:loadWorld3d( tbl )
   local W = require( "World3D" )
   local w = tbl.world3d
-  if w.level then W.level( "./"..gameName.."/genome/"..w.level, w.cell ) end
+  local level = w.level and W.level( w.level, w.cell )
   if w.sky then W.View.sky( w.sky[1], w.sky[2], w.sky[3] ) end
   if w.fog then W.View.fog( w.fog[1], w.fog[2], w.fog[3], w.fog[4], w.fog[5] ) end
   if w.light then W.View.light( w.light[1], w.light[2], w.light[3], w.light[4] ) end
   Scene.world3d = w
+  local Genome = require( "Genome" )
+  for _, list in ipairs( { level and level.entities or {}, w.entities or {} } ) do
+    for _, e in ipairs( list ) do
+      local key = Scene.keyOf( e )
+      if not W.persistentByName[e.genome] and not Scene.state.removed[key] then
+        local entry = { key = key }
+        for k, v in pairs( e ) do if k ~= "key" then entry[k] = v end end
+        Genome.spawn3d( e.genome, entry )
+      end
+    end
+  end
   if w.build then w.build( self ) end
+end
+
+-- A 3D scene's level file (bare name or old path), read once per scene table, for its spawn points.
+local function levelData( w )
+  if type( w ) ~= "table" or not w.level then return nil end
+  local path = w.level:find( "/", 1, true ) and ( "./"..gameName.."/genome/"..w.level ) or require( "Ids" ).asset( "level", w.level )
+  if not Asset.exists( path ) then return nil end
+  return Asset.dofile( path )
 end
 
 -- Starts the game in genome/scene/<name>.lua (instead of Scene.new on a table you required yourself).
 function Scene.start( name )
-  local tbl = require( "./"..gameName.."/genome/scene/"..name )
-  tbl.file = name
-  return Scene.new( tbl )
+  return Scene.new( Scene.sceneTable( name ) )
 end
 
 -- 3D mode: static scenery from scripts/blender/export.py's scene3d.lua (ground, props), or the file the scene names
@@ -261,7 +285,7 @@ end
 function Scene.keyOf( instance )
   if instance.key then return instance.key end
   local p = instance.pos or {}
-  return instance.genome.."@"..tostring( p[1] )..","..tostring( p[2] )
+  return tostring( instance.genome or instance.genomeName ).."@"..tostring( p[1] )..","..tostring( p[2] )..( p[3] and ( ","..tostring( p[3] ) ) or "" )
 end
 
 function Scene.stateOf( file )
@@ -283,6 +307,15 @@ local function sceneTable( name )
   id = id or Ids.define( "scene", name )
   tbl.file = name
   tbl.sceneId = id
+  -- 3D: the level's spawn points (placed in Blender) join the scene file's own (which win).
+  if type( tbl.world3d ) == "table" then
+    local lv = levelData( tbl.world3d )
+    tbl.world3d.spawns = tbl.world3d.spawns or {}
+    for sname, pos in pairs( lv and lv.spawns or {} ) do
+      if tbl.world3d.spawns[sname] == nil then tbl.world3d.spawns[sname] = pos end
+    end
+    tbl.world3d.levelEntities = lv and lv.entities or {}
+  end
   -- Its spawns by spawn id (names resolved once per scene).
   tbl.spawnById = {}
   for _, list in ipairs( { tbl.spawns or {}, type( tbl.world3d ) == "table" and tbl.world3d.spawns or {} } ) do
@@ -316,6 +349,7 @@ function Scene.preload( name )
   for _, layer in pairs( tbl.fg or {} ) do
     for _, instance in ipairs( layer ) do require( "Genome" ).get( instance.genome ) end
   end
+  for _, e in ipairs( type( tbl.world3d ) == "table" and tbl.world3d.levelEntities or {} ) do require( "Genome" ).get( e.genome ) end
   return true
 end
 
@@ -343,6 +377,18 @@ function Scene.removeForever( tbl )
       Scene.state.removed[g.key] = true
       table.insert( S.removals, g )
       return true
+    end
+  end
+  -- A 3D body (Genome.spawn3d): gone at once (safe inside its own collision dispatch), its id freed at frame end.
+  local W = package.loaded["World3D"]
+  if W and type( W ) == "table" then
+    for _, b in ipairs( W.live ) do
+      if b == tbl then
+        Scene.state.removed[b.key or Scene.keyOf( b )] = true
+        if b.onDespawn then b:onDespawn() end
+        b:remove()
+        return true
+      end
     end
   end
   return false
@@ -543,8 +589,7 @@ local function startTransition( p )
   local nextMusic = sceneTable( p.name ).music
   local Sound = require( "Sound" )
   local musicMode = opts.music or ( nextMusic and nextMusic.transition ) or "crossfade"
-  S.trans.fadeMusic = musicMode == "crossfade" and Sound.song and
-                      not ( nextMusic and nextMusic.song == Sound.song )
+  S.trans.fadeMusic = musicMode == "crossfade" and Sound.song and Sound.songOf( nextMusic ) ~= Sound.song
   if S.trans.fadeMusic then ffi.C.musicFade( 0, half * 1000 / FPS ) end
 end
 

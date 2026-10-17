@@ -62,14 +62,16 @@ local C = ffi.C
 local W = {}
 local rad, deg = math.rad, math.deg
 
--- The level: every object of an exported scene3d.lua (scripts/blender/export.py). role "static" is drawn and
--- collides, "decor" is only drawn, "collider" only collides (invisible walls), "character" is skipped (placed by
--- the game). Returns the scene table.
+-- The level: every object of an exported level file (genome/level/<name>.lua, tools/blender). role "static" is drawn
+-- and collides, "decor" is only drawn, "collider" only collides (invisible walls), "character" is skipped (genome
+-- models, drawn where entities are placed). Returns the level table (its entities and spawns are Scene.lua's).
+-- level: a bare level name ("courtyard") or an old file path.
 function W.level( scenePath, cell )
+  if not scenePath:find( "/", 1, true ) then scenePath = require( "Ids" ).asset( "level", scenePath ) end
   -- mesh names in the list are relative to the game's genome/ (e.g. "model/ground")
   local dir = scenePath:match( "^(.*/genome/)" ) or scenePath:match( "^(.*/)" )
   local scene = Asset.dofile( scenePath )
-  for _, obj in ipairs( scene.objects ) do
+  for _, obj in ipairs( scene.objects or {} ) do
     local mesh = dir..obj.mesh..".bmesh"
     if obj.role == "static" or obj.role == "decor" then
       if not ffi.C.addStaticModel( mesh ) then error( "3D: can't load "..mesh.." (build the 'assets' target)" ) end
@@ -95,6 +97,7 @@ local KIND = { character = 1, kinematic = 2, box = 3 }
 -- placed on the next scene's spawn point (companions keep their offset from it).
 W.live = {}        -- this scene's bodies
 W.persistent = {}  -- id -> body
+W.persistentByName = {}  -- genome name -> its persistent body (Genome.spawn3d): not spawned again by the next scene
 W.player = false
 local function scoped( persist, fn )
   local S = package.loaded["Scene"]
@@ -128,7 +131,7 @@ function W.Body.make( opts )
     C.bodyTune( id, opts.gravity or 25, opts.jumpSpeed or 9, opts.accel or 60, opts.airAccel or 18, opts.maxSlope or 50, opts.step or 0.35 )
   end
   if opts.model then
-    if not ffi.C.setModel( id, "./"..gameName.."/genome/model/"..opts.model..".bmesh" ) then
+    if not ffi.C.setModel( id, require( "Ids" ).asset( "model", opts.model ) ) then
       error( "3D: can't load model "..opts.model )
     end
   end
@@ -175,7 +178,13 @@ function W.Body:remove()
   table.insert( W.dying, self.id )
   unregister( self.id )
   W.persistent[self.id] = nil
+  if self.genomeName and W.persistentByName[self.genomeName] == self then W.persistentByName[self.genomeName] = nil end
   for i, b in ipairs( W.live ) do if b == self then table.remove( W.live, i ) break end end
+end
+-- One of the body's genome sounds (its sfx gene; scripts/Sound.lua), played where the body is.
+function W.Body:sound( name, vel )
+  local x, y, z = self:pos()
+  require( "Sound" ).playFor( self, name, vel, x, y, z )
 end
 -- Kinematics-driven motions (the same system as the 2D motions, on the transform).
 function W.Body:path( points, speed, pingPong )

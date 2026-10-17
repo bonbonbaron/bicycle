@@ -84,20 +84,35 @@ for line in ( readFile( opt.list ) or "" ):gmatch( "[^\r\n]+" ) do files[#files 
 table.sort( files )
 
 -- kind -> set of names; kind order is the order of ids.h
-local KINDS = { "anim", "scene", "spawn", "door", "song", "soundfont", "sound", "color", "coll", "edge", "genome" }
+local KINDS = { "anim", "scene", "spawn", "door", "song", "soundfont", "sound", "color", "coll", "edge", "genome",
+                "model", "level" }
 local DOC = {
   anim = "animation tags (Aseprite tags; DEFAULT for untagged frames)",
   scene = "scenes (genome/scene/<name>.lua)",
   spawn = "spawn points (scene.spawns / world3d.spawns keys)",
   door = "doors (<scene>><target>[:<spawn>])",
-  song = "songs (genome-relative .mid paths)",
-  soundfont = "SoundFonts (genome-relative .sf2 paths)",
-  sound = "sound effects (scene.sfx.sounds keys)",
+  song = "songs (bare names of genome/music/**.mid)",
+  soundfont = "SoundFonts (bare names of genome/music/**.sf2)",
+  sound = "sound effects (the keys of every genome's sfx.sounds; names are local to each genome)",
   color = "terminal colors (ColorPalette.h enum Color)",
   coll = "collision types (Genome.lua COLL; explicit values)",
   edge = "graph edge names (edges = { <name> = ... } tables)",
   genome = "genomes (genome/<name>.lua)",
+  model = "genome models (bare names of genome/body/model/**.obj)",
+  level = "3D levels (bare names of genome/level/**.lua, from tools/blender)",
 }
+
+-- Where each kind of bare-name reference lives (scripts/GenomeLayout.lua, the engine's single source of paths).
+local Layout
+do
+  local here = ( debug and debug.getinfo and debug.getinfo( 1, "S" ).source or "" ):match( "^@(.*[/\\])" )
+  for _, p in ipairs( { root .. "scripts/GenomeLayout.lua", here and ( here .. "../../scripts/GenomeLayout.lua" ) } ) do
+    local src = p and readFile( p )
+    if src then Layout = assert( loadChunk( src, "@" .. p, _G ) )() break end
+  end
+  assert( Layout, "genids: can't find scripts/GenomeLayout.lua" )
+end
+local REF_KINDS = { "soundfont", "song", "model", "level" }
 local sets = {}
 for _, k in ipairs( KINDS ) do sets[k] = {} end
 local fixed = { coll = {}, color = {} }  -- kinds whose values come from a source, not sorting
@@ -111,7 +126,8 @@ local function problem( msg ) errors[#errors + 1] = msg end
 local games = {}  -- game -> { scenes = { name -> tbl }, music = { path -> true }, genomes = {}, sprites = {} }
 local function game( g )
   if not games[g] then
-    games[g] = { scenes = {}, music = {}, genomes = {}, bodies = {}, anims = {}, srcRects = {}, sources = {} }
+    games[g] = { scenes = {}, music = {}, genomes = {}, bodies = {}, anims = {}, srcRects = {}, sources = {},
+                 levels = {}, found = { soundfont = {}, song = {}, model = {}, level = {} }, genomeSrc = {} }
   end
   return games[g]
 end
@@ -148,6 +164,19 @@ for _, path in ipairs( files ) do
   end
   if g then
     local G = game( g )
+    -- bare-name references: which file each name is (a name found twice in one game is ambiguous)
+    for _, kind in ipairs( REF_KINDS ) do
+      local n = Layout.nameOf( kind, sub )
+      if n then
+        local canonical = kind == "model" and ( sub:gsub( "%.%a+$", "" ) .. Layout.REFS.model.exts[1] ) or sub
+        local prev = G.found[kind][n]
+        if prev and prev ~= canonical then
+          problem( g .. "/genome/" .. sub .. ": " .. kind .. " name '" .. n .. "' is ambiguous (also " .. g .. "/genome/" .. prev .. "); rename one" )
+        end
+        G.found[kind][n] = canonical
+        add( kind, n )
+      end
+    end
     if sub:match( "^scene/[^/]+%.lua$" ) then
       local name = sub:match( "^scene/(.+)%.lua$" )
       add( "scene", name )
@@ -157,12 +186,21 @@ for _, path in ipairs( files ) do
       if t then
         keys( t.spawns, "spawn" )
         if type( t.world3d ) == "table" then keys( t.world3d.spawns, "spawn" ) end
-        if type( t.sfx ) == "table" then keys( t.sfx.sounds, "sound" ) end
+        if type( t.sfx ) == "table" then
+          keys( t.sfx.sounds, "sound" )
+          warnings[#warnings + 1] = path .. ": scene-level sfx is deprecated: declare each sound in its genome's sfx gene"
+        end
+        if type( t.world3d ) == "table" and type( t.world3d.entities ) == "table" then G.levels["@" .. name] = { entities = t.world3d.entities } end
       end
-    elseif sub:match( "^music/.+%.midi?$" ) then
-      add( "song", sub ); G.music[sub] = true
-    elseif sub:match( "^music/.+%.sf2$" ) then
-      add( "soundfont", sub ); G.music[sub] = true
+    elseif sub:match( "^level/.+%.lua$" ) then
+      local t = loadData( path )
+      local lname = Layout.nameOf( "level", sub )
+      if t and lname then
+        G.levels[lname] = t
+        keys( t.spawns, "spawn" )
+      end
+    elseif sub:match( "^music/.+%.midi?$" ) or sub:match( "^music/.+%.sf2$" ) then
+      G.music[sub] = true  -- old-style path references still resolve
     elseif sub:match( "_globalAnim%.lua$" ) then
       local t = loadData( path )
       if t then keys( t.strips, "anim" ); G.anims[base:gsub( "_globalAnim%.lua$", "" )] = t.strips or {} end
@@ -174,8 +212,11 @@ for _, path in ipairs( files ) do
     elseif sub:match( "^[^/]+%.lua$" ) then
       local name = sub:gsub( "%.lua$", "" )
       add( "genome", name )
-      G.genomes[name] = loadData( path ) or {}
+      local gt = loadData( path ) or {}
+      G.genomes[name] = gt
+      G.genomeSrc[name] = path
       G.sources[#G.sources + 1] = path
+      if type( gt.sfx ) == "table" then keys( gt.sfx.sounds, "sound" ) end
     end
     if sub:match( "%.lua$" ) then
       local src = readFile( path ) or ""
@@ -189,14 +230,29 @@ for _, path in ipairs( files ) do
   end
 end
 
--- doors: 2D (fg entries with door = {...}) and 3D (W.door{ to = ..., spawn = ... } in scene/main sources)
+-- The scene a level belongs to (world3d.level = "<level>"), for door names and messages.
+local function levelOf( t )
+  return type( t ) == "table" and type( t.world3d ) == "table" and type( t.world3d.level ) == "string" and
+         ( Layout.isPath( t.world3d.level ) and Layout.nameOf( "level", t.world3d.level ) or t.world3d.level ) or nil
+end
+
+-- doors: 2D (fg entries with door = {...}), 3D levels (entities placed in Blender, the same entry shape) and
+-- W.door{ to = ..., spawn = ... } in scene/main sources
 for gname, G in pairs( games ) do
   for sname, t in pairs( G.scenes ) do
-    for _, list in pairs( type( t.fg ) == "table" and t.fg or {} ) do
+    local lists = {}
+    for _, list in pairs( type( t.fg ) == "table" and t.fg or {} ) do lists[#lists + 1] = list end
+    local lv = levelOf( t )
+    if lv and G.levels[lv] and type( G.levels[lv].entities ) == "table" then lists[#lists + 1] = G.levels[lv].entities end
+    if G.levels["@" .. sname] then lists[#lists + 1] = G.levels["@" .. sname].entities end
+    for _, list in ipairs( lists ) do
       for _, e in ipairs( type( list ) == "table" and list or {} ) do
         if type( e ) == "table" then
-          if type( e.door ) == "table" then
-            local d = e.door
+          local proto = type( e.genome ) == "string" and G.genomes[e.genome] or {}
+          if type( e.door ) == "table" or type( proto.door ) == "table" then
+            local d = {}
+            for k, v in pairs( type( proto.door ) == "table" and proto.door or {} ) do d[k] = v end
+            for k, v in pairs( type( e.door ) == "table" and e.door or {} ) do d[k] = v end
             add( "door", d.name or ( sname .. ">" .. tostring( d.to ) .. ( d.spawn and ( ":" .. d.spawn ) or "" ) ) )
             G.doors = G.doors or {}
             G.doors[#G.doors + 1] = { from = sname, to = d.to, spawn = d.spawn }
@@ -231,30 +287,78 @@ for gname, G in pairs( games ) do
   for _, path in ipairs( G.sources ) do
     local src = readFile( path ) or ""
     for name in src:gmatch( "Sound%.play%s*%(%s*\"([^\"]+)\"" ) do
-      if not sets.sound[name] then problem( path .. ": Sound.play: no sound '" .. name .. "' in any sfx.sounds" ) end
+      if not sets.sound[name] then problem( path .. ": Sound.play: no sound '" .. name .. "' in any genome's sfx.sounds" ) end
     end
     for name in src:gmatch( "Sound%.key%s*%(%s*\"([^\"]+)\"" ) do
-      if not sets.sound[name] then problem( path .. ": Sound.key: no sound '" .. name .. "' in any sfx.sounds" ) end
+      if not sets.sound[name] then problem( path .. ": Sound.key: no sound '" .. name .. "' in any genome's sfx.sounds" ) end
     end
   end
 end
 
 -- ---- checks ----
-local function spawnsOf( t )
+local function spawnsOf( t, G )
   local s = {}
   if type( t ) ~= "table" then return s end
+  local lv = levelOf( t )
+  if lv and G and G.levels[lv] and type( G.levels[lv].spawns ) == "table" then
+    for k in pairs( G.levels[lv].spawns ) do s[k] = true end
+  end
   for k in pairs( type( t.spawns ) == "table" and t.spawns or {} ) do s[k] = true end
   if type( t.world3d ) == "table" and type( t.world3d.spawns ) == "table" then
     for k in pairs( t.world3d.spawns ) do s[k] = true end
   end
   return s
 end
+-- A bare-name reference (or an old genome-relative path) that has to be a file of the game.
+local function checkRef( G, gname, where, kind, ref )
+  if type( ref ) ~= "string" then return end
+  if Layout.isPath( ref ) then
+    if not ( G.music[ref] or ref:match( "^sf2/" ) or G.found[kind][Layout.nameOf( kind, ref ) or ""] ) then
+      problem( where .. ": " .. kind .. " '" .. ref .. "' isn't a file of " .. gname .. "/genome/" )
+    end
+    return
+  end
+  if not G.found[kind][ref] then
+    local list = {}
+    for n in pairs( G.found[kind] ) do list[#list + 1] = n end
+    table.sort( list )
+    local r = Layout.REFS[kind]
+    problem( where .. ": no " .. r.what .. " '" .. ref .. "' (" .. gname .. "/genome/" .. r.dir .. ref .. ( kind == "model" and ".obj" or r.exts[1] ) ..
+             "); " .. gname .. " has: " .. ( #list > 0 and table.concat( list, ", " ) or "none" ) )
+  end
+end
+
 for gname, G in pairs( games ) do
+  -- genomes: their own sounds, models and SoundFonts
+  for gn, t in pairs( G.genomes ) do
+    local where = gname .. "/genome/" .. gn .. ".lua"
+    local own = {}
+    if type( t.sfx ) == "table" then
+      checkRef( G, gname, where, "soundfont", t.sfx.soundfont )
+      for k, v in pairs( type( t.sfx.sounds ) == "table" and t.sfx.sounds or {} ) do
+        own[k] = true
+        if type( v ) == "table" then checkRef( G, gname, where, "soundfont", v.soundfont ) end
+      end
+    end
+    if type( t.model ) == "string" then checkRef( G, gname, where, "model", t.model ) end
+    local src = readFile( G.genomeSrc[gn] ) or ""
+    for name in src:gmatch( "self:sound%s*%(%s*\"([^\"]+)\"" ) do
+      if not own[name] then problem( where .. ": self:sound: no sound '" .. name .. "' in this genome's sfx.sounds" ) end
+    end
+  end
+  -- levels: the genomes placed in them
+  for lname, lt in pairs( G.levels ) do
+    for _, e in ipairs( type( lt.entities ) == "table" and lt.entities or {} ) do
+      if type( e ) == "table" and type( e.genome ) == "string" and not G.genomes[e.genome] then
+        problem( gname .. "/genome/level/" .. lname .. ".lua: no genome '" .. e.genome .. "' (placed as " .. tostring( e.key ) .. ")" )
+      end
+    end
+  end
   for _, d in ipairs( G.doors or {} ) do
     local where = d.file or ( gname .. "/genome/scene/" .. d.from .. ".lua" )
     if not G.scenes[d.to] then
       problem( where .. ": door to scene '" .. tostring( d.to ) .. "', which doesn't exist" )
-    elseif d.spawn and d.spawn ~= "default" and not spawnsOf( G.scenes[d.to] )[d.spawn] then
+    elseif d.spawn and d.spawn ~= "default" and not spawnsOf( G.scenes[d.to], G )[d.spawn] then
       problem( where .. ": door to " .. d.to .. " uses spawn '" .. d.spawn .. "', which " .. d.to .. " doesn't have" )
     end
   end
@@ -262,13 +366,10 @@ for gname, G in pairs( games ) do
     local where = gname .. "/genome/scene/" .. sname .. ".lua"
     for _, m in ipairs( { t.music, t.sfx } ) do
       if type( m ) == "table" then
-        for _, f in ipairs( { "song", "soundfont" } ) do
-          if type( m[f] ) == "string" and not G.music[m[f]] and not m[f]:match( "^sf2/" ) then
-            problem( where .. ": " .. f .. " '" .. m[f] .. "' isn't in " .. gname .. "/genome/music/" )
-          end
-        end
+        for _, f in ipairs( { "song", "soundfont" } ) do checkRef( G, gname, where, f, m[f] ) end
       end
     end
+    if type( t.world3d ) == "table" and t.world3d.level then checkRef( G, gname, where, "level", t.world3d.level ) end
     if type( t.music ) == "table" and t.music.transition and not ( { crossfade = 1, cut = 1, keep = 1 } )[t.music.transition] then
       problem( where .. ": music.transition must be crossfade, cut or keep" )
     end
@@ -399,6 +500,26 @@ for _, kind in ipairs( KINDS ) do
   l[#l + 1] = "ids." .. kind .. " = { " .. table.concat( a, ", " ) .. " }"
   l[#l + 1] = "ids.names." .. kind .. " = { " .. table.concat( b, ", " ) .. " }"
 end
+-- Which file each bare name is, per game (scripts/GenomeLayout.lua's Layout.path uses it).
+l[#l + 1] = "ids.paths = {"
+do
+  local gnames = {}
+  for gname in pairs( games ) do gnames[#gnames + 1] = gname end
+  table.sort( gnames )
+  for _, gname in ipairs( gnames ) do
+    local parts = {}
+    for _, kind in ipairs( REF_KINDS ) do
+      local ns = {}
+      for n in pairs( games[gname].found[kind] ) do ns[#ns + 1] = n end
+      table.sort( ns )
+      local items = {}
+      for _, n in ipairs( ns ) do items[#items + 1] = "[" .. q( n ) .. "]=" .. q( games[gname].found[kind][n] ) end
+      parts[#parts + 1] = kind .. " = { " .. table.concat( items, ", " ) .. " }"
+    end
+    l[#l + 1] = "  [" .. q( gname ) .. "] = { " .. table.concat( parts, ", " ) .. " },"
+  end
+end
+l[#l + 1] = "}"
 l[#l + 1] = "return ids"
 l[#l + 1] = ""
 
