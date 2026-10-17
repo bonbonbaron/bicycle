@@ -3,6 +3,7 @@
 #include "data/tinfl.h"
 #include "Bytes.h"
 #include <algorithm>
+#include <cstdio>
 #include <cstdlib>
 #ifndef BICYCLE_RELEASE
 #include <fstream>
@@ -129,6 +130,15 @@ auto mount( const std::string& gameName ) -> bool {
     m.on = true;
     return true;
   }
+#endif
+#ifndef BICYCLE_RELEASE_ASSETS
+  // Dev builds read loose files only: a <game>/assets.bpak left over from an earlier `package` build would otherwise
+  // shadow every edit with stale data. Say so once, so a pack that's being ignored is no surprise either.
+  if ( std::ifstream( gameName + "/assets.bpak" ) ) {
+    std::fprintf( stderr, "bicycle: dev build: ignoring %s/assets.bpak, reading loose files (configure with "
+                          "-DBICYCLE_RELEASE_ASSETS=ON to load the pack)\n", gameName.c_str() );
+  }
+  return false;
 #endif
   if ( const char* loose = std::getenv( "BICYCLE_LOOSE_ASSETS" ); loose && *loose && *loose != '0' ) return false;
   auto bytes = readFile( gameName + "/assets.bpak", mem::PERMANENT );

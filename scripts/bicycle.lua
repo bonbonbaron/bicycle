@@ -298,7 +298,8 @@ ffi.cdef([[
   const char* assetList( const char* dir );
 ]])
 
--- Game assets come from <game>/assets.bpak when it's there (inflated by the engine), else from loose files.
+-- Game assets come from the asset pack in release builds (-DBICYCLE_RELEASE_ASSETS=ON: <game>/assets.bpak; -DBICYCLE_RELEASE=ON:
+-- embedded), inflated by the engine; dev builds always read loose files, even if an old assets.bpak is lying around.
 Asset = {}
 -- Outside the engine (e.g. plain luajit running a headless test) there's no ffi.C.assetRead: use files.
 local inEngine = pcall( function() return ffi.C.assetRead end )

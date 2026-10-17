@@ -157,7 +157,9 @@ endforeach()
 # SoundFont, and that pack is linked into the executable (src/data/EmbeddedPack.c). The engine's file readers,
 # Lua's file searchers/io.open/dofile and fluidsynth's file loader are compiled out or disabled; see README.
 if ( BICYCLE_RELEASE )
-  set( BICYCLE_RELEASE_ASSETS ON CACHE BOOL "" FORCE )
+  # A plain variable, not the cache: forcing the cache option ON here used to leave it ON after BICYCLE_RELEASE was
+  # turned off again in the same build directory, so that "dev" build kept mounting a (stale) <game>/assets.bpak.
+  set( BICYCLE_RELEASE_ASSETS ON )
   if ( MSVC )
     message( FATAL_ERROR "BICYCLE_RELEASE embeds the pack with .incbin: build with GCC/clang/MinGW/llvm-mingw." )
   endif()
@@ -281,6 +283,7 @@ target_link_libraries( o PRIVATE bicycle_data bicycle_luajit bicycle_fluidsynth 
 target_compile_definitions( o PRIVATE BICYCLE_RENDER_${BICYCLE_RENDER} )
 if ( BICYCLE_RELEASE_ASSETS )
   target_compile_definitions( o PRIVATE BICYCLE_RELEASE_ASSETS )
+  target_compile_definitions( bicycle_data PRIVATE BICYCLE_RELEASE_ASSETS )  # Pack.cpp: dev builds never mount a pack
 endif()
 if ( BICYCLE_RELEASE )
   target_compile_definitions( o PRIVATE BICYCLE_RELEASE "BICYCLE_RELEASE_GAME=\"${BICYCLE_RELEASE_GAME}\"" )

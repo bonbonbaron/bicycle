@@ -44,11 +44,11 @@ namespace bicycle {
 
   void init( const std::string& gameName ) {
     // Release builds mount the pack linked into the executable (BICYCLE_RELEASE) or <game>/assets.bpak
-    // (BICYCLE_RELEASE_ASSETS); see include/data/Pack.h. Dev builds read loose files only. First, so the renderer
-    // can load its fonts from it.
+    // (BICYCLE_RELEASE_ASSETS); see include/data/Pack.h. Dev builds read loose files only (mount() refuses there and
+    // notes a stale pack it ignores). First, so the renderer can load its fonts from it.
 #ifdef BICYCLE_RELEASE
     if ( !assets::mount( gameName ) ) die( "bicycle: the embedded asset pack is corrupt" );
-#elif defined( BICYCLE_RELEASE_ASSETS )
+#else
     assets::mount( gameName );
 #endif
     startup::mark( "asset pack" );
