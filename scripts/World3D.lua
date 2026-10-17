@@ -2,7 +2,7 @@
 -- yaw 0 looks down -Z. An entity's position is its feet. 2D games don't need this module.
 --
 --   local W = require("World3D")
---   W.level( "./plat3d/genome/level/scene3d.lua" )       -- draw + collide every static object
+--   W.level( "courtyard" )                               -- genome/level/courtyard.lua: draw + collide its static meshes
 --   local hero = W.Body.new{ kind = "character", x = 0, y = 1, z = 0, model = "hero3d", modelYaw = -90 }
 --   W.Camera.orbit( hero.id, { distance = 6, height = 1.4, rate = 10 } )
 --   function onFrame( dt ) hero:wish( vx, vz ) if jump then hero:jump() end end

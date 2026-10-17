@@ -16,7 +16,8 @@ feet. Demos: `./o-3d plat3d` (third person) and `./o-3d fps3d` (first person).
 | FFI | `src/c/World3DApi.cpp`, `src/c/InputState.cpp` |
 | Lua | `scripts/World3D.lua`, `scripts/Input3D.lua`, `onFrame(dt)` in `scripts/bicycle.lua` |
 | rendering (shadow map, fog, culling, billboards) | `src/v/3d/Renderer3D.cpp` (`drawWorld3D`) |
-| levels from Blender | `scripts/blender/make_level.py` + `export.py` |
+| levels and placed genomes from Blender | `tools/blender/bicycle_blender.py` (add-on; [blender-entities.md](blender-entities.md)), `scripts/blender/make_level.py` + `export.py` |
+| genomes as 3D bodies | `Genome.spawn3d` in `scripts/Genome.lua` (README, "Self-contained genomes") |
 | tests | `tests/math3d_test.cpp` (`ctest -R math3d`) |
 
 ## Physics
@@ -39,7 +40,7 @@ feet. Demos: `./o-3d plat3d` (third person) and `./o-3d fps3d` (first person).
 ```lua
 local W = require("World3D")
 local Input = require("Input3D")
-W.level( "./mygame/genome/level/scene3d.lua" )      -- static: draw + collide; decor: draw; collider: collide
+W.level( "scene3d" )                                 -- genome/level/scene3d.lua. static: draw + collide; decor: draw; collider: collide
 W.View.light( { -0.45, -1, -0.35 }, { 1, 0.96, 0.88 }, 0.4, true )   -- direction, color, ambient, shadows
 W.View.fog( 0.62, 0.76, 0.95, 25, 70 )
 local hero = W.Body.new{ kind = "character", x = 0, y = 1, z = 8, model = "pilgrim3d", modelYaw = 90, collType = 1 }
@@ -62,32 +63,39 @@ coin:spin( 180 )  platform:path( { { 2, 0.75, -14 }, { 2, 4, -14 } }, 1.2, true 
 
 ## Scene changes in true 3D
 
-`Scene.go` (README, "Scene changes") works for true-3D games. A scene file sets `world3d` instead of `bg`/`fg`:
+`Scene.go` (README, "Scene changes") works for true-3D games. A scene file sets `world3d` instead of `bg`/`fg`, and
+is only the scene's look; what's in it is placed in Blender:
 
 ```lua
 -- plat3d/genome/scene/bonus.lua
-local W = require( "World3D" )
-return { name = "Bonus room", sfx = { ... },
-  world3d = { level = "level/bonus3d.lua", sky = { r, g, b }, fog = { r, g, b, near, far },
-              light = { dir, color, ambient, shadows }, spawns = { entry = { x, y, z, yaw } },
-              build = function( scene )            -- the scene's own bodies, loaded into the SCENE pool
-                W.Body.new{ kind = "kinematic", ... }
-                W.door{ x = 0, y = 0, z = -6, radius = 0.9, to = "courtyard", spawn = "from_bonus" }
-              end } }
+return { name = "Bonus room",
+  world3d = { level = "bonus",                      -- genome/level/bonus.lua, exported by tools/blender
+              sky = { r, g, b }, fog = { r, g, b, near, far }, light = { dir, color, ambient, shadows } } }
 ```
 
+The level file has the level's meshes, its `entities` (genomes placed in Blender, each `{ genome = "coin", key,
+pos = { x, y, z }, yaw, <per-instance fields> }`) and its `spawns = { entry = { x, y, z, yaw } }`. On load, every
+entity is spawned from its genome (`Genome.spawn3d`): `model`, `body = { kind, radius, height, half, pitch, ... }`,
+`coll`, `motion` (`spin`/`linear`/`orbital`/`follow`, run by Kinematics), `door` (a trigger to another scene),
+`sfx`, `timer` and the event callbacks. A scene can still add `world3d.spawns`, `world3d.entities` (hand-placed)
+or an old `build = function( scene ) ... end`.
+
 - Start with `Scene.start( "courtyard" )` (it pushes the scene window: create bodies after it, entity 0 is reserved).
-- `W.Body.new{ ..., persist = true, player = true }`: carried to the next scene, the player onto the spawn point
-  (velocity zeroed, yaw from the spawn), other persistent bodies at the same offset; `onSceneEnter( name, spawn )`.
+- `persist = true, player = true` (a genome's fields or `W.Body.new` options): carried to the next scene, the player
+  onto the spawn point (velocity zeroed, yaw from the spawn), other persistent bodies at the same offset;
+  `onSceneEnter( name, spawn )`. A persistent genome that's already alive isn't placed again when its level comes
+  back up, and `Scene.removeForever( body )` (a collected coin) keeps it out of that scene for good.
 - Everything else made while the scene loaded is despawned on the way out (transform, body, overlaps with an
   uncollision to the other side, motions, model), the level collision is freed (`levelClear`), and the scene's
   meshes, textures and collision grid (GRAPHIC, i.e. the SCENE pool during the load) go with the SCENE reset.
 - The camera rig (`W.Camera.orbit/firstPerson/side/free`) is re-applied on the same target with the same options,
   keeping the look angles, and the camera starts where it was relative to the player.
-- `W.door{ x, y, z, radius, height, to, spawn, on, transition, duration, music }`: an invisible, non-solid trigger
-  capsule (collType 6) for the player (collType 1); the packer checks its target scene exists.
+- A `door = { to, spawn, radius, height, on, transition, duration, music }` gene makes a genome a non-solid trigger
+  capsule (collType 6) for the player (collType 1); the ID generator and the packer check its target scene and
+  spawn exist. (`W.door{ x, y, z, ... }` does the same from a script.)
 - Demo: `./o-3d plat3d`: touch the flag on the tower to enter the bonus room; its flag leads back. Coins stay
-  collected per scene (`Scene.state`). `PLAT3D_SCENE=bonus ./o-3d plat3d` starts there.
+  collected per scene (`Scene.state`). `PLAT3D_SCENE=bonus ./o-3d plat3d` starts there. The analog controls
+  (camera-relative running, mouse look) are the game's `onFrame` in `main.lua`; the genomes only have events.
 
 ## Headless capture
 

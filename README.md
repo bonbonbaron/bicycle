@@ -142,13 +142,67 @@ engine and the Aseprite exporters get these paths from):
   body/graybody/colormap/      *_colormap.lua, *.txt                    ASCII art (and img gene text images)
   tilemap/                     *_tilemap.lua, *_tileset.lua             background tile layouts and tilesets
   scene/                       scene tables (scene/bg/<name>/: text backgrounds)
-  level/                       3D level / scenery lists (scene3d.lua from scripts/blender/export.py)
-  model/                       meshes (.obj/.mtl, packed .bmesh), skins (.bskin), mesh textures
+  body/model/                  genome models: meshes a genome's model = "..." names (.obj/.mtl -> .bmesh, .bskin)
+  level/                       3D levels from Blender (tools/blender): meshes, placed genomes, spawn points
+  model/                       level meshes (.obj/.mtl, packed .bmesh) and mesh textures
   music/                       songs (.mid) and SoundFonts (.sf2)
 ```
 
+**Asset references are bare names.** A genome or scene names an asset by its file name alone, never a folder or
+an extension; the field says what kind it is and `scripts/GenomeLayout.lua` (`Layout.REFS`) says where that kind
+lives: `soundfont = "meadow"` is `genome/music/meadow.sf2`, `song = "house"` is `genome/music/house.mid`,
+`model = "pilgrim3d"` is `genome/body/model/pilgrim3d` (.bmesh in a pack, the loose .obj in dev),
+`level = "courtyard"` is `genome/level/courtyard.lua`, `sprite = "goldcoin"` is `genome/body/goldcoin.lua`. The
+ID generator (below) finds every such file, so a typo'd or missing name is a build error that lists what the game
+has, and a name two files share (`music/house.mid` and `music/more/house.mid`) is reported as ambiguous. Old
+paths (`"music/meadow.sf2"`) still work.
+
+### Self-contained genomes
+
+A genome (`genome/<name>.lua`) is everything about one kind of thing, so it can be dropped into any scene as is:
+its sprite or model, animation, collision, motion, sounds, timer, behavior and the parameters each placed copy
+may change. A scene only says where its copies go. plat3d's coin:
+
+```lua
+local coin = {
+  model = "coin3d",                                         -- genome/body/model/coin3d
+  body = { kind = "kinematic", radius = 0.4, height = 0.8, pitch = 90 },
+  coll = { type = "coin" },
+  motion = { type = "spin", speed = 180, bob = 0.12, bobHz = 0.8 },     -- the engine spins and bobs it
+  sfx = { soundfont = "sfx", program = 120, sounds = { collect = 72 } }, -- its own sounds, named its own way
+}
+function coin:onCollision( other, collType )
+  if collType ~= 1 then return end                          -- Genome.COLL.hero
+  self:sound( "collect", 115 )
+  entityOf( other ):collect( self )
+  require( "Scene" ).removeForever( self )                  -- stays collected when the hero comes back
+end
+return coin
+```
+
+* **Sounds** (`sfx` gene): `soundfont`, `program` (and `bank`), and `sounds = { <name> = <MIDI key> | { key,
+  program, soundfont, bank, vel } }`. Names are the genome's own: two genomes can both have a "hit".
+  `self:sound( "collect" [, vel] )` plays one (where the body is, in 3D). A SoundFont several genomes use is loaded
+  once (`Sound.soundfonts`, outside the scene's memory scope). Scenes have no sound-effect lists any more (an old
+  `scene.sfx` still loads, with a warning). Samples go into a SoundFont (`tools/audio/make_sf2.py`).
+* **Behavior** is events only: `onSpawn`, `onInput( key )`, `onCollision( other, type )`, `onUncollision`,
+  `onTimer( timerId, type )`, `onSceneEnter( scene, spawn )`, `onDespawn`. `timer = <ms> | { ms, rep, type }`
+  starts a timer at spawn; `self:after( ms, type )`, `self:every( ms, type )` and `self:stopTimer( id )` add more.
+  Continuous motion is data (`motion`: linear paths, orbits, spin and bob, follow; or an animation), moved by the
+  engine's Kinematics, not per-frame Lua.
+* **Per-instance parameters**: whatever a placement adds (a door's `door = { to = "bonus" }`, a mover's
+  `motion = { path = ... }`) is merged over the genome's own fields (nested tables merge, lists replace).
+  `params = { ["door.to"] = "scene", ["door.spawn"] = "spawn:door.to", ["motion.path"] = "path", ... }` tells the
+  Blender add-on which ones to offer, and how (a scene drop-down, the spawn points of that scene, path points, a
+  number...): see [docs/blender-entities.md](docs/blender-entities.md).
+
+**Placing them.** 2D scenes: on the background sprite in Aseprite (below). 3D scenes: in Blender with the add-on in
+`tools/blender` (genome drop-down, door and spawn drop-downs, path points, spawn points); the exporter writes
+`genome/level/<scene>.lua` and the engine spawns its genomes when the scene loads. A 3D scene file is then only
+its look: `world3d = { level = "courtyard", sky, fog, light }` (and `music`).
+
 New game: `scripts/new_game.sh mygame` (or by hand: `mkdir -p mygame/genome/body/palette/{color,collision}
-mygame/genome/body/graybody/{animation,collision,colormap} mygame/genome/{tilemap,scene,level,model,music}`).
+mygame/genome/body/graybody/{animation,collision,colormap} mygame/genome/{tilemap,scene,level,model,body/model,music}`).
 
 **Graybody + palettes (palette swaps).** The graybody is shared by every variant of a body: its gray pixels,
 animation and collision regions are loaded once (`Sprite.load` caches it in Lua; `newPixelImage` shares one
@@ -277,9 +331,11 @@ The pixel modes use the `.bimg` files when a sprite has them, and a genome can n
 
 ### 3D art: Blender
 
-See `scripts/blender/README.md`: `make_scene.py` authors the test scene headless, `export.py` exports it
-(`blender -b scene.blend --python scripts/blender/export.py -- test/genome`), and the pack turns the OBJs
-into `.bmesh`. Genomes pick a mesh with `model = "<object>"`.
+Install the add-on `tools/blender/bicycle_blender.py` (Edit > Preferences > Add-ons > Install from Disk) and use the
+Bicycle tab of the 3D Viewport's sidebar to place genomes and export levels: [docs/blender-entities.md](docs/blender-entities.md)
+walks through it click by click. Headless, `scripts/blender/export.py` does the same export
+(`blender -b plat3d/blender/plat3d.blend --python scripts/blender/export.py`); see `scripts/blender/README.md`. The pack
+turns the OBJs into `.bmesh`. Genomes pick a mesh with `model = "<object>"` (genome/body/model/).
 
 ### Scene tools in Aseprite: doors and music
 
@@ -289,7 +345,7 @@ doorway with the marquee (or add a slice named `door`), run File > Scripts > add
 and its spawn (both drop-downs list what's in `<game>/genome/scene/`; the spawn list follows the scene). It
 writes `{ genome = "door", pos = {...}, door = { to, spawn, w, h, on } }` into the scene's first fg layer and can
 add the return spawn here (`from_<target>`, beside the door). `scripts/aseprite/addsong.lua` sets a scene's
-`music = { soundfont, song, transition }` from the game's `genome/music/*.mid` / `*.sf2` (transition:
+`music = { soundfont = "meadow", song = "house", transition }` (bare names) from the game's `genome/music/*.mid` / `*.sf2` (transition:
 crossfade, cut or keep, used when the scene is entered unless `Scene.go` says otherwise).
 
 Batch mode (`--script-param list=1` prints the drop-downs' choices):
@@ -298,7 +354,7 @@ Batch mode (`--script-param list=1` prints the drop-downs' choices):
 aseprite -b --script-param game=test --script-param scene=house --script-param to=intro \
   --script-param spawn=from_house --script-param x=140 --script-param y=36 --script-param w=6 --script-param h=10 \
   --script-param on=press --script-param return_spawn=from_intro --script scripts/aseprite/adddoor.lua
-aseprite -b --script-param game=test --script-param scene=house --script-param song=music/house.mid \
+aseprite -b --script-param game=test --script-param scene=house --script-param song=house \
   --script-param transition=cut --script scripts/aseprite/addsong.lua
 ```
 
@@ -311,7 +367,7 @@ order) and `extra` (other fields as Lua, e.g. `focus = true, persist = true` or 
 "entry" }`). The entities layer draws an outline for each so you can see them; it's never exported as art.
 
 * `scripts/aseprite/addentity.lua`: select a spot, pick a genome (the game's `genome/*.lua`, the same names as
-  `ids.genome`), the fg layer, persist/focus, a motion preset (linear, orbital, spin) and any more fields.
+  `ids.genome`), the fg layer, persist/focus, a motion preset (linear, orbital, combo) and any more fields.
 * `scripts/aseprite/adddoor.lua` with the scene's background open makes the door a slice there too (its size is
   the door's `w`/`h`); without it, it edits the scene file as before.
 * Move or resize slices in Aseprite, then re-run either script (`--script-param sync=1`) or export with
@@ -324,12 +380,11 @@ converted, with identical output). Batch:
 
 ```sh
 aseprite -b test/aseprite/meadow.aseprite --script-param genome=coin --script-param x=30 --script-param y=42 \
-  [--script-param fg=4] [--script-param persist=1] [--script-param motion=spin] --script scripts/aseprite/addentity.lua
+  [--script-param fg=4] [--script-param persist=1] [--script-param motion=orbital] --script scripts/aseprite/addentity.lua
 aseprite -b test/aseprite/meadow.aseprite --script-param list=1 --script scripts/aseprite/addentity.lua
 ```
 
-plat3d and fps3d build their 3D scenes in Lua (`world3d.build`), with no Aseprite background, so they have no
-entities layer.
+plat3d and fps3d place their entities in Blender instead (docs/blender-entities.md).
 
 `ctest -R aseprite-scene-scripts` runs both on a copy of the test game (configure with
 `-DBICYCLE_ASEPRITE=/path/to/aseprite`).
@@ -484,7 +539,9 @@ build/_deps/src/luajit/src/host/minilua tools/ids/genids.lua --root . --out gen 
 ```
 
 The generator also checks references: a door to a missing scene or spawn, a scene's song/SoundFont that isn't
-in `genome/music/`, a literal `Scene.go("...")`, `Sound.play("...")`/`Sound.key("...")` naming nothing, an
+in `genome/music/`, a genome's model or SoundFont that isn't there, a `self:sound("...")` that isn't one of that
+genome's own sounds, a level placing a genome that doesn't exist, a literal `Scene.go("...")`,
+`Sound.play("...")`/`Sound.key("...")` naming nothing, an
 `initAnim` that isn't one of its sprite's tags, unknown collision types. Dev builds print these as warnings; release
 builds (`BICYCLE_RELEASE`, `BICYCLE_RELEASE_ASSETS`) run it with `--strict`, the packs depend on it, and a typo fails
 the build. Release embeds `gen/ids.lua` in the pack.
