@@ -4,10 +4,12 @@
 --
 -- GUI: open any sprite of the game (or none), run the script, pick the scene, song and SoundFont, OK.
 -- Batch / CLI:
---   aseprite -b --script-param game=test --script-param scene=house --script-param song=music/house.mid \
---     [--script-param soundfont=music/meadow.sf2] [--script-param transition=cut] --script scripts/aseprite/addsong.lua
+--   aseprite -b --script-param game=test --script-param scene=house --script-param song=house \
+--     [--script-param soundfont=meadow] [--script-param transition=cut] --script scripts/aseprite/addsong.lua
+--   Songs and SoundFonts are bare names (house = genome/music/house.mid, meadow = genome/music/meadow.sf2); old
+--   paths (music/house.mid) are accepted and written as names.
 --   aseprite -b --script-param game=test --script-param list=1 --script scripts/aseprite/addsong.lua
---     prints the drop-downs' choices: "scene <name>", "song <path>", "soundfont <path>" lines.
+--     prints the drop-downs' choices: "scene <name>", "song <name>", "soundfont <name>" lines.
 local current_file = debug.getinfo(1, "S").source:match("^@?(.*)")
 local current_dir = current_file:match("^(.*[/\\])") or "./"
 package.path = current_dir .. "?.lua;" .. package.path
@@ -39,14 +41,15 @@ if params.list or params.song or isBatch then
   end
   local scene = params.scene or L.sceneOfSprite(game, spriteName() or "")
   assert(scene and contains(L.scenes(game), scene), "addsong: which scene? (--script-param scene=<name>)")
-  assert(params.song and contains(mids, params.song), "addsong: song must be one of: " .. table.concat(mids, ", "))
+  local song = L.bare(params.song)
+  assert(song and contains(mids, song), "addsong: song must be one of: " .. table.concat(mids, ", "))
   local current = L.sceneInfo(game, scene).music or {}
-  local sf = params.soundfont or current.soundfont or sf2s[1]
+  local sf = L.bare(params.soundfont or current.soundfont) or sf2s[1]
   assert(sf == nil or contains(sf2s, sf), "addsong: soundfont must be one of: " .. table.concat(sf2s, ", "))
   local tr = params.transition or "crossfade"
   assert(contains(TRANSITIONS, tr), "addsong: transition must be crossfade, cut or keep")
   print("addsong: " .. L.sceneFile(game, scene) .. ": " ..
-        L.setMusic(game, scene, { song = params.song, soundfont = sf, transition = tr }))
+        L.setMusic(game, scene, { song = song, soundfont = sf, transition = tr }))
   require("refreshids")()  -- gen/ids.lua knows the new spawn/door now (README, "IDs")
   return
 end
@@ -68,14 +71,14 @@ local function refresh()
 end
 local function sceneChanged()
   local m = L.sceneInfo(dlg.data.game, dlg.data.scene).music or {}
-  if m.song then dlg:modify { id = "song", option = m.song } end
-  if m.soundfont then dlg:modify { id = "soundfont", option = m.soundfont } end
+  if m.song then dlg:modify { id = "song", option = L.bare(m.song) } end
+  if m.soundfont then dlg:modify { id = "soundfont", option = L.bare(m.soundfont) } end
   dlg:modify { id = "transition", option = m.transition or "crossfade" }
 end
 dlg:combobox { id = "game", label = "Game", option = game, options = L.games(), onchange = refresh }
 dlg:combobox { id = "scene", label = "Scene", option = scene, options = scenes, onchange = sceneChanged }
-dlg:combobox { id = "song", label = "Song", option = cur.song or mids[1], options = mids }
-dlg:combobox { id = "soundfont", label = "SoundFont", option = cur.soundfont or sf2s[1], options = sf2s }
+dlg:combobox { id = "song", label = "Song", option = L.bare(cur.song) or mids[1], options = mids }
+dlg:combobox { id = "soundfont", label = "SoundFont", option = L.bare(cur.soundfont) or sf2s[1], options = sf2s }
 dlg:combobox { id = "transition", label = "On entering", option = cur.transition or "crossfade", options = TRANSITIONS }
 dlg:button { id = "ok", text = "&OK", focus = true }
 dlg:button { id = "cancel", text = "&Cancel" }

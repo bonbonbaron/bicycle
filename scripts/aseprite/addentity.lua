@@ -7,7 +7,7 @@
 -- layer and options, OK. Doors: scripts/aseprite/adddoor.lua (they're slices on the same layer).
 -- Batch / CLI (with the sprite on the command line; x y in cells; the sprite is saved):
 --   aseprite -b test/aseprite/meadow.aseprite --script-param genome=coin --script-param x=30 --script-param y=42 \
---     [--script-param fg=4] [--script-param persist=1] [--script-param focus=1] [--script-param motion=spin] \
+--     [--script-param fg=4] [--script-param persist=1] [--script-param focus=1] [--script-param motion=orbital] \
 --     [--script-param extra='key = "gem"'] --script scripts/aseprite/addentity.lua
 --   ... --script-param list=1        prints "genome <name>" (the drop-down) and "entity <slice> <genome> x y" lines
 --   ... --script-param sync=1        rewrites the scene file from the slices (no new entity)
@@ -25,10 +25,10 @@ local sprite = app and app.sprite or nil
 local MOTIONS = {
   none = nil,
   linear = 'motion = { type = "linear", speed = 6, path = { { 0, 0 }, { 20, 0 } } }',
-  orbital = 'motion = { type = "orbital", radius = 6, period = 3 }',
-  spin = 'motion = { type = "spin", period = 2 }',
+  orbital = 'motion = { type = "orbital", radius = 3, speed = 90 }',
+  combo = 'motion = { type = "combo", radius = 3, speed = 180, travel = 6, pingpong = true, path = { { 0, 0 }, { 20, 0 } } }',
 }
-local MOTION_NAMES = { "none", "linear", "orbital", "spin" }
+local MOTION_NAMES = { "none", "linear", "orbital", "combo" }  -- the 2D motion types (Genome.startMotion)
 
 -- Genome names of a game (genome/*.lua), the same set as gen/ids.lua's ids.genome.
 local function genomes(game)
