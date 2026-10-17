@@ -1,0 +1,43 @@
+-- written by tools/blender (bicycle add-on) from plat3d.blend, Blender scene "courtyard": don't edit, re-export.
+-- objects: the level's meshes; entities: genomes placed in it (genome/<name>.lua) with per-instance
+-- parameters; spawns: { x, y, z, yaw } where doors and Scene.go put the player.
+return {
+  objects = {
+    { name = "ground", mesh = "model/ground", role = "static" },
+    { name = "plat_a", mesh = "model/plat_a", role = "static" },
+    { name = "plat_b", mesh = "model/plat_b", role = "static" },
+    { name = "plat_c", mesh = "model/plat_c", role = "static" },
+    { name = "tower", mesh = "model/tower", role = "static" },
+    { name = "ramp", mesh = "model/ramp", role = "static" },
+    { name = "ramp_top", mesh = "model/ramp_top", role = "static" },
+    { name = "stairs", mesh = "model/stairs", role = "static" },
+    { name = "stairs_top", mesh = "model/stairs_top", role = "static" },
+    { name = "wall_n", mesh = "model/wall_n", role = "static" },
+    { name = "wall_s", mesh = "model/wall_s", role = "static" },
+    { name = "wall_w", mesh = "model/wall_w", role = "static" },
+    { name = "wall_e", mesh = "model/wall_e", role = "static" },
+    { name = "trunk0", mesh = "model/trunk0", role = "static" },
+    { name = "canopy0", mesh = "model/canopy0", role = "decor" },
+    { name = "trunk1", mesh = "model/trunk1", role = "static" },
+    { name = "canopy1", mesh = "model/canopy1", role = "decor" },
+    { name = "trunk2", mesh = "model/trunk2", role = "static" },
+    { name = "canopy2", mesh = "model/canopy2", role = "decor" },
+    { name = "trunk3", mesh = "model/trunk3", role = "static" },
+    { name = "canopy3", mesh = "model/canopy3", role = "decor" },
+  },
+  entities = {
+    { genome = "coin", key = "coin1", pos = { 4.5, 1.6, -2.5 } },
+    { genome = "coin", key = "coin2", pos = { 9, 2.6, -5.5 } },
+    { genome = "coin", key = "coin3", pos = { 12.5, 3.6, -10.5 } },
+    { genome = "coin", key = "coin4", pos = { -6, 1.2, 4 } },
+    { genome = "coin", key = "coin5", pos = { 0, 3.1, 4 } },
+    { genome = "coin", key = "coin6", pos = { -9, 1.2, -6.5 } },
+    { genome = "coin", key = "coin7", pos = { -6.5, 2.6, -6.5 } },
+    { genome = "coin", key = "coin8", pos = { 0, 2.2, -10 } },
+    { genome = "coin", key = "coin9", pos = { -14, 0.6, 14 } },
+    { genome = "flag", door = { on = "touch", spawn = "entry", to = "bonus" }, key = "flag_to_bonus", pos = { 7.5, 4.2, -17.5 } },
+    { genome = "hero", key = "hero", pos = { 4.5, 0.5, 9 } },
+    { genome = "mover", key = "mover", motion = { path = { { 0, 0, 0 }, { 0, 3.25, 0 } } }, pos = { 2, 0.75, -14 } },
+  },
+  spawns = { default = { 4.5, 0.5, 9, 0 }, from_bonus = { 7.5, 4.4, -15.2, 0 } },
+}

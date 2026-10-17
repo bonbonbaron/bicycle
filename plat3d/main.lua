@@ -1,22 +1,20 @@
 -- plat3d: a third-person 3D platformer demo (Mario 64-style controls) on bicycle's true-3D layer.
 -- Run: ./o-3d plat3d   (3D build). WASD/left stick: run (camera-relative), Space/pad A: jump,
 -- mouse/right stick/J L I K: orbit the camera, Esc: release the mouse, Q: quit.
--- Scenes: genome/scene/courtyard.lua (start) and bonus.lua; touch the flag on the tower to go to the bonus room,
--- and its flag to come back (Scene.go via W.door; the hero is a persistent body).
--- The level is plat3d/blender/plat3d.blend, made by scripts/blender/make_level.py and exported with
--- scripts/blender/export.py (see README there).
+-- Scenes: genome/scene/courtyard.lua (start) and bonus.lua. Everything in them (coins, the moving platform, the
+-- flags that are doors, the hero, spawn points) is a genome (genome/<name>.lua) placed in Blender:
+-- plat3d/blender/plat3d.blend with the add-on in tools/blender (docs/blender-entities.md).
 package.path = package.path .. ";./scripts/?.lua"
 require("bicycle")
 local ffi = require("ffi")
 local W = require("World3D")
 local Input = require("Input3D")
-local Sound = require("Sound")
+local Genome = require("Genome")
 
 gameName = "plat3d"
 if ffi.C.renderMode() ~= 2 then error( "plat3d needs the 3D build (-DBICYCLE_RENDER=3D)" ) end
 
 local Scene = require("Scene")
-local Hud = require("Hud")
 Input.bind( "jump", { "space", "pad:a" } )
 Input.bindAxis( "moveX", { neg = { "a" }, pos = { "d" }, pad = "leftx" } )
 Input.bindAxis( "moveY", { neg = { "s" }, pos = { "w" }, pad = "lefty", padScale = -1 } )
@@ -26,66 +24,21 @@ Input.bind( "release", { "escape" } )
 Input.enableGamepad()
 Input.captureMouse( true )
 
-local RUN = 7
-local coins, collected = {}, 0
-local TOTAL = 18  -- 9 in the courtyard, 9 in the bonus room
-local hud
-
--- Scenes call this from their build(): coins at spots, minus the ones already picked up there.
-Plat = {}
-function Plat.spawnCoins( sceneName, spots )
-  local taken = Scene.stateOf( sceneName )
-  for i, p in ipairs( spots ) do
-    if not taken[i] then
-      local c = W.Body.new{ kind = "kinematic", x = p[1], y = p[2], z = p[3], radius = 0.4, height = 0.8, collType = 2,
-                            model = "coin3d", pitch = 90 }
-      c:orbit{ center = { p[1], p[2], p[3] }, radius = 0, speed = 0, bob = 0.12, bobHz = 0.8 }
-      c:spin( 180 )
-      c.slot = i
-      coins[c.id] = c
-      c.onDespawn = function( self ) coins[self.id] = nil end
-    end
-  end
-end
-
 Scene.start( os.getenv( "PLAT3D_SCENE" ) or "courtyard" )
--- The hero: a capsule character drawn as the rigged pilgrim (Blender model faces +X: modelYaw 90 -> faces -Z).
--- persist + player: carried through doors to the next scene's spawn point (Scene.go in scripts/Scene.lua).
-local hero = W.Body.new{ kind = "character", x = 4.5, y = 0.5, z = 9, radius = 0.35, height = 1.6, collType = 1,
-                         model = "pilgrim3d", modelYaw = 90, jumpSpeed = 10, gravity = 28, accel = 70, airAccel = 22,
-                         persist = true, player = true }
-local sp = Scene.world3d.spawns.default or Scene.world3d.spawns.entry
-hero:setPos( sp[1], sp[2], sp[3] )
-hud = Hud.bar( "Coins", TOTAL )
-hud:set( 0 )
-W.Camera.orbit( hero.id, { distance = 7, height = 1.5, rate = 12, yaw = 0, pitch = -18, fov = 65 } )
-
-function hero:onSceneEnter( sceneName )
-  if os.getenv( "BICYCLE_DEMO_LOG" ) then io.stderr:write( "plat3d entered "..sceneName.."\n" ) end
+local function spawnPoint()
+  local s = Scene.world3d and Scene.world3d.spawns or {}
+  return s.default or s.entry or { 0, 1, 0, 0 }
 end
+-- The courtyard's level places the hero; starting anywhere else, it stands on that scene's spawn point.
+local hero = W.player or Genome.spawn3d( "hero", { pos = spawnPoint() } )
 
-function hero:onCollision( other, type )
-  local c = coins[other]
-  if c then
-    coins[other] = nil
-    local x, y, z = c:pos()
-    Scene.state[c.slot] = true  -- stays picked up when we come back
-    c:remove()
-    collected = collected + 1
-    hud:set( collected )
-    if AUTO then io.stderr:write( "plat3d coin "..collected.."\n" ) end
-    W.sound( Sound.key( "coin" ), 115, x, y, z )
-  end
-end
-function hero:onInput( key )
-  if key == ffi.C.Q then ffi.C.popWindow() end
-end
-register( hero.id, hero )
-focusOn( hero.id )
-
-AUTO = tonumber( os.getenv( "PLAT3D_AUTOCOLLECT" ) or "" )
-local yaw = 0  -- the hero's facing (degrees), turned smoothly toward the run direction
+-- The game's controller. Running is analog (a stick's tilt, held keys, the camera's current yaw), so it's polled
+-- every frame here rather than being a genome event; the hero genome only gets events (onInput, onCollision...).
+local RUN = 7
+local AUTO = tonumber( os.getenv( "PLAT3D_AUTOCOLLECT" ) or "" )
+local yaw, wasGrounded, frameNo = 0, true, 0
 function onFrame( dt )
+  frameNo = frameNo + 1
   if Input.pressed( "release" ) then Input.captureMouse( false ) end
   -- Camera: mouse / right stick / keys orbit it (the rig, not this script, places it).
   local dx, dy = Input.look( dt )
@@ -103,28 +56,26 @@ function onFrame( dt )
     hero:setYaw( yaw )
   end
   ffi.C.setModelAction( hero.id, len > 0.1 and "walk" or "idle" )
-  if Input.pressed( "jump" ) and hero:grounded() then
+  local grounded = hero:grounded()
+  if Input.pressed( "jump" ) and grounded then
     hero:jump()
-    local x, y, z = hero:pos()
-    W.sound( Sound.key( "jump" ), 90, x, y, z )
+    hero:sound( "jump", 90 )
   end
+  if grounded and not wasGrounded then hero:sound( "land", 70 ) end
+  wasGrounded = grounded
   -- PLAT3D_AUTOCOLLECT=N (tests/coin_collect_test.sh): every N frames, put the hero on a coin still out there.
-  if AUTO then
-    autoFrame = ( autoFrame or 0 ) + 1
-    if autoFrame % AUTO == 0 and not Scene.busy() then
-      for _, c in pairs( coins ) do local cx, cy, cz = c:pos() hero:setPos( cx, cy - 0.4, cz ) break end
+  if AUTO and frameNo % AUTO == 0 and not Scene.busy() then
+    for _, b in ipairs( W.live ) do
+      if b.genomeName == "coin" then local cx, cy, cz = b:pos() hero:setPos( cx, cy - 0.4, cz ) break end
     end
   end
   local x, y, z = hero:pos()
   if y < -15 then
-    local sp = ( Scene.world3d and Scene.world3d.spawns or {} ).default or { 4.5, 1, 9 }
+    local sp = spawnPoint()
     hero:setPos( sp[1], sp[2] + 0.5, sp[3] ) hero:setVel( 0, 0, 0 )
   end
-  if os.getenv( "BICYCLE_DEMO_LOG" ) then
-    frameNo = ( frameNo or 0 ) + 1
+  if os.getenv( "BICYCLE_DEMO_LOG" ) and frameNo % 15 == 0 then
     local ex, ey, ez = W.Camera.eye()
-    if frameNo % 15 == 0 then
-      io.stderr:write( string.format( "plat3d f%d hero %.2f %.2f %.2f grounded %s coins %d eye %.2f %.2f %.2f tris %d\n", frameNo, x, y, z, tostring( hero:grounded() ), collected, ex, ey, ez, tonumber( ffi.C.levelTriangles() ) ) )
-    end
+    io.stderr:write( string.format( "plat3d f%d hero %.2f %.2f %.2f grounded %s coins %d eye %.2f %.2f %.2f tris %d\n", frameNo, x, y, z, tostring( grounded ), hero.coins, ex, ey, ez, tonumber( ffi.C.levelTriangles() ) ) )
   end
 end
