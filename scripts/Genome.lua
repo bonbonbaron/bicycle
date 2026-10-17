@@ -679,6 +679,11 @@ function Genome.methods:sound( name, vel )
   end
   return Sound.playFor( self, name, vel )
 end
+-- Timers beyond the timer gene: onTimer( self, timerId, type ) gets them; type tells yours apart.
+--   self:after( ms, type )   once        self:every( ms, type )   repeatedly        self:stopTimer( id )
+function Genome.methods:after( ms, ttype ) return ffi.C.createTimer( ms, self.id, ttype or 0, false, ffi.C.TO_BRIDGE ) end
+function Genome.methods:every( ms, ttype ) return ffi.C.createTimer( ms, self.id, ttype or 0, true, ffi.C.TO_BRIDGE ) end
+function Genome.methods:stopTimer( id ) ffi.C.stopTimer( id ) end
 
 -- Returns a fresh copy of the genome's table so several instances (e.g. coins) each keep their own state.
 function Genome.get(genomeName)

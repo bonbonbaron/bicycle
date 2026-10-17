@@ -186,6 +186,10 @@ function W.Body:sound( name, vel )
   local x, y, z = self:pos()
   require( "Sound" ).playFor( self, name, vel, x, y, z )
 end
+-- Timers (onTimer( self, timerId, type )), as on 2D genome instances.
+function W.Body:after( ms, ttype ) return C.createTimer( ms, self.id, ttype or 0, false, C.TO_BRIDGE ) end
+function W.Body:every( ms, ttype ) return C.createTimer( ms, self.id, ttype or 0, true, C.TO_BRIDGE ) end
+function W.Body:stopTimer( id ) C.stopTimer( id ) end
 -- Kinematics-driven motions (the same system as the 2D motions, on the transform).
 function W.Body:path( points, speed, pingPong )
   for _, p in ipairs( points ) do C.motionWaypoint3D( self.id, p[1], p[2], p[3] ) end

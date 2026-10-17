@@ -634,6 +634,11 @@ namespace bicycle {
       return timer.create( timeMs, entity, timeoutType, repeat, addr );
     }
 
+    // Stops a timer (createTimer's id) before it times out again.
+    void stopTimer( const TimerId timerId ) {
+      Timer::getInstance().stop( timerId );
+    }
+
     // ASSETS (the game's asset pack, or loose files; see include/data/Pack.h)
     // Returns the asset's bytes (valid until the next call) and their length, or null.
     const char* assetRead( const char* path, size_t* len ) {

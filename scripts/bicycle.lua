@@ -289,6 +289,7 @@ ffi.cdef([[
 
   typedef unsigned TimerId;
   TimerId createTimer( const unsigned timeMs, Entity entity, const unsigned timeoutType, const bool repeat, const TimeoutAddr addr );
+  void stopTimer( const TimerId timerId );
 
   int rollDice( const int min, const int max );
 

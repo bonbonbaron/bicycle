@@ -37,6 +37,8 @@ void Timer::_run() {
       const auto& cfg = _cfgs.at(timerId);
       if ( cfg.repeat ) {
         _times.at(timerId) = cfg.fullTimer;
+      } else {
+        stop( timerId );  // a one-shot timer's slot is free again (it used to stay taken for good)
       }
     }
   }
