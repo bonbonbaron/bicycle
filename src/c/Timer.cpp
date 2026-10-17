@@ -78,6 +78,7 @@ auto Timer::create( const unsigned timeMs, Entity entity, const unsigned timeout
   auto timerId = findAvailableTimer();
   if ( timerId < MAX_NUM_TIMERS )  {
     unsigned nFrames{ (Constants::FRAMES_PER_SECOND * timeMs) / 1000 };
+    if ( nFrames == 0 ) nFrames = 1;  // under a frame: the next frame (0 never fired: the counter wrapped around)
     _times.at( timerId ) = nFrames;
     _decrementers.at(timerId) = 1;
     _msgs.at(timerId)  = Timeout{ entity, timerId, timeoutType, addr };
