@@ -17,7 +17,9 @@ return {
     { genome = "coin", key = "bonus_coin7", pos = { 0, 0.6, -4.5 } },
     { genome = "coin", key = "bonus_coin8", pos = { 3.182, 0.6, -3.182 } },
     { genome = "coin", key = "bonus_coin9", pos = { 0, 3.6, -3 } },
+    { genome = "camera", camera = { mode = "orbit", target = "hero", track = "lerp" }, key = "camera.001", pos = { 0, 3, 9 } },
     { genome = "flag", door = { on = "touch", spawn = "from_bonus", to = "courtyard" }, key = "flag_to_courtyard", pos = { 0, 0, -6 } },
+    { genome = "hero", key = "hero.001", pos = { 0, 0.1, 2.5 } },
   },
   spawns = { entry = { 0, 0.1, 2.5, 0 } },
 }

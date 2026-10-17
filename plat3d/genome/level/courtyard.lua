@@ -26,6 +26,7 @@ return {
     { name = "canopy3", mesh = "model/canopy3", role = "decor" },
   },
   entities = {
+    { genome = "camera", camera = { mode = "orbit", target = "hero", track = "lerp" }, key = "camera", pos = { 4.5, 3, 16 } },
     { genome = "coin", key = "coin1", pos = { 4.5, 1.6, -2.5 } },
     { genome = "coin", key = "coin2", pos = { 9, 2.6, -5.5 } },
     { genome = "coin", key = "coin3", pos = { 12.5, 3.6, -10.5 } },

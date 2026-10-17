@@ -254,6 +254,7 @@ if WHICH == "plat":
     spawn(yard, "default", 4.5, 0.5, 9)
     spawn(yard, "from_bonus", 7.5, 4.4, -15.2)
     place(yard, "hero", "hero", 4.5, 0.5, 9)
+    place(yard, "camera", "camera", 4.5, 3, 16, **{"camera.target": "hero"})
     for i, (x, y, z) in enumerate([(4.5, 1.6, -2.5), (9, 2.6, -5.5), (12.5, 3.6, -10.5), (-6, 1.2, 4), (0, 3.1, 4),
                                    (-9, 1.2, -6.5), (-6.5, 2.6, -6.5), (0, 2.2, -10), (-14, 0.6, 14)]):
         place(yard, "coin", "coin%d" % (i + 1), x, y, z)
@@ -261,6 +262,10 @@ if WHICH == "plat":
     B.add_path_point(mover, game(2, 4.0, -14))
     place(yard, "flag", "flag_to_bonus", 7.5, 4.2, -17.5, **{"door.to": "bonus", "door.spawn": "entry"})
     spawn(bonus, "entry", 0, 0.1, 2.5)
+    # The hero and camera persist, so arriving through the flag they come along; these only matter when the game
+    # starts here (PLAT3D_SCENE=bonus).
+    place(bonus, "hero", "hero", 0, 0.1, 2.5)
+    place(bonus, "camera", "camera", 0, 3, 9, **{"camera.target": "hero"})
     for i in range(8):
         a = i * math.pi / 4
         place(bonus, "coin", "bonus_coin%d" % (i + 1), 4.5 * math.cos(a), 0.6, 4.5 * math.sin(a))
@@ -326,6 +331,7 @@ else:
     B.catalog(refresh=True)
     spawn(rng, "default", -3.75, 0.2, 12)
     place(rng, "player", "player", -3.75, 0.2, 12)
+    place(rng, "camera", "camera", -3.75, 1.8, 12, **{"camera.target": "player"})
     for i, (x, z, yaw) in enumerate([(-3, -14, 0), (6, -12, 0), (-12, -2, 90), (12, 0, -90), (12.5, -10, -90),
                                      (-12, 12, 90), (-3, -3, 0), (8, 13, 180)]):
         place(rng, "target", "target%d" % (i + 1), x, 2.3 if z == -10 else 0, z, yaw)

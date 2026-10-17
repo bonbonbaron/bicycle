@@ -24,6 +24,7 @@ return {
     { name = "catwalk_stairs", mesh = "model/catwalk_stairs", role = "static" },
   },
   entities = {
+    { genome = "camera", camera = { mode = "firstPerson", target = "player" }, key = "camera", pos = { -3.75, 1.8, 12 } },
     { genome = "player", key = "player", pos = { -3.75, 0.2, 12 } },
     { genome = "target", key = "target1", pos = { -3, 0, -14 } },
     { genome = "target", key = "target2", pos = { 6, 0, -12 } },

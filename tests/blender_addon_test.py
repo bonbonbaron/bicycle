@@ -35,7 +35,20 @@ bpy.context.window.scene = scene if bpy.context.window else None
 check(B.genome_dir(scene) == os.path.join(game, "genome"), "genome folder found next to the .blend")
 bpy.ops.bicycle.refresh()
 names = [i[0] for i in B.genome_items(scene.bicycle, bpy.context)]
-check(names == ["coin", "flag", "hero", "mover"], "genome drop-down: %s" % names)
+check(names == ["camera", "coin", "flag", "hero", "mover"], "genome drop-down: %s" % names)
+
+# The camera genome: its target is a genome drop-down, its mode an enum.
+scene.bicycle.add_genome_choice = "camera"
+with bpy.context.temp_override(scene=scene):
+    bpy.ops.bicycle.add_entity()
+cam = max((o for o in scene.objects if o.bicycle.genome == "camera"), key=lambda o: o.name)
+cparams = {p.name: p for p in cam.bicycle.params}
+check("camera.target" in cparams and "camera.mode" in cparams, "camera params: %s" % sorted(cparams))
+targets = [i[0] for i in B.param_items(cparams["camera.target"], None)]
+check("hero" in targets and "coin" in targets, "camera.target drop-down lists the genomes: %s" % targets)
+modes = [i[0] for i in B.param_items(cparams["camera.mode"], None)]
+check(modes == ["orbit", "firstPerson", "side"], "camera.mode drop-down: %s" % modes)
+cparams["camera.target"].choice = "hero"
 
 scene.bicycle.add_genome_choice = "flag"
 scene.cursor.location = (1, 2, 3)
