@@ -283,18 +283,16 @@ else:
     bmesh.ops.create_cone(b, cap_ends=True, segments=24, radius1=0.45, radius2=0.45, depth=0.08)
     for v in b.verts:
         v.co = (v.co.x, v.co.z, v.co.y + 1.5)  # disc in the XZ(blender) plane -> faces -Y blender = +Z game
-    n = len(b.faces)
+    old = set(b.faces)
     r = bmesh.ops.create_cone(b, cap_ends=True, segments=24, radius1=0.25, radius2=0.25, depth=0.1)
     for v in r["verts"]:
         v.co = (v.co.x, v.co.z - 0.02, v.co.y + 1.5)
-    b.faces.ensure_lookup_table()
-    for f in b.faces[n:]:
-        f.material_index = 1
-    n = len(b.faces)
+    for f in set(b.faces) - old:
+        f.material_index = 1  # the bullseye: white
+    old = set(b.faces)
     add_box(b, (-0.05, 0, -0.05), (0.05, 1.05, 0.05))
-    b.faces.ensure_lookup_table()
-    for f in b.faces[n:]:
-        f.material_index = 2
+    for f in set(b.faces) - old:
+        f.material_index = 2  # the post: metal
     t = finish("target3d", b, m_red, role="character")
     t.data.materials.append(m_white)
     t.data.materials.append(m_metal)
