@@ -412,4 +412,8 @@ if ( NOT CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_NAME STREQUAL "Linux" )
   set( BICYCLE_ASEPRITE "$ENV{BICYCLE_ASEPRITE}" CACHE FILEPATH "Aseprite binary for the aseprite-scene-scripts test" )
   add_test( NAME aseprite-scene-scripts COMMAND sh "${CMAKE_SOURCE_DIR}/tests/aseprite_scene_scripts_test.sh" "${CMAKE_SOURCE_DIR}" )
   set_tests_properties( aseprite-scene-scripts PROPERTIES SKIP_RETURN_CODE 77 ENVIRONMENT "BICYCLE_ASEPRITE=${BICYCLE_ASEPRITE}" )
+  # The Blender add-on (tools/blender) in background mode (skipped unless BICYCLE_BLENDER points at blender).
+  set( BICYCLE_BLENDER "$ENV{BICYCLE_BLENDER}" CACHE FILEPATH "Blender binary for the blender-addon test" )
+  add_test( NAME blender-addon COMMAND sh "${CMAKE_SOURCE_DIR}/tests/blender_addon_test.sh" "${CMAKE_SOURCE_DIR}" )
+  set_tests_properties( blender-addon PROPERTIES SKIP_RETURN_CODE 77 ENVIRONMENT "BICYCLE_BLENDER=${BICYCLE_BLENDER}" )
 endif()
