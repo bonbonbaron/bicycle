@@ -78,7 +78,8 @@ params = { ["door.to"] = "scene", ["door.spawn"] = "spawn:door.to", ["door.on"] 
 * **Numbers, checkboxes, text** (`"number"`, `"int"`, `"bool"`, `"string"`): fields to type in, e.g. the mover's
   **motion.speed** and **motion.pingpong**. A value equal to the genome's own isn't written per instance, so
   changing the genome changes every copy that didn't override it.
-* **Genome** (`"genome"`): a drop-down of the game's genomes (e.g. what a spawner makes).
+* **Genome** (`"genome"`): a drop-down of the game's genomes (e.g. what a spawner makes, or what a camera follows:
+  plat3d's and fps3d's `camera.lua` have `["camera.target"] = "genome"`).
 
 ## 5. Spawn points
 

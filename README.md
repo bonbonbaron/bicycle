@@ -185,8 +185,11 @@ return coin
   `self:sound( "collect" [, vel] )` plays one (where the body is, in 3D). A SoundFont several genomes use is loaded
   once (`Sound.soundfonts`, outside the scene's memory scope). Scenes have no sound-effect lists any more (an old
   `scene.sfx` still loads, with a warning). Samples go into a SoundFont (`tools/audio/make_sf2.py`).
-* **Behavior** is events only: `onSpawn`, `onInput( key )`, `onCollision( other, type )`, `onUncollision`,
-  `onTimer( timerId, type )`, `onSceneEnter( scene, spawn )`, `onDespawn`. `timer = <ms> | { ms, rep, type }`
+* **Behavior** is events only: `onSpawn`, `onInput( key, pressed, dx, dy )` (see "Input" below),
+  `onCollision( other, type )`, `onUncollision`, `onTimer( timerId, type )`, `onSceneEnter( scene, spawn )`,
+  `onDespawn`; in 3D also `onLand( self )`, `onFallOut( self )` (below the genome's `killY`, default -15) and
+  `onLevelReady( self )` (everything the level places exists). `listen = true` (3D genomes; `listenInput( id )` for
+  anything) makes it get every input event without having the focus (a camera genome). `timer = <ms> | { ms, rep, type }`
   starts a timer at spawn; `self:after( ms, type )`, `self:every( ms, type )` and `self:stopTimer( id )` add more.
   Continuous motion is data (`motion`: linear paths, orbits, spin and bob, follow; or an animation), moved by the
   engine's Kinematics, not per-frame Lua.
@@ -578,6 +581,48 @@ is); a non-GC64 build falls back to LuaJIT's own allocator with a warning. fluid
 its own malloc'd memory, so only the sf2/mid bytes are in AUDIO. Third-party C code (SDL, fluidsynth, GL drivers)
 still uses malloc. fluidsynth's cpp11 thread code is patched at fetch time (new vs free mismatch).
 
+## Input
+
+Input is events, in every render mode: `onInput( self, key, pressed, dx, dy )` on the focused entity
+(`focusOn( id )`) and on every listener (`listen = true` genomes, or `listenInput( id )`), in the order it happened.
+
+* `key` is a `LogicalKey` (`include/c/Input.h`, `ffi.C.<name>`): `A`..`Z`, `Key0`..`Key9`, `Enter`, `Escape`,
+  `Tab`, `Space`, `LeftShift`, `RightShift`, `LeftCtrl`, `RightCtrl`, `LeftAlt`, `RightAlt`, `LeftMeta`,
+  `RightMeta`, `MouseLeft`, `MouseRight`, `MouseMiddle`, and `Look`. Arrows are `W`/`A`/`S`/`D`.
+* `pressed` is `true` when the key or button goes down and `false` when it comes up: one press and one release per
+  hold (auto-repeat is not a new press). Things that should keep happening while a key is held are a value set on
+  the press and cleared on the release (`hero:move( right, fwd )`, `W.Camera.turn( yawRate, pitchRate )`) or a
+  repeating timer started on the press and stopped on the release (the test hero's grid steps, fps3d's trigger).
+* `Look` is mouse look: once per frame, only when the mouse moved (while captured, `Input3D.captureMouse`), with
+  `dx, dy` the pixels since the last frame; the gamepad's right stick adds to it (600 px/s at full tilt). It is an
+  event like the rest rather than a polled value or one event per motion report: one call a frame with the sum is
+  the smallest form that keeps a frame's motion exact and costs nothing when the mouse is still.
+* Gamepad (SDL): the left stick is `W`/`A`/`S`/`D` (past half tilt), A is `Space`, the right trigger and bumper are
+  `MouseLeft`, the left stick's click is `LeftShift`.
+* Dialogues and menus page and select on presses; releases don't reach them. During a scene transition presses are
+  dropped but releases still arrive (a key held through a door is let go).
+* `scripts/Input3D.lua` (held keys, axes, `Input.look()`) still works for code that polls.
+
+**Terminals (ASCII mode, SSH).** Terminals send bytes, not key events, so `src/c/SshInputListener.cpp` with
+`include/c/TermInput.h`:
+
+* parses escape sequences (arrows are `W`/`A`/`S`/`D`, not `ESC [ A` = A; a lone ESC is `Escape` a frame later);
+* asks for the kitty keyboard protocol (`CSI > 11 u`: kitty, foot, WezTerm, Ghostty, recent Alacritty and
+  iTerm2...) and, if the terminal answers the `CSI ? u` query, uses its real press/repeat/release events;
+* turns on SGR mouse (`?1000` + `?1006`): button presses and releases (`MouseLeft`/`MouseRight`/`MouseMiddle`);
+* otherwise infers releases from auto-repeat: a key's first byte is a press, and while its repeat bytes keep coming
+  it stays held; it's released when none arrives within the timeout: `initial` ms before the first repeat (the
+  typematic delay; it adapts to the measured delay, within 0.5x..2x of `initial`), then `factor` times the measured
+  repeat interval, clamped to [`min`, `max`]. Tune with `BICYCLE_TTY_KEYUP="initial,min,max,factor"` (default
+  `500,60,150,2.5`). A key let go before its first repeat is released `initial` ms after it was pressed. xterm's
+  modifyOtherKeys reports no releases, so xterm uses the heuristic. Terminals repeat only the newest key, so a key
+  held under another one is released by its timeout. `BICYCLE_TTY_KITTY=0` / `BICYCLE_TTY_MOUSE=0` turn the
+  protocols off; both are undone at exit.
+* Tests: `tests/term_input_test.cpp` (ctest `term-input`: synthetic bytes and timings) and
+  `tests/tty_input_test.py` (ctest `tty-input`, ASCII builds: the game in a pty).
+
+`BICYCLE_INPUT_LOG=1` prints every event (`input <key> down|up`) to stderr, `=<file>` appends them to a file.
+
 ## Environment variables
 
 * `BICYCLE_SCENE_STATS=1`: print the memory pools on every scene change. `BICYCLE_SCENE_CYCLE=<n>[:<a>:<b>:<frames>]`:
@@ -587,7 +632,8 @@ still uses malloc. fluidsynth's cpp11 thread code is patched at fetch time (new 
 
 `BICYCLE_MAX_FRAMES=<n>`: quit after n frames (headless tests).
 
-`BICYCLE_SCRIPTED_INPUT="w@20-34/2,d@36-170/2"`: press a key on frames 20..34, every 2nd frame (dev only).
+`BICYCLE_SCRIPTED_INPUT="w@20-34/2,d@36-170"`: input on frame ranges: `/2` taps the key every 2nd frame
+(pressed, released the next frame), no step (or `/1`) holds it from the first frame and releases it after the last.
 
 `BICYCLE_LOOSE_ASSETS`, `BICYCLE_WINDOW_SIZE`, `BICYCLE_SCREENSHOT=<file.bmp>` (`%d` = frame number; in
 ASCII the file is a text dump of the screen) (+ `BICYCLE_SCREENSHOT_FRAME`, default 90, or a list in

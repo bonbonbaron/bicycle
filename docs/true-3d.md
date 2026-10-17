@@ -14,7 +14,7 @@ feet. Demos: `./o-3d plat3d` (third person) and `./o-3d fps3d` (first person).
 | transforms, bodies, level collider, character physics, raycasts, overlaps | `include/c/Physics3D.h`, `src/c/Physics3D.cpp` |
 | 3D motions + camera rigs (side, orbit, first person, free) | `Kinematics::linear3D/orbit3D/follow3D/spin3D/runCamera3D` |
 | FFI | `src/c/World3DApi.cpp`, `src/c/InputState.cpp` |
-| Lua | `scripts/World3D.lua`, `scripts/Input3D.lua`, `onFrame(dt)` in `scripts/bicycle.lua` |
+| Lua | `scripts/World3D.lua`, `scripts/CameraGenome.lua`, `scripts/Input3D.lua` (polling, optional) |
 | rendering (shadow map, fog, culling, billboards) | `src/v/3d/Renderer3D.cpp` (`drawWorld3D`) |
 | levels and placed genomes from Blender | `tools/blender/bicycle_blender.py` (add-on; [blender-entities.md](blender-entities.md)), `scripts/blender/make_level.py` + `export.py` |
 | genomes as 3D bodies | `Genome.spawn3d` in `scripts/Genome.lua` (README, "Self-contained genomes") |
@@ -43,23 +43,45 @@ local Input = require("Input3D")
 W.level( "scene3d" )                                 -- genome/level/scene3d.lua. static: draw + collide; decor: draw; collider: collide
 W.View.light( { -0.45, -1, -0.35 }, { 1, 0.96, 0.88 }, 0.4, true )   -- direction, color, ambient, shadows
 W.View.fog( 0.62, 0.76, 0.95, 25, 70 )
-local hero = W.Body.new{ kind = "character", x = 0, y = 1, z = 8, model = "pilgrim3d", modelYaw = 90, collType = 1 }
+local hero = W.Body.new{ kind = "character", x = 0, y = 1, z = 8, model = "pilgrim3d", modelYaw = 90, collType = 1,
+                         turnRate = 14 }                -- turns to face the way it moves
 W.Camera.orbit( hero.id, { distance = 7, height = 1.5, rate = 12, pitch = -18, fov = 65 } )   -- or .firstPerson/.side/.free
-Input.bind( "jump", { "space", "pad:a" } )
-Input.bindAxis( "moveX", { neg = { "a" }, pos = { "d" }, pad = "leftx" } )
-Input.bindAxis( "moveY", { neg = { "s" }, pos = { "w" }, pad = "lefty", padScale = -1 } )
-Input.captureMouse( true )      -- SDL relative mouse mode
+Input.captureMouse( true )      -- SDL relative mouse mode: Look events
 Input.enableGamepad()
-function onFrame( dt )
-  local dx, dy = Input.look( dt )                       -- mouse + right stick
-  W.Camera.look( -dx * 0.25, -dy * 0.2 )                -- the rig places the camera; Lua only steers it
-  hero:wish( W.Camera.relative( Input.axis( "moveX" ) * 7, Input.axis( "moveY" ) * 7 ) )
-  if Input.pressed( "jump" ) and hero:grounded() then hero:jump() end
-end
+-- in the hero's onInput( key, pressed, dx, dy ), on a press or release only:
+hero:move( right * 7, forward * 7 )                     -- camera-relative run, kept until changed (0, 0 stops)
+W.Camera.look( -dx * 0.25, -dy * 0.2 )                  -- on Look: the rig places the camera; Lua only steers it
+W.Camera.turn( 120, 0 )                                 -- keep turning (deg/s) while a key is held; turn( 0, 0 ) stops
+hero:jump()
+gun:follow( W.Camera.id(), { view = true, offset = { 0.2, -0.2, 0.34 } } )   -- ride in the view (right, up, forward)
+gun:kick( 0.06, 6, 8 )                                  -- recoil: back, pitch up (deg), easing out per second
 local hit = W.raycast( { W.Camera.eye() }, W.Camera.forward(), 100, hero.id )   -- hitscan: hit.entity, hit.x ...
 W.sound( 72, 110, x, y, z )                            -- positional SFX: pan + attenuation from the camera
 coin:spin( 180 )  platform:path( { { 2, 0.75, -14 }, { 2, 4, -14 } }, 1.2, true )   -- Kinematics 3D motions
 ```
+
+## The camera is a genome
+
+`plat3d/genome/camera.lua` and `fps3d/genome/camera.lua` are data; `scripts/CameraGenome.lua` (`mixin`) is the
+behavior. Place one in Blender like any genome, with its target picked from the genome drop-down:
+
+```lua
+local camera = {
+  camera = { mode = "orbit",   -- or "firstPerson", "side"
+             target = "hero",  -- a genome: its placed instance, or the persistent one
+             track = "lerp",   -- or "hard"; rate = 12 (1/s)
+             distance = 7, height = 1.5, pitch = -18, fov = 65, lookX = 0.25, lookY = 0.2 },
+  params = { ["camera.target"] = "genome", ["camera.mode"] = "enum:orbit|firstPerson|side", ... },
+}
+require( "CameraGenome" ).mixin( camera )
+return camera
+```
+
+It listens to every input event (`listen = true`) while the hero keeps the focus: `Look` orbits, J/L/I/K turn
+while held, Escape lets go of the mouse and a click grabs it again. It persists across scenes. It finds its target
+on spawn, or in `onLevelReady` when the level placed the target after it. The hero's run is camera-relative without
+asking the camera anything per frame: `hero:move( right, fwd )` is relative to the rig's yaw at every physics step
+(`W.Camera.angles()` gives the yaw if a genome wants it).
 
 ## Scene changes in true 3D
 
@@ -94,13 +116,14 @@ or an old `build = function( scene ) ... end`.
   capsule (collType 6) for the player (collType 1); the ID generator and the packer check its target scene and
   spawn exist. (`W.door{ x, y, z, ... }` does the same from a script.)
 - Demo: `./o-3d plat3d`: touch the flag on the tower to enter the bonus room; its flag leads back. Coins stay
-  collected per scene (`Scene.state`). `PLAT3D_SCENE=bonus ./o-3d plat3d` starts there. The analog controls
-  (camera-relative running, mouse look) are the game's `onFrame` in `main.lua`; the genomes only have events.
+  collected per scene (`Scene.state`). `PLAT3D_SCENE=bonus ./o-3d plat3d` starts there. The controls are the
+  genomes' `onInput` (hero.lua, camera.lua); `main.lua` only starts the scene, and neither demo has an `onFrame`.
 
 ## Headless capture
 
 `BICYCLE_SCRIPTED_INPUT` presses also count as held keys on their frames; `BICYCLE_SCRIPTED_MOUSE="12:0@30-60;L@80-81"`
-adds mouse motion (dx:dy per frame) or held buttons (L/R/M) over frame ranges. `BICYCLE_FRAME_STATS=1` prints
+adds mouse motion (dx:dy per frame, also as `Look` events) or held buttons (L/R/M, also as `MouseLeft`... press and
+release events) over frame ranges. `BICYCLE_FRAME_STATS=1` prints
 per-frame physics / Lua / render milliseconds and meshes drawn/culled. `BICYCLE_NO_SHADOWS=1` disables the shadow map.
 
 ## Limits
