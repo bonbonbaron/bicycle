@@ -103,7 +103,16 @@ libgbm-dev:arm64`, `:armhf` for 32-bit) and point the compiler at them, or build
   (`BICYCLE_GL=gles3` / `gles2`, `LIBGL_ALWAYS_SOFTWARE=1`): with gles3, test and plat3d match GL 3.3 core, shadows
   included; gles2 renders the same apart from the missing shadows (GLES2 shaders: lighting per vertex, texture and
   distance fog per pixel; skinning on the CPU unless `BICYCLE_GLES2_GPU_SKIN=1`). `BICYCLE_GL_DEBUG=1` logs the GL
-  renderer, limits, shader uniform counts, GL errors and the first frames' draw counts and camera. `MESA_GL_VERSION_OVERRIDE=3.1` (no 3.3 core, like
+  renderer, limits, shader uniform counts, GL errors and the first frames' draw counts and camera.
+  `BICYCLE_GL_VIEW=uv|tex|lit|fog` (GLES2) shows one shader stage: fract(uv) (blue = textured), the raw texture
+  (magenta = untextured), the lighting (with shadows) or the fog amount.
+- Meshes are split at load time (all tiers) so no triangle edge is longer than 6 m, with each triangle's uvs moved
+  by whole tiles toward 0: small GPUs (vc4) interpolate huge near-plane-crossing triangles and large texture
+  coordinates badly.
+- GLES2 shadows: `BICYCLE_SHADOWS=low` (off by default on GLES2) uses an OES_depth_texture map and a separate shader
+  variant (16 uniforms, 73 floats; the plain one has 14 / 56) with one depth compare per pixel. The map pass redraws
+  every caster whenever the light view or a moving caster changes (no statics-map blit on GLES2), so expect it to
+  cost frame rate on a Zero 2. `MESA_GL_VERSION_OVERRIDE=3.1` (no 3.3 core, like
   v3d) exercises the core -> gles3 fallback with the window recreated.
 - plat3d on llvmpipe, ms per frame (shadow pass + main pass; overlay and swap add ~2.5 ms on every tier):
   gles2 0.9 + 3.5, gles3 off 0.9 + 3.2, low 1.5 + 4.0, med 1.8 + 6.8, high 3.5 + 10.9; core high 4.1 + 7.9.

@@ -123,6 +123,10 @@ enum : GLenum {
   X( void, DrawBuffer, GLenum ) \
   X( void, Finish ) \
   X( void, TexSubImage2D, GLenum, GLint, GLint, GLint, GLsizei, GLsizei, GLenum, GLenum, const void* ) \
+  X( void, GenRenderbuffers, GLsizei, GLuint* ) \
+  X( void, BindRenderbuffer, GLenum, GLuint ) \
+  X( void, RenderbufferStorage, GLenum, GLenum, GLsizei, GLsizei ) \
+  X( void, FramebufferRenderbuffer, GLenum, GLenum, GLenum, GLuint ) \
   X( void, BlitFramebuffer, GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLbitfield, GLenum ) \
   X( void, ReadBuffer, GLenum ) \
   X( void, PolygonOffset, GLfloat, GLfloat ) \
@@ -348,9 +352,16 @@ uniform mediump int uWorld3D;  // shared with the fragment shader, so the same p
 varying float vNdl;  // N.L per vertex (exact for flat faces under a directional light)
 varying vec2 vUv;
 varying vec3 vRel;   // world position - eye; interpolates exactly, so the fog distance is per pixel
+#ifdef SHADOWS
+uniform mat4 uLightMvp;  // light view-projection x model, multiplied on the CPU
+varying vec4 vLight;
+#endif
 void main() {
   vec4 p = vec4(aPos, 1.0);
   gl_Position = uMvp * p;
+#ifdef SHADOWS
+  vLight = uLightMvp * p;
+#endif
   vec3 n = normalize(mat3(uModel[0].xyz, uModel[1].xyz, uModel[2].xyz) * aNrm);
   vNdl = dot(n, uWorld3D == 1 ? -uLightDir : vec3(0.3980, 0.7960, 0.4975));
   vUv = aUv;
@@ -387,10 +398,27 @@ void main() {
   vRel = (uModel * p).xyz - uCamPos;
 })";
 const char* FS_ES2 = R"(#version 100
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;  // texture coordinates and the fog distance at full precision where the GPU has it
+#else
 precision mediump float;
+#endif
 varying float vNdl;
 varying vec2 vUv;
 varying vec3 vRel;
+uniform int uView;  // BICYCLE_GL_VIEW: 0 normal, 1 uv (fract), 2 tex (raw texture), 3 lit (lighting only), 4 fog
+#ifdef SHADOWS
+varying vec4 vLight;
+uniform sampler2D uShadowMap;  // OES_depth_texture: depth in .r; compared here (no shadow samplers in GLES2)
+float shadow() {
+  vec3 q = vLight.xyz / vLight.w * 0.5 + 0.5;
+  if (q.x < 0.0 || q.x > 1.0 || q.y < 0.0 || q.y > 1.0 || q.z > 1.0) return 1.0;
+  float bias = max(0.003 * (1.0 - max(vNdl, 0.0)), 0.0012);
+  return q.z - bias > texture2D(uShadowMap, q.xy).r ? 0.0 : 1.0;
+}
+#else
+float shadow() { return 1.0; }
+#endif
 uniform vec4 uColor;
 uniform int uTex;
 uniform int uLit;
@@ -404,6 +432,8 @@ void main() {
   vec4 c = uColor;
   if (uTex == 1) c *= texture2D(tex, vec2(vUv.x, 1.0 - vUv.y));
   if (c.a < 0.5) discard;
+  if (uView == 1) { gl_FragColor = vec4(fract(vUv), uTex == 1 ? 1.0 : 0.0, 1.0); return; }
+  if (uView == 2) { gl_FragColor = uTex == 1 ? texture2D(tex, vec2(vUv.x, 1.0 - vUv.y)) : vec4(1.0, 0.0, 1.0, 1.0); return; }
   if (uWorld3D == 0) {
     float l = 1.0;
     if (uLit == 1) l = 0.45 + 0.55 * max(vNdl, 0.0);
@@ -411,9 +441,30 @@ void main() {
     return;
   }
   vec3 rgb = c.rgb;
-  if (uLit == 1) rgb = c.rgb * (uAmbient + (1.0 - uAmbient) * max(gl_FrontFacing ? vNdl : -vNdl, 0.0) * uLightColor);
+  float sh = shadow();
+  vec3 light = vec3(mix(uAmbient + 0.25, 1.0, sh));  // billboards: shadowed but unlit
+  if (uLit == 1) light = uAmbient + (1.0 - uAmbient) * max(gl_FrontFacing ? vNdl : -vNdl, 0.0) * sh * uLightColor;
+  rgb = c.rgb * light;
   float f = clamp((length(vRel) - uFog.x) / max(uFog.y - uFog.x, 0.001), 0.0, 1.0);
+  if (uView == 3) { gl_FragColor = vec4(light, 1.0); return; }
+  if (uView == 4) { gl_FragColor = vec4(vec3(f), 1.0); return; }
   gl_FragColor = vec4(mix(rgb, uFogColor, f), c.a);
+})";
+// GLES2 shadow map pass: position only (plus the uv for cut-out textures).
+const char* VS_ES2_DEPTH = R"(#version 100
+attribute vec3 aPos;
+attribute vec2 aUv;
+uniform mat4 uMvp;
+varying vec2 vUv;
+void main() { vUv = aUv; gl_Position = uMvp * vec4(aPos, 1.0); })";
+const char* FS_ES2_DEPTH = R"(#version 100
+precision mediump float;
+varying vec2 vUv;
+uniform int uTex;
+uniform sampler2D tex;
+void main() {
+  if (uTex == 1 && texture2D(tex, vec2(vUv.x, 1.0 - vUv.y)).a < 0.5) discard;
+  gl_FragColor = vec4(1.0);
 })";
 // The last resort when a GLES2 program doesn't link: unlit, untextured-or-textured, no fog. Logged loudly.
 const char* VS_ES2_MIN = R"(#version 100
@@ -684,7 +735,22 @@ class Renderer3D final : public PixelRenderer {
           if ( !sok ) _skinProg = 0;
         }
         std::fprintf( stderr, "bicycle 3D: GLES2 skinning on the %s\n", _skinProg ? "GPU (BICYCLE_GLES2_GPU_SKIN)" : "CPU" );
-        _depthProg = 0;  // no shadow map on GLES2
+        _plainProg = _prog;
+        _depthProg = 0;
+        // Shadows (opt-in, BICYCLE_SHADOWS=low|med|high): OES_depth_texture map, a separate shader variant with the
+        // light matrix and one manual depth compare, so the plain variant stays as small as it is.
+        const char* ext = reinterpret_cast<const char*>( gl.GetString( GL_EXTENSIONS ) );
+        if ( ext && std::strstr( ext, "GL_OES_depth_texture" ) ) {
+          auto withShadows = []( const char* src ) {  // "#define SHADOWS" right after the #version line
+            std::string t = src;
+            return t.insert( t.find( '\n' ) + 1, "#define SHADOWS 1\n" );
+          };
+          const std::string vs = withShadows( VS_ES2 ), fs = withShadows( FS_ES2 );
+          bool sok = false, dok = false;
+          _shadowProg = program( vs.c_str(), fs.c_str(), true, &sok );
+          _depthProg = program( VS_ES2_DEPTH, FS_ES2_DEPTH, true, &dok );
+          if ( !sok || !dok ) _shadowProg = _depthProg = 0;
+        }
       }
       else {
         _prog = program( VS, FS );
@@ -693,10 +759,11 @@ class Renderer3D final : public PixelRenderer {
       if ( s_tier != CORE || glDebug() ) {
         reportUniforms( "main", _prog );
         if ( _skinProg ) reportUniforms( "skinned", _skinProg );
+        if ( _shadowProg ) reportUniforms( "shadowed", _shadowProg );
       }
       startup::mark( "  shaders (compile + link)" );
       // The color texture is on unit 0 and the shadow map on unit 1, always (two sampler types may not share a unit).
-      for ( GLuint pr : { _prog, _skinProg } ) {
+      for ( GLuint pr : { _prog, _skinProg, _shadowProg } ) {
         if ( !pr ) continue;
         gl.UseProgram( pr );
         gl.Uniform1i( gl.GetUniformLocation( pr, "tex" ), 0 );
@@ -705,7 +772,7 @@ class Renderer3D final : public PixelRenderer {
       gl.UseProgram( _prog );
       // Shadow map: a depth texture compared in the shader (sampler2DShadow, hardware PCF where available), made on
       // first use at the quality's size (ensureShadowMap). GLES2: none (no depth textures or shadow samplers).
-      _shadowOk = !s_es2;
+      _shadowOk = !s_es2 || _shadowProg;
       {
         const char* r = reinterpret_cast<const char*>( gl.GetString( GL_RENDERER ) );
         const std::string rs = r ? r : "";
@@ -714,6 +781,9 @@ class Renderer3D final : public PixelRenderer {
         for ( const char* k : { "V3D", "v3d", "VC4", "vc4", "Mali", "llvmpipe", "softpipe", "Adreno", "PowerVR" } )
           if ( rs.find( k ) != std::string::npos ) slow = true;
         _autoQuality = slow ? Q_LOW : Q_HIGH;
+        // GLES2 (vc4): off unless asked for. The map pass redraws the casters whenever the light view or one of them
+        // moves (no separate statics map without depth blits), and the fill rate of a Zero 2 is the limit already.
+        if ( s_es2 ) _autoQuality = Q_OFF;
         const char* ext = s_tier != CORE ? reinterpret_cast<const char*>( gl.GetString( GL_EXTENSIONS ) ) : nullptr;
         s_bgraExt = ext && std::strstr( ext, "GL_EXT_texture_format_BGRA8888" );
         // Strict GLES2 without OES_texture_npot: a non-power-of-two texture may be incomplete (samples black), so
@@ -1046,6 +1116,7 @@ class Renderer3D final : public PixelRenderer {
             }
           }
         }
+        if ( !skinned ) tessellate( verts, static_cast<size_t>( r.first ) * 16 );
         r.count = static_cast<int>( verts.size() / 16 ) - r.first;
         if ( mat < m->materials.size() ) {
           const auto& mm = m->materials[mat];
@@ -1082,13 +1153,62 @@ class Renderer3D final : public PixelRenderer {
       return g;
     }
 
+    // Large triangles (a level's ground: two 68 m triangles) are split along their longest edge until no edge is
+    // longer than MAX_EDGE, and each triangle's uvs are shifted by whole tiles toward 0 (the same texels under
+    // GL_REPEAT). Huge triangles crossing the near plane and large texture coordinates are where small GPUs (vc4)
+    // interpolate badly; small ones also give per-vertex lighting and fog more samples. verts from `from` on are
+    // triangles of 16 floats per vertex (pos3 nrm3 uv2 joints4 weights4).
+    template <class V>
+    static void tessellate( V& verts, size_t from ) {
+      constexpr float MAX_EDGE = 6.f;
+      constexpr int VF = 16, TF = 3 * VF;
+      std::vector<float> out, stack;
+      out.reserve( verts.size() - from );
+      for ( size_t t = from; t + TF <= verts.size(); t += TF ) {
+        stack.assign( verts.begin() + t, verts.begin() + t + TF );
+        while ( !stack.empty() ) {
+          float tri[TF];
+          std::copy( stack.end() - TF, stack.end(), tri );
+          stack.resize( stack.size() - TF );
+          int longest = -1;
+          float best = MAX_EDGE * MAX_EDGE;
+          for ( int e = 0; e < 3; ++e ) {
+            const float* a = tri + VF * e;
+            const float* b = tri + VF * ( ( e + 1 ) % 3 );
+            const float d = ( a[0] - b[0] ) * ( a[0] - b[0] ) + ( a[1] - b[1] ) * ( a[1] - b[1] ) + ( a[2] - b[2] ) * ( a[2] - b[2] );
+            if ( d > best ) { best = d; longest = e; }
+          }
+          if ( longest < 0 ) {
+            const float du = std::floor( ( tri[6] + tri[VF + 6] + tri[2 * VF + 6] ) / 3 );
+            const float dv = std::floor( ( tri[7] + tri[VF + 7] + tri[2 * VF + 7] ) / 3 );
+            for ( int c = 0; c < 3; ++c ) { tri[VF * c + 6] -= du; tri[VF * c + 7] -= dv; }
+            out.insert( out.end(), tri, tri + TF );
+            continue;
+          }
+          const int i0 = longest, i1 = ( longest + 1 ) % 3, i2 = ( longest + 2 ) % 3;
+          float mid[VF];
+          for ( int k = 0; k < VF; ++k ) mid[k] = 0.5f * ( tri[VF * i0 + k] + tri[VF * i1 + k] );
+          const float nl = std::sqrt( mid[3] * mid[3] + mid[4] * mid[4] + mid[5] * mid[5] );
+          if ( nl > 0 ) for ( int k = 3; k < 6; ++k ) mid[k] /= nl;
+          // (i0, mid, i2) and (mid, i1, i2): the same winding as (i0, i1, i2).
+          const float* a = tri + VF * i0;
+          const float* b = tri + VF * i1;
+          const float* c = tri + VF * i2;
+          for ( const float* v : { a, static_cast<const float*>( mid ), c, static_cast<const float*>( mid ), b, c } )
+            stack.insert( stack.end(), v, v + VF );
+        }
+      }
+      verts.resize( from );
+      verts.insert( verts.end(), out.begin(), out.end() );
+    }
+
     // drawMesh's uniform locations, looked up once per program (not per draw).
-    struct MeshLocs { GLint skinned, bones, mvp, model, lit, color, tex; };
+    struct MeshLocs { GLint skinned, bones, mvp, model, lit, color, tex, lightMvp; };
     auto meshLocs( GLuint prog ) -> const MeshLocs& {
       auto it = _meshLocs.find( prog );
       if ( it != _meshLocs.end() ) return it->second;
       auto u = [&]( const char* n ) { return gl.GetUniformLocation( prog, n ); };
-      return _meshLocs[prog] = { u( "uSkinned" ), u( "uBones" ), u( "uMvp" ), u( "uModel" ), u( "uLit" ), u( "uColor" ), u( "uTex" ) };
+      return _meshLocs[prog] = { u( "uSkinned" ), u( "uBones" ), u( "uMvp" ), u( "uModel" ), u( "uLit" ), u( "uColor" ), u( "uTex" ), u( "uLightMvp" ) };
     }
     // GLES2 CPU skinning: the bind-pose vertices blended by their 4 joints' matrices into the mesh's dynamic buffer.
     static void skinOnCpu( const GpuMesh& m, const float* bones ) {
@@ -1119,8 +1239,8 @@ class Renderer3D final : public PixelRenderer {
     }
     void drawMesh( const GpuMesh& m, const Mat4& viewProj, const Mat4& model, const float* bones = nullptr, GLuint prog = 0 ) {
       if ( !prog ) prog = _prog;
-      if ( s_es2 && prog == _prog && bones && m.skin ) {  // GLES2: skinned on the CPU, or with the small skinned shader
-        if ( _skinProg && m.skin->joints.size() <= static_cast<size_t>( ES2_BONES ) ) {
+      if ( s_es2 && bones && m.skin ) {  // GLES2: skinned on the CPU, or with the small skinned shader
+        if ( prog == _prog && _skinProg && m.skin->joints.size() <= static_cast<size_t>( ES2_BONES ) ) {
           float rows[4 * 3 * ES2_BONES];
           const size_t nj = m.skin->joints.size();
           for ( size_t j = 0; j < nj; ++j )
@@ -1146,6 +1266,7 @@ class Renderer3D final : public PixelRenderer {
       if ( gpuSkin ) gl.UniformMatrix4fv( l.bones, static_cast<GLsizei>( m.skin->joints.size() ), 0, bones );
       gl.UniformMatrix4fv( l.mvp, 1, 0, mvp.data() );
       gl.UniformMatrix4fv( l.model, 1, 0, model.data() );
+      if ( l.lightMvp >= 0 ) gl.UniformMatrix4fv( l.lightMvp, 1, 0, mul( _lightVP, model ).data() );
       gl.Uniform1i( l.lit, 1 );
       if ( cpuBones && !m.bindVerts.empty() ) skinOnCpu( m, cpuBones );
       else bindVertices( m.vao, m.vbo, meshLayout );
@@ -1285,6 +1406,7 @@ class Renderer3D final : public PixelRenderer {
       }
       setWorldUniforms( _prog, v, eye, lightVP, shadows );
       _dbgEye = eye;
+      _lightVP = lightVP;
     }
     void setWorldUniforms( GLuint prog, const phys3d::View& v, const m3::Vec3& eye, const m3::Mat4& lightVP, bool shadows ) {
       auto u = [&]( const char* n ) { return gl.GetUniformLocation( prog, n ); };
@@ -1302,6 +1424,7 @@ class Renderer3D final : public PixelRenderer {
       const float fog[2] = { v.fogNear, v.fogFar };
       gl.Uniform2fv( u( "uFog" ), 1, fog );
       gl.UniformMatrix4fv( u( "uLightVP" ), 1, 0, lightVP.data() );
+      gl.Uniform1i( u( "uView" ), s_glView );
     }
 
     void drawWorld3D() {
@@ -1365,6 +1488,7 @@ class Renderer3D final : public PixelRenderer {
       if ( !v.shadows ) _quality = Q_OFF;
       const Quality& Q = QUALITY[_quality];
       const bool shadows = _quality != Q_OFF && _shadowOk && ensureShadowMap( Q.size );
+      if ( s_es2 && _plainProg ) _prog = shadows && _shadowProg ? _shadowProg : _plainProg;
       m3::Mat4 lightVP = m3::identity();
       if ( shadows ) {
         const m3::Vec3 ld = m3::normalize( v.lightDir );
@@ -1615,10 +1739,11 @@ class Renderer3D final : public PixelRenderer {
       if ( size == _shadowSize ) return _shadowOk;
       const bool es = s_tier != CORE;
       auto make = [&]( GLuint& tex, GLuint& fbo, bool compare ) {
+        if ( s_es2 ) compare = false;  // OES_depth_texture: sampled as a plain texture, compared in the shader
         if ( !tex ) gl.GenTextures( 1, &tex );
         if ( !fbo ) gl.GenFramebuffers( 1, &fbo );
         gl.BindTexture( GL_TEXTURE_2D, tex );
-        gl.TexImage2D( GL_TEXTURE_2D, 0, es ? GL_DEPTH_COMPONENT16 : GL_DEPTH_COMPONENT24, size, size, 0, GL_DEPTH_COMPONENT,
+        gl.TexImage2D( GL_TEXTURE_2D, 0, s_es2 ? GL_DEPTH_COMPONENT : es ? GL_DEPTH_COMPONENT16 : GL_DEPTH_COMPONENT24, size, size, 0, GL_DEPTH_COMPONENT,
                        es ? GL_UNSIGNED_SHORT : GL_FLOAT, nullptr );
         gl.TexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, compare ? GL_LINEAR : GL_NEAREST );
         gl.TexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, compare ? GL_LINEAR : GL_NEAREST );
@@ -1638,14 +1763,23 @@ class Renderer3D final : public PixelRenderer {
           gl.DrawBuffer( GL_NONE );
           gl.ReadBuffer( GL_NONE );
         }
-        const bool ok = gl.CheckFramebufferStatus( GL_FRAMEBUFFER ) == GL_FRAMEBUFFER_COMPLETE;
+        bool ok = gl.CheckFramebufferStatus( GL_FRAMEBUFFER ) == GL_FRAMEBUFFER_COMPLETE;
+        if ( !ok && s_es2 ) {  // some GLES2 drivers want a color attachment too: a small 565 one, never read
+          constexpr GLenum RENDERBUFFER = 0x8D41, COLOR_ATTACHMENT0 = 0x8CE0, RGB565 = 0x8D62;
+          if ( !_shadowColorRb ) gl.GenRenderbuffers( 1, &_shadowColorRb );
+          gl.BindRenderbuffer( RENDERBUFFER, _shadowColorRb );
+          gl.RenderbufferStorage( RENDERBUFFER, RGB565, size, size );
+          gl.FramebufferRenderbuffer( GL_FRAMEBUFFER, COLOR_ATTACHMENT0, RENDERBUFFER, _shadowColorRb );
+          ok = gl.CheckFramebufferStatus( GL_FRAMEBUFFER ) == GL_FRAMEBUFFER_COMPLETE;
+          std::fprintf( stderr, "bicycle 3D: GLES2 shadow map: depth-only framebuffer incomplete; with a color buffer: %s\n", ok ? "ok" : "still incomplete" );
+        }
         gl.BindFramebuffer( GL_FRAMEBUFFER, 0 );
         gl.BindTexture( GL_TEXTURE_2D, 0 );
         return ok;
       };
       _shadowOk = make( _shadowTex, _shadowFbo, true );
       if ( !_shadowOk ) std::fprintf( stderr, "bicycle 3D: no shadow map framebuffer; shadows off\n" );
-      if ( _shadowOk && gl.BlitFramebuffer && !make( _staticTex, _staticFbo, false ) ) _staticFbo = 0;
+      if ( _shadowOk && !s_es2 && gl.BlitFramebuffer && !make( _staticTex, _staticFbo, false ) ) _staticFbo = 0;
       _shadowSize = size;
       _shadowValid = false;
       return _shadowOk;
@@ -1701,6 +1835,15 @@ class Renderer3D final : public PixelRenderer {
     std::vector<Item> _items;
     std::vector<std::array<float, 16 * skin::MAX_JOINTS>> _poses;
     GLuint _depthProg{}, _shadowTex{}, _shadowFbo{};
+    GLuint _plainProg{}, _shadowProg{}, _shadowColorRb{};  // GLES2: the main program without and with shadows (_prog is one of them)
+    m3::Mat4 _lightVP = m3::identity();  // this frame's light view-projection (GLES2: uLightMvp per draw)
+    static inline int s_glView = [] {    // BICYCLE_GL_VIEW (GLES2 shader): a stage on its own, for diagnosis
+      const char* e = std::getenv( "BICYCLE_GL_VIEW" );
+      if ( !e ) return 0;
+      static const char* const names[5] = { "", "uv", "tex", "lit", "fog" };
+      for ( int i = 1; i < 5; ++i ) if ( std::strcmp( e, names[i] ) == 0 ) return i;
+      return 0;
+    }();
     bool _shadowOk{};
     struct Stats3D { size_t meshes{}, culled{}, billboards{}; } _stats3d;
     GLuint _skinProg{};
