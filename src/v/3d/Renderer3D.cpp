@@ -108,6 +108,8 @@ enum : GLenum {
   X( void, Uniform4fv, GLint, GLsizei, const GLfloat* ) \
   X( void, Uniform1i, GLint, GLint ) \
   X( void, GenTextures, GLsizei, GLuint* ) \
+  X( GLboolean, IsTexture, GLuint ) \
+  X( void, DepthMask, GLboolean ) \
   X( void, BindTexture, GLenum, GLuint ) \
   X( void, TexImage2D, GLenum, GLint, GLint, GLsizei, GLsizei, GLint, GLenum, GLenum, const void* ) \
   X( void, TexParameteri, GLenum, GLenum, GLint ) \
@@ -317,6 +319,26 @@ void main() {
   if (uTex == 1 && texture(tex, vec2(vUv.x, 1.0 - vUv.y)).a < 0.5) discard;
 })";
 
+// Blob shadows: soft dark circles on the ground under modelled bodies when there's no shadow map (GLES2 / Pi Zero,
+// BICYCLE_SHADOWS=off). All of a frame's blobs are one triangle list in world space: pos.xyz + alpha in w, uv.
+const char* BLOB_VS = R"(#version 330 core
+layout(location = 0) in vec4 aPos;
+layout(location = 2) in vec2 aUv;
+uniform mat4 uMvp;
+out vec2 vUv;
+out float vA;
+void main() {
+  vUv = aUv;
+  vA = aPos.w;
+  gl_Position = uMvp * vec4(aPos.xyz, 1.0);
+})";
+const char* BLOB_FS = R"(#version 330 core
+in vec2 vUv;
+in float vA;
+uniform sampler2D tex;
+out vec4 o;
+void main() { o = vec4(0.0, 0.0, 0.0, texture(tex, vUv).a * vA); })";
+
 const char* OVERLAY_VS = R"(#version 330 core
 layout(location = 0) in vec2 aPos;
 uniform vec2 uUvScale;  // the screen's part of the texture (GLES2 without NPOT textures: a power-of-two texture)
@@ -493,7 +515,7 @@ struct GpuMesh {
   std::vector<float> bindVerts;
   mutable std::vector<float> skinVerts;
   mutable GLuint skinVbo{};
-  struct Range { int first{}, count{}; std::array<float, 4> rgba{}; GLuint tex{}; };
+  struct Range { int first{}, count{}; std::array<float, 4> rgba{}; GLuint tex{}; std::string texPath; };
   std::vector<Range> ranges;  // one per material
   m3::Vec3 center{};          // bounding sphere (model space), for frustum culling
   float radius{};
@@ -798,6 +820,32 @@ class Renderer3D final : public PixelRenderer {
         std::fprintf( stderr, "bicycle 3D: shadows %s%s\n", qualityName( _envQuality >= 0 ? _envQuality : _autoQuality ),
                       _envQuality >= 0 ? " (BICYCLE_SHADOWS)" : " (auto; BICYCLE_SHADOWS=off|low|med|high)" );
       _overlayProg = program( OVERLAY_VS, OVERLAY_FS );
+      // Blob shadows: the program, a dynamic buffer and the prerendered soft circle (64x64, alpha falls off smoothly).
+      _blobProg = program( BLOB_VS, BLOB_FS );
+      if ( !s_es2 ) gl.GenVertexArrays( 1, &_blobVao );
+      gl.GenBuffers( 1, &_blobVbo );
+      if ( !s_es2 ) gl.BindVertexArray( _blobVao );
+      gl.BindBuffer( GL_ARRAY_BUFFER, _blobVbo );
+      blobLayout();
+      {
+        constexpr int N = 64;
+        std::vector<uint32_t> px( N * N );
+        for ( int y = 0; y < N; ++y )
+          for ( int x = 0; x < N; ++x ) {
+            const float dx = ( x + 0.5f ) / N * 2 - 1, dy = ( y + 0.5f ) / N * 2 - 1;
+            const float r = std::sqrt( dx * dx + dy * dy );
+            const float a = std::clamp( ( 1.0f - r ) / 0.5f, 0.0f, 1.0f );
+            const float soft = a * a * ( 3 - 2 * a );  // an even dark middle, a soft rim over the outer half, 0 at the edge
+            px[static_cast<size_t>( y ) * N + x] = static_cast<uint32_t>( std::lround( soft * 255 ) ) << 24;  // ARGB
+          }
+        gl.GenTextures( 1, &_blobTex );
+        texParams( _blobTex, GL_CLAMP_TO_EDGE );
+        gl.TexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
+        gl.TexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
+        gl.PixelStorei( GL_UNPACK_ALIGNMENT, 4 );
+        uploadBGRA( N, N, px.data() );
+      }
+      if ( const char* b = std::getenv( "BICYCLE_BLOB_SHADOWS" ) ) s_blobs = *b ? ( *b == '0' ? 0 : 1 ) : -1;
       // Billboard quad: rewritten per sprite. Overlay quad: the whole screen.
       if ( !s_es2 ) gl.GenVertexArrays( 1, &_quadVao );
       gl.GenBuffers( 1, &_quadVbo );
@@ -920,6 +968,13 @@ class Renderer3D final : public PixelRenderer {
       gl.EnableVertexAttribArray( 2 );
       if ( s_es2 ) { gl.DisableVertexAttribArray( 3 ); gl.DisableVertexAttribArray( 4 ); }
     }
+    static void blobLayout() {
+      gl.VertexAttribPointer( 0, 4, GL_FLOAT, 0, 6 * sizeof( float ), nullptr );
+      gl.VertexAttribPointer( 2, 2, GL_FLOAT, 0, 6 * sizeof( float ), reinterpret_cast<void*>( 4 * sizeof( float ) ) );
+      gl.EnableVertexAttribArray( 0 );
+      gl.EnableVertexAttribArray( 2 );
+      if ( s_es2 ) for ( GLuint a : { 1u, 3u, 4u } ) gl.DisableVertexAttribArray( a );
+    }
     static void overlayLayout() {
       gl.VertexAttribPointer( 0, 2, GL_FLOAT, 0, 2 * sizeof( float ), nullptr );
       gl.EnableVertexAttribArray( 0 );
@@ -1031,6 +1086,38 @@ class Renderer3D final : public PixelRenderer {
       return p;
     }
 
+    // Texture log lines: on the GLES tiers (small GPUs, where things went missing before) and with BICYCLE_GL_DEBUG.
+    static auto texLog() -> bool { return s_tier != CORE || glDebug(); }
+    auto loadTexture( const std::string& path ) -> GLuint {
+      auto tb = assets::read( path, mem::TEMPORARY );
+      if ( !tb ) { std::fprintf( stderr, "bicycle 3D: texture %s: can't read it\n", path.c_str() ); return 0; }
+      auto ti = BImg::parse( *tb );
+      if ( !ti ) { std::fprintf( stderr, "bicycle 3D: texture %s: not a valid .bimg (%zu bytes)\n", path.c_str(), tb->size() ); return 0; }
+      while ( gl.GetError() != 0 ) {}
+      const GLuint t = texture( *ti );
+      const GLenum err = gl.GetError();
+      if ( texLog() || err || !t )
+        std::fprintf( stderr, "bicycle 3D: texture %s: %dx%d%s, GL id %u, upload error 0x%04x\n", path.c_str(), ti->w, ti->h,
+                      ti->indexed() ? " indexed" : "", t, err );
+      return t;
+    }
+    // Once, at the first frame: every textured material's texture must still be a texture of this context (one made
+    // before a context was replaced, or a failed upload, would draw untextured). Missing ones are loaded again.
+    void verifyTextures() {
+      int ok = 0, fixed = 0, failed = 0;
+      for ( auto& [name, g] : _meshes ) {
+        for ( auto& r : g->ranges ) {
+          if ( r.texPath.empty() ) continue;
+          if ( r.tex && gl.IsTexture( r.tex ) ) { ++ok; continue; }
+          std::fprintf( stderr, "bicycle 3D: mesh %s: texture %s (GL id %u) isn't a texture of this context; loading it again\n",
+                        name.c_str(), r.texPath.c_str(), r.tex );
+          r.tex = loadTexture( r.texPath );
+          ( r.tex && gl.IsTexture( r.tex ) ? fixed : failed ) += 1;
+        }
+      }
+      if ( texLog() || fixed || failed )
+        std::fprintf( stderr, "bicycle 3D: textures at the first frame: %d ok, %d loaded again, %d missing\n", ok, fixed, failed );
+    }
     auto texture( const BImg& img ) -> GLuint {
       gfx::Pixels rgba( static_cast<size_t>( img.w ) * img.h );
       for ( int y = 0; y < img.h; ++y )
@@ -1058,7 +1145,9 @@ class Renderer3D final : public PixelRenderer {
         if ( mat.texture.empty() ) continue;
         std::string base = mat.texture.substr( mat.texture.find_last_of( "/\\" ) + 1 );
         base = base.substr( 0, base.find_last_of( '.' ) ) + ".bimg";
-        mat.texture = assets::exists( gameDir + dir + base ) ? dir + base : "";
+        const bool found = assets::exists( gameDir + dir + base );
+        if ( !found ) std::fprintf( stderr, "bicycle 3D: %s: material texture %s: no %s; drawn untextured\n", obj.c_str(), mat.texture.c_str(), ( gameDir + dir + base ).c_str() );
+        mat.texture = found ? dir + base : "";
       }
       return m;
     }
@@ -1122,10 +1211,11 @@ class Renderer3D final : public PixelRenderer {
           const auto& mm = m->materials[mat];
           r.rgba = mm.rgba;
           if ( !mm.texture.empty() ) {
-            auto tb = assets::read( "./" + _gameName + "/" + mm.texture, mem::TEMPORARY );
-            auto ti = tb ? BImg::parse( *tb ) : std::nullopt;
-            if ( ti ) r.tex = texture( *ti );
+            r.texPath = "./" + _gameName + "/" + mm.texture;
+            r.tex = loadTexture( r.texPath );
           }
+          if ( texLog() ) std::fprintf( stderr, "bicycle 3D: mesh %s material %zu: %s (GL texture %u)\n", path.c_str(), mat,
+                                        mm.texture.empty() ? "no texture" : mm.texture.c_str(), r.tex );
         }
         else {
           r.rgba = { 0.8f, 0.8f, 0.8f, 1.0f };
@@ -1208,6 +1298,7 @@ class Renderer3D final : public PixelRenderer {
       auto it = _meshLocs.find( prog );
       if ( it != _meshLocs.end() ) return it->second;
       auto u = [&]( const char* n ) { return gl.GetUniformLocation( prog, n ); };
+      if ( u( "uTex" ) < 0 ) std::fprintf( stderr, "bicycle 3D: program %u has no active uTex uniform: meshes draw untextured\n", prog );
       return _meshLocs[prog] = { u( "uSkinned" ), u( "uBones" ), u( "uMvp" ), u( "uModel" ), u( "uLit" ), u( "uColor" ), u( "uTex" ), u( "uLightMvp" ) };
     }
     // GLES2 CPU skinning: the bind-pose vertices blended by their 4 joints' matrices into the mesh's dynamic buffer.
@@ -1277,6 +1368,77 @@ class Renderer3D final : public PixelRenderer {
         gl.DrawArrays( GL_TRIANGLES, r.first, r.count );
         ++_frameDraws;
       }
+    }
+
+    // One soft circle per caster on the ground below it, found with a ray down (the level, and moving platforms). It
+    // is largest and darkest at contact and shrinks and fades as the caster rises (gone 6 m up). One draw for all:
+    // depth test on, depth writes off, alpha blend, a polygon offset and a 2 cm lift against z-fighting.
+    void drawBlobShadows( const Mat4& viewProj, const m3::Vec3& eye ) {
+      if ( _blobCasters.empty() || !_blobProg ) return;
+      auto& w3 = phys3d::World3D::get();
+      constexpr float FADE_HEIGHT = 6.f;
+      std::vector<float>& v = _blobVerts;
+      v.clear();
+      for ( Entity e : _blobCasters ) {
+        const auto& t = w3.transform( e );
+        const auto& b = w3.body( e );
+        float radius = t.shadow;
+        float bottom = t.pos.y;  // characters stand on pos; kinematic capsules and boxes are centered on it
+        if ( b.kind == phys3d::BOX ) bottom -= b.half.y;
+        else if ( b.kind == phys3d::KINEMATIC ) bottom -= 0.5f * b.height;
+        if ( radius < 0 ) {  // auto: from the body (a body-less model gets none)
+          if ( b.kind == phys3d::NONE ) continue;
+          radius = b.kind == phys3d::BOX ? std::max( b.half.x, b.half.z ) : b.radius * 1.6f;
+          radius *= std::max( t.scale.x, t.scale.z );
+        }
+        if ( radius <= 0 || t.shadowAlpha <= 0 ) continue;
+        const m3::Vec3 o{ t.pos.x, bottom + 0.05f, t.pos.z };
+        phys3d::Hit h = w3.raycast( o, { 0, -1, 0 }, FADE_HEIGHT + 0.05f, e, false );
+        const phys3d::Hit he = w3.raycast( o, { 0, -1, 0 }, FADE_HEIGHT + 0.05f, e, true );  // moving platforms too
+        if ( he.hit && he.entity && w3.body( he.entity ).kind == phys3d::BOX && ( !h.hit || he.t < h.t ) ) h = he;
+        if ( !h.hit ) continue;
+        const float height = std::max( 0.0f, bottom - h.point.y );
+        const float k = std::clamp( height / FADE_HEIGHT, 0.0f, 1.0f );
+        const float r = radius * ( 1.0f - 0.55f * k ), a = t.shadowAlpha * ( 1.0f - k ) * ( 1.0f - k );
+        if ( a < 0.01f ) continue;
+        const m3::Vec3 n = h.normal;
+        const m3::Vec3 ax = m3::normalize( m3::cross( n, std::fabs( n.z ) < 0.9f ? m3::Vec3{ 0, 0, 1 } : m3::Vec3{ 1, 0, 0 } ) );
+        const m3::Vec3 az = m3::cross( n, ax );  // counter-clockwise seen from above the ground (back faces are culled)
+        // Lifted off the ground by more the farther it is (depth precision falls with distance; 16-bit depth buffers).
+        const float lift = 0.02f + 0.006f * m3::length( h.point - eye );
+        const m3::Vec3 c = h.point + n * lift;
+        auto vtx = [&]( float sx, float sz ) {
+          const m3::Vec3 p = c + ax * ( sx * r ) + az * ( sz * r );
+          v.insert( v.end(), { p.x, p.y, p.z, a, sx * 0.5f + 0.5f, sz * 0.5f + 0.5f } );
+        };
+        vtx( -1, -1 ); vtx( 1, -1 ); vtx( 1, 1 );
+        vtx( -1, -1 ); vtx( 1, 1 ); vtx( -1, 1 );
+      }
+      if ( glDebug() && _dbgFrame < 2 ) {
+        std::fprintf( stderr, "bicycle 3D: blob shadows: %zu casters, %zu drawn\n", _blobCasters.size(), v.size() / 36 );
+      }
+      if ( v.empty() ) return;
+      gl.UseProgram( _blobProg );
+      gl.UniformMatrix4fv( gl.GetUniformLocation( _blobProg, "uMvp" ), 1, 0, viewProj.data() );
+      gl.Uniform1i( gl.GetUniformLocation( _blobProg, "tex" ), 0 );
+      gl.ActiveTexture( GL_TEXTURE0 );
+      gl.BindTexture( GL_TEXTURE_2D, _blobTex );
+      bindVertices( _blobVao, _blobVbo, blobLayout );
+      gl.BufferData( GL_ARRAY_BUFFER, v.size() * sizeof( float ), v.data(), GL_DYNAMIC_DRAW );
+      if ( s_es2 ) blobLayout();
+      gl.Enable( GL_BLEND );
+      gl.BlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
+      gl.DepthMask( 0 );
+      gl.Enable( GL_POLYGON_OFFSET_FILL );
+      gl.PolygonOffset( -1.0f, -2.0f );
+
+      gl.DrawArrays( GL_TRIANGLES, 0, static_cast<GLsizei>( v.size() / 6 ) );
+      ++_frameDraws;
+      if ( glDebug() && _dbgFrame < 2 ) glCheck( "the blob shadows" );
+      gl.Disable( GL_POLYGON_OFFSET_FILL );
+      gl.DepthMask( 1 );
+      gl.Disable( GL_BLEND );
+      gl.UseProgram( _prog );
     }
 
     void drawWorld() {
@@ -1439,14 +1601,17 @@ class Renderer3D final : public PixelRenderer {
       const m3::Planes planes = m3::frustumPlanes( viewProj );
       _stats3d = {};
       ++_tick;
+      if ( !_texVerified ) { _texVerified = true; verifyTextures(); }
 
       // What to draw: the level's static meshes, then every visible 3D entity's model (posed if rigged).
       _items.clear();
       for ( const auto& st : _statics ) _items.push_back( { st.get(), m3::identity(), false, nullptr } );
       size_t nPosed = 0;
+      _blobCasters.clear();
       _models.forEach( [&]( Entity entity, std::shared_ptr<GpuMesh>& mesh ) {
         const auto& t = w3.transform( entity );
         if ( !t.on || !t.visible ) return;
+        if ( t.shadow != 0 ) _blobCasters.push_back( entity );
         Item it{ mesh.get(), modelMatrix( t ), false, nullptr };
         auto& st = _motion[entity];
         const float dx = t.pos.x - st.x, dz = t.pos.z - st.z3;
@@ -1609,6 +1774,8 @@ class Renderer3D final : public PixelRenderer {
         ++_stats3d.meshes;
       }
 
+      // Blob shadows where there's no shadow map (BICYCLE_BLOB_SHADOWS=1 adds them to shadow maps, =0 turns them off).
+      if ( s_blobs == 1 || ( s_blobs < 0 && !shadows ) ) drawBlobShadows( viewProj, eye );
       if ( glDebug() && _dbgFrame < 2 ) glCheck( "the meshes" );
       fpsMark( P_MAIN );
       // Billboards: 3D entities with a sprite and no model, upright and turned to the camera (cylindrical).
@@ -1835,7 +2002,12 @@ class Renderer3D final : public PixelRenderer {
     std::vector<Item> _items;
     std::vector<std::array<float, 16 * skin::MAX_JOINTS>> _poses;
     GLuint _depthProg{}, _shadowTex{}, _shadowFbo{};
-    GLuint _plainProg{}, _shadowProg{}, _shadowColorRb{};  // GLES2: the main program without and with shadows (_prog is one of them)
+    GLuint _plainProg{}, _shadowProg{}, _shadowColorRb{};
+    GLuint _blobProg{}, _blobVao{}, _blobVbo{}, _blobTex{};
+    std::vector<Entity> _blobCasters;
+    bool _texVerified{};
+    std::vector<float> _blobVerts;
+    static inline int s_blobs = -1;  // BICYCLE_BLOB_SHADOWS: -1 when there's no shadow map, 1 always, 0 never
     m3::Mat4 _lightVP = m3::identity();  // this frame's light view-projection (GLES2: uLightMvp per draw)
     static inline int s_glView = [] {    // BICYCLE_GL_VIEW (GLES2 shader): a stage on its own, for diagnosis
       const char* e = std::getenv( "BICYCLE_GL_VIEW" );

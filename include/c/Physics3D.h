@@ -25,6 +25,8 @@ struct Transform {
   bool useQuat{};
   Vec3 scale{ 1, 1, 1 };
   float modelYaw{};  // extra yaw for the drawn model (e.g. Blender characters face +X: -pi/2 makes them face -Z)
+  // Blob shadow (the shadow gene): radius in m at ground contact (-1: from the body; 0: none) and darkness 0..1.
+  float shadow{ -1.f }, shadowAlpha{ 0.55f };
 };
 
 enum BodyKind : int {

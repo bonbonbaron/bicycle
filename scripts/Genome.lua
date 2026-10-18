@@ -586,6 +586,7 @@ Gene["GeneLoader"] = {
   timerId = 0,    -- set by the timer gene
   params = 0,     -- per-instance parameters a scene / the Blender add-on may set (tools/blender; README, "Genomes")
   body = 0,       -- 3D physics body (Genome.spawn3d); 2D/2.5D entities ignore it
+  shadow = 0,     -- 3D blob shadow: false = none, a radius (m) or { radius =, alpha = } (Genome.spawn3d; default on)
   genomeName = 0, -- set by Genome.get
   player = 0,     -- 3D: the persistent body put on the next scene's spawn point (Genome.spawn3d)
   key = 0,        -- the instance's saved-state key (Scene.keyOf)
@@ -766,7 +767,8 @@ function Genome.spawn3d( name, entry )
     pitch = b.pitch, radius = b.radius or ( tbl.door and tbl.door.radius ), height = b.height or ( tbl.door and tbl.door.height ),
     half = b.half, solid = b.solid, collType = collType, model = tbl.model, modelYaw = b.modelYaw, scale = b.scale,
     image = b.image, gravity = b.gravity, jumpSpeed = b.jumpSpeed, accel = b.accel, airAccel = b.airAccel,
-    maxSlope = b.maxSlope, step = b.step, turnRate = b.turnRate, persist = persist, player = player }
+    maxSlope = b.maxSlope, step = b.step, turnRate = b.turnRate, persist = persist, player = player,
+    shadow = tbl.shadow }
   for k, v in pairs( tbl ) do if body[k] == nil then rawset( body, k, v ) end end
   body.key = entry.key or ( name.."@"..p[1]..","..p[2]..","..p[3] )
   body.spawnPos = { p[1], p[2], p[3] }

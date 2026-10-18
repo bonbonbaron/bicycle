@@ -56,6 +56,11 @@ EXPORT_API void xfSetQuat( Entity e, float x, float y, float z, float w ) {
 EXPORT_API void xfSetScale( Entity e, float x, float y, float z ) { w3().transform( e ).scale = { x, y, z }; }
 EXPORT_API void xfSetModelYaw( Entity e, float deg ) { w3().transform( e ).modelYaw = deg * DEG; }
 EXPORT_API void xfSetVisible( Entity e, bool v ) { w3().transform( e ).visible = v; }
+EXPORT_API void xfSetShadow( Entity e, float radius, float alpha ) {
+  auto& t = w3().transform( e );
+  t.shadow = radius;
+  t.shadowAlpha = alpha;
+}
 EXPORT_API void xfRemove( Entity e ) {
   Trigger::forgetEntity( e );  // queued events to/from it (we may be inside its own collision dispatch)
   w3().removeEntity( e );

@@ -19,6 +19,7 @@ ffi.cdef([[
   void xfSetScale( unsigned e, float x, float y, float z );
   void xfSetModelYaw( unsigned e, float deg );
   void xfSetVisible( unsigned e, bool v );
+  void xfSetShadow( unsigned e, float radius, float alpha );
   void xfRemove( unsigned e );
   void bodySet( unsigned e, int kind, float r, float h, float d, unsigned collType, bool solid );
   void bodyTune( unsigned e, float gravity, float jumpSpeed, float accelGround, float accelAir, float maxSlopeDeg, float stepHeight );
@@ -144,6 +145,14 @@ function W.Body.make( opts )
     if not ffi.C.newPixelImage( id, opts.image ) then error( "3D: can't load image "..opts.image ) end
   end
   if opts.modelYaw then C.xfSetModelYaw( id, opts.modelYaw ) end
+  -- shadow: the blob shadow under a modelled body (drawn when shadow maps are off: GLES2 / Pi Zero, BICYCLE_SHADOWS=off).
+  -- nil/true: on, sized from the body; false: none; a number: the radius (m); { radius =, alpha = } (alpha 0..1).
+  if opts.shadow ~= nil and opts.shadow ~= true then
+    local s = opts.shadow
+    if s == false then C.xfSetShadow( id, 0, 0 )
+    elseif type( s ) == "number" then C.xfSetShadow( id, s, 0.55 )
+    else C.xfSetShadow( id, s.radius or -1, s.alpha or 0.55 ) end
+  end
   if opts.turnRate then C.bodyTurnRate( id, opts.turnRate ) end
   if opts.scale then
     local s = type( opts.scale ) == "number" and { opts.scale, opts.scale, opts.scale } or opts.scale

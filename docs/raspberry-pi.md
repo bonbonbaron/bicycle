@@ -109,6 +109,14 @@ libgbm-dev:arm64`, `:armhf` for 32-bit) and point the compiler at them, or build
 - Meshes are split at load time (all tiers) so no triangle edge is longer than 6 m, with each triangle's uvs moved
   by whole tiles toward 0: small GPUs (vc4) interpolate huge near-plane-crossing triangles and large texture
   coordinates badly.
+- Blob shadows (default wherever there's no shadow map: GLES2 / Pi Zero, `BICYCLE_SHADOWS=off`): a soft dark circle
+  on the ground under every modelled body, found with a ray down; largest and darkest at contact, smaller and fainter
+  as the body rises, gone 6 m up. All in one draw. Per genome: `shadow = false` (none), `shadow = 0.8` (radius in m)
+  or `shadow = { radius = 0.8, alpha = 0.7 }`; default radius 1.6 x the body radius (a box: its larger half extent),
+  alpha 0.55. `BICYCLE_BLOB_SHADOWS=0` turns them off, `=1` draws them with shadow maps too.
+- Textures: on the GLES tiers (and with `BICYCLE_GL_DEBUG=1`) the log lists every texture (`texture <path>: WxH, GL
+  id N, upload error 0x0000`), each mesh material's texture, and at the first frame `textures at the first frame: N ok,
+  M loaded again, K missing`; a missing .bimg or an unreadable/invalid one is always logged.
 - GLES2 shadows: `BICYCLE_SHADOWS=low` (off by default on GLES2) uses an OES_depth_texture map and a separate shader
   variant (16 uniforms, 73 floats; the plain one has 14 / 56) with one depth compare per pixel. The map pass redraws
   every caster whenever the light view or a moving caster changes (no statics-map blit on GLES2), so expect it to
