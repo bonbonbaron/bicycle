@@ -117,6 +117,9 @@ class PixelRenderer : public Renderer {
     int _fbW{};
     int _fbH{};
     bool _quit{};
+    bool _console{};         // SDL kmsdrm (Linux console): one always-focused window
+    int _unreadableInput{};  // console input devices we may not open (not in the input group)
+    void reportInput();      // log the video driver and input devices; grab the mouse on the console
     bool _resized{};
     bool _up{};
     long _frame{};

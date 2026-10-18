@@ -81,9 +81,22 @@ endfunction()
 
 # Configures, builds and installs a CMake project into BICYCLE_DEPS_PREFIX with this build's compilers.
 function( bicycle_build_cmake_dep name src )
+  # The stamp holds the dep's options, so changing them (e.g. SDL_LIBUDEV) rebuilds it on the next configure.
   set( stamp "${BICYCLE_DEPS_PREFIX}/.${name}-installed" )
+  string( REPLACE ";" " " opts "${ARGN}" )
   if ( EXISTS "${stamp}" )
-    return()
+    file( READ "${stamp}" old )
+    if ( old STREQUAL opts )
+      return()
+    endif()
+    # Stamps from before options were recorded are empty: keep those deps (no surprise full rebuild), except SDL3,
+    # whose options did change (libudev on, for keyboard/mouse input on the Linux console).
+    if ( old STREQUAL "" AND NOT name STREQUAL "sdl3" )
+      file( WRITE "${stamp}" "${opts}" )
+      return()
+    endif()
+    message( STATUS "bicycle: ${name}'s options changed; rebuilding it from a clean configure" )
+    file( REMOVE_RECURSE "${BICYCLE_DEPS_DIR}/build/${name}" )  # cached checks (e.g. a missing libudev.h) are redone
   endif()
   set( bin "${BICYCLE_DEPS_DIR}/build/${name}" )
   set( args -S "${src}" -B "${bin}" -G "${CMAKE_GENERATOR}"
@@ -109,7 +122,7 @@ function( bicycle_build_cmake_dep name src )
   bicycle_run( "configuring ${name}" "${CMAKE_COMMAND}" ${args} ${ARGN} )
   bicycle_run( "building ${name}" "${CMAKE_COMMAND}" --build "${bin}" --config Release --parallel ${BICYCLE_JOBS} )
   bicycle_run( "installing ${name}" "${CMAKE_COMMAND}" --install "${bin}" --config Release )
-  file( TOUCH "${stamp}" )
+  file( WRITE "${stamp}" "${opts}" )
 endfunction()
 
 # ncurses with terminfo compiled in and no database (release builds; see bicycle_curses).
@@ -395,7 +408,7 @@ function( bicycle_sdl3 )
     -DSDL_INSTALL_DOCS=OFF -DSDL_DISABLE_INSTALL_DOCS=ON -DSDL_CAMERA=OFF -DSDL_SENSOR=OFF -DSDL_HAPTIC=OFF
     -DSDL_JOYSTICK=OFF -DSDL_HIDAPI=OFF -DSDL_POWER=OFF -DSDL_AUDIO=OFF -DSDL_GPU=OFF -DSDL_VULKAN=OFF
     -DSDL_DIALOG=OFF -DSDL_TRAY=OFF -DSDL_PIPEWIRE=OFF -DSDL_PULSEAUDIO=OFF -DSDL_ALSA=OFF -DSDL_JACK=OFF
-    -DSDL_SNDIO=OFF -DSDL_IBUS=OFF -DSDL_LIBURING=OFF -DSDL_DBUS=OFF -DSDL_LIBUDEV=OFF
+    -DSDL_SNDIO=OFF -DSDL_IBUS=OFF -DSDL_LIBURING=OFF -DSDL_DBUS=OFF -DSDL_LIBUDEV=ON
     -DSDL_X11_XTEST=OFF -DSDL_X11_XSCRNSAVER=OFF )
   find_package( SDL3 CONFIG REQUIRED PATHS "${BICYCLE_DEPS_PREFIX}" NO_DEFAULT_PATH )
   add_library( bicycle_sdl3 INTERFACE )

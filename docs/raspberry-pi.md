@@ -51,8 +51,10 @@ machine fps stays at 30 and the ms show the headroom; on the Pi watch for fps un
 ```sh
 sudo apt install git cmake ninja-build build-essential pkg-config \
   libasound2-dev libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxss-dev \
-  libwayland-dev libxkbcommon-dev libdrm-dev libgbm-dev libegl-dev libgles-dev libncurses-dev
-git clone https://github.com/bonbonbaron/bicycle && cd bicycle && git checkout pi-zero2   # later: git pull
+  libwayland-dev libxkbcommon-dev libdrm-dev libgbm-dev libegl-dev libgles-dev libncurses-dev \
+  libudev-dev libevdev-dev
+sudo usermod -aG input $USER   # console (KMSDRM) keyboard/mouse: SDL reads /dev/input/event*; log out and back in
+git clone https://github.com/bonbonbaron/bicycle && cd bicycle && git checkout self-contained-genomes   # later: git pull
 cmake -B build-2d -G Ninja -DBICYCLE_RENDER=2D -DCMAKE_BUILD_TYPE=Release && cmake --build build-2d
 ./o-2d test
 cmake -B build-3d -G Ninja -DBICYCLE_RENDER=3D -DCMAKE_BUILD_TYPE=Release && cmake --build build-3d
@@ -62,6 +64,19 @@ cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release && cmake --build build && ./o
 The first configure builds LuaJIT, fluidsynth and SDL3 from source: allow ~10 minutes on a Pi 4, an hour or more
 on a Zero (use `-j1` / a swap file on 512 MB boards: `cmake --build build-2d -j1`). The dev packages above give SDL
 its X11, Wayland and KMS/DRM (console, no desktop) video backends and ALSA sound.
+
+### Keyboard and mouse on the console (KMSDRM)
+Without a desktop SDL reads the keyboard and mouse straight from `/dev/input/event*`, so:
+- you must be in the `input` group (`sudo usermod -aG input $USER`, then log in again; `groups` shows it);
+- SDL finds the devices through libudev: `libudev-dev` (and `libxkbcommon-dev` for the key map) must be installed
+  when SDL is built. An SDL built without them gets no keys at all (only Ctrl-C in the terminal works). bicycle
+  then lists the devices itself from `/proc/bus/input/devices` (`SDL_EVDEV_DEVICES`) as a fallback, but rebuild SDL
+  anyway: after installing the packages, `rm -rf build-3d/_deps/build/sdl3 build-3d/_deps/prefix/.sdl3-installed`
+  and build again (a changed SDL option list also triggers the rebuild by itself).
+
+At startup the log names SDL's video driver and the keyboards and mice found, e.g. `bicycle: SDL video driver
+kmsdrm, 1 keyboard(s) (...)`; with no keyboard on the console it prints the two fixes above. On the console the
+window always has focus and the mouse is grabbed (relative mode) from the start, so mouse look works without a click.
 
 ## Cross-building (x86_64 Linux, zig 0.14)
 Wrapper scripts in `$ZIG_WRAP` (CMake wants a single compiler path):
@@ -86,7 +101,9 @@ libgbm-dev:arm64`, `:armhf` for 32-bit) and point the compiler at them, or build
   of qemu) ASCII 36/32 MB, 2D 47/42 MB (aarch64/armv6).
 - 3D can't run under qemu-user (no GL); the GLES tiers were validated on x86 with Mesa llvmpipe
   (`BICYCLE_GL=gles3` / `gles2`, `LIBGL_ALWAYS_SOFTWARE=1`): with gles3, test and plat3d match GL 3.3 core, shadows
-  included; gles2 renders the same apart from the missing shadows. `MESA_GL_VERSION_OVERRIDE=3.1` (no 3.3 core, like
+  included; gles2 renders the same apart from the missing shadows (GLES2 shaders: lighting per vertex, texture and
+  distance fog per pixel; skinning on the CPU unless `BICYCLE_GLES2_GPU_SKIN=1`). `BICYCLE_GL_DEBUG=1` logs the GL
+  renderer, limits, shader uniform counts, GL errors and the first frames' draw counts and camera. `MESA_GL_VERSION_OVERRIDE=3.1` (no 3.3 core, like
   v3d) exercises the core -> gles3 fallback with the window recreated.
 - plat3d on llvmpipe, ms per frame (shadow pass + main pass; overlay and swap add ~2.5 ms on every tier):
   gles2 0.9 + 3.5, gles3 off 0.9 + 3.2, low 1.5 + 4.0, med 1.8 + 6.8, high 3.5 + 10.9; core high 4.1 + 7.9.

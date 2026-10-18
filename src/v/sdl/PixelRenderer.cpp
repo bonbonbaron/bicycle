@@ -20,6 +20,11 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <fstream>
+#include <string>
+#if defined( __linux__ )
+#include <unistd.h>
+#endif
 
 namespace gfx {
 
@@ -53,12 +58,69 @@ auto PixelRenderer::windowFlags() const -> uint64_t {
   return SDL_WINDOW_RESIZABLE;
 }
 
+#if defined( __linux__ )
+// On the Linux console (KMSDRM, no X11/Wayland) SDL reads keyboards and mice straight from /dev/input/event*. It
+// finds them through libudev; an SDL built without it (no libudev-dev at build time) finds none and the game gets
+// no input at all. So list them ourselves from /proc/bus/input/devices in SDL_EVDEV_DEVICES ("class:path,...";
+// class 2 keyboard, 1 mouse), which such an SDL reads instead (an SDL with udev ignores it). Returns how many
+// devices exist but can't be opened (not in the input group).
+static auto consoleInputDevices() -> int {
+  if ( std::getenv( "DISPLAY" ) || std::getenv( "WAYLAND_DISPLAY" ) || std::getenv( "SDL_EVDEV_DEVICES" ) ) return 0;
+  std::ifstream f( "/proc/bus/input/devices" );
+  std::string line, list;
+  int unreadable = 0;
+  while ( std::getline( f, line ) ) {
+    if ( line.rfind( "H: Handlers=", 0 ) != 0 ) continue;
+    const std::string h = " " + line.substr( 12 ) + " ";
+    const auto ev = h.find( " event" );
+    if ( ev == std::string::npos ) continue;
+    const std::string node = "/dev/input/" + h.substr( ev + 1, h.find( ' ', ev + 1 ) - ev - 1 );
+    const bool kbd = h.find( " kbd " ) != std::string::npos, mouse = h.find( " mouse" ) != std::string::npos;
+    if ( !kbd && !mouse ) continue;
+    if ( access( node.c_str(), R_OK ) != 0 ) { ++unreadable; continue; }
+    if ( !list.empty() ) list += ',';
+    list += ( mouse ? "1:" : "2:" ) + node;
+  }
+  if ( !list.empty() ) SDL_SetHint( SDL_HINT_EVDEV_DEVICES, list.c_str() );
+  return unreadable;
+}
+#endif
+
+void PixelRenderer::reportInput() {
+  const char* driver = SDL_GetCurrentVideoDriver();
+  _console = driver && std::strcmp( driver, "kmsdrm" ) == 0;
+  int nk{}, nm{};
+  SDL_KeyboardID* kb = SDL_GetKeyboards( &nk );
+  SDL_MouseID* mice = SDL_GetMice( &nm );
+  std::fprintf( stderr, "bicycle: SDL video driver %s, %d keyboard(s)", driver ? driver : "?", nk );
+  for ( int i = 0; i < nk; ++i ) std::fprintf( stderr, "%s%s", i ? ", " : " (", SDL_GetKeyboardNameForID( kb[i] ) ? SDL_GetKeyboardNameForID( kb[i] ) : "?" );
+  std::fprintf( stderr, "%s, %d mouse/mice", nk ? ")" : "", nm );
+  for ( int i = 0; i < nm; ++i ) std::fprintf( stderr, "%s%s", i ? ", " : " (", SDL_GetMouseNameForID( mice[i] ) ? SDL_GetMouseNameForID( mice[i] ) : "?" );
+  std::fprintf( stderr, "%s\n", nm ? ")" : "" );
+  SDL_free( kb );
+  SDL_free( mice );
+  if ( _console && nk == 0 ) {
+    std::fprintf( stderr, "bicycle: *** no keyboard found on the console (KMSDRM)%s. Add yourself to the input group: "
+                          "sudo usermod -aG input $USER (then log out and back in), and install libudev-dev and rebuild "
+                          "SDL (delete the build's _deps/sdl3* and deps-prefix dirs; see docs/raspberry-pi.md) ***\n",
+                  _unreadableInput ? ", and some /dev/input/event* can't be opened" : "" );
+  }
+  if ( _console ) {  // one fullscreen window that always has the keyboard: grab the mouse for looking right away
+    setMouseCapture( true );
+    std::fprintf( stderr, "bicycle: console: mouse grabbed, relative mouse mode %s\n",
+                  SDL_GetWindowRelativeMouseMode( _window ) ? "on" : "failed" );
+  }
+}
+
 void PixelRenderer::init( const std::string& gameName ) {
 #if defined( BICYCLE_RELEASE ) && defined( __linux__ )
   // Release builds keep the OS libraries' own file traffic down too (unless the user set these): no mesa shader
   // cache in ~/.cache (the shaders are compiled from the strings in the executable each run; that takes
   // milliseconds).
   setenv( "MESA_SHADER_CACHE_DISABLE", "true", 0 );
+#endif
+#if defined( __linux__ )
+  _unreadableInput = consoleInputDevices();
 #endif
   if ( !SDL_Init( SDL_INIT_VIDEO | SDL_INIT_EVENTS ) ) {
     std::fprintf( stderr, "SDL_Init failed: %s\n", SDL_GetError() );
@@ -89,6 +151,7 @@ void PixelRenderer::init( const std::string& gameName ) {
   SDL_GetWindowSizeInPixels( _window, &_fbW, &_fbH );
   _fb.assign( static_cast<size_t>( _fbW ) * _fbH, frameClearColor() );
   onWindowCreated();
+  reportInput();
   _up = true;
 }
 
@@ -199,8 +262,8 @@ void PixelRenderer::handleEvent( const SDL_Event& e ) {
         _pad = nullptr;
       }
       break;
-    case SDL_EVENT_WINDOW_FOCUS_LOST:
-      if ( inputState().mouseCaptured ) setMouseCapture( false );
+    case SDL_EVENT_WINDOW_FOCUS_LOST:  // the console has one window, always focused: keep the grab there
+      if ( inputState().mouseCaptured && !_console ) setMouseCapture( false );
       break;
     default:
       break;

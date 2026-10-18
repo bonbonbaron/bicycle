@@ -331,7 +331,7 @@ void main() { o = texture(tex, vUv); })";
 // OpenGL ES 2.0 (Pi Zero / Zero 2 / 3: vc4). vc4's vertex shader compiler fails register allocation on the
 // GL 3.3 shader above (32 bone matrices = 512 uniform floats, a 4-matrix blend, the light matrix): it rejects the
 // shader when it's first drawn ("Failed to register allocate", no GL error) and nothing 3D is drawn. So GLES2 has
-// its own small shaders: a static one (MVP + model, fog per vertex; no shadow map on GLES2) and a skinned one with
+// its own small shaders: a static one (MVP + model, N.L per vertex, fog per pixel from the interpolated eye offset; no shadow map) and a skinned one with
 // at most ES2_BONES joints as 3 rows each. Skinned meshes are skinned on the CPU by default (vc4 may still reject
 // the skinned shader, and that can't be detected); BICYCLE_GLES2_GPU_SKIN=1 tries the skinned shader.
 constexpr int ES2_BONES = 24;
@@ -343,16 +343,18 @@ attribute vec2 aUv;
 uniform mat4 uMvp;
 uniform mat4 uModel;
 uniform vec3 uCamPos;
-uniform vec2 uFog;  // near, far
-varying vec3 vN;
+uniform vec3 uLightDir;
+uniform mediump int uWorld3D;  // shared with the fragment shader, so the same precision
+varying float vNdl;  // N.L per vertex (exact for flat faces under a directional light)
 varying vec2 vUv;
-varying float vFog;
+varying vec3 vRel;   // world position - eye; interpolates exactly, so the fog distance is per pixel
 void main() {
   vec4 p = vec4(aPos, 1.0);
   gl_Position = uMvp * p;
-  vN = mat3(uModel[0].xyz, uModel[1].xyz, uModel[2].xyz) * aNrm;
+  vec3 n = normalize(mat3(uModel[0].xyz, uModel[1].xyz, uModel[2].xyz) * aNrm);
+  vNdl = dot(n, uWorld3D == 1 ? -uLightDir : vec3(0.3980, 0.7960, 0.4975));
   vUv = aUv;
-  vFog = clamp((length((uModel * p).xyz - uCamPos) - uFog.x) / max(uFog.y - uFog.x, 0.001), 0.0, 1.0);
+  vRel = (uModel * p).xyz - uCamPos;
 })";
 const char* VS_ES2_SKIN = R"(#version 100
 precision highp float;
@@ -364,11 +366,12 @@ attribute vec4 aWeights;
 uniform mat4 uMvp;
 uniform mat4 uModel;
 uniform vec3 uCamPos;
-uniform vec2 uFog;
+uniform vec3 uLightDir;
+uniform mediump int uWorld3D;
 uniform vec4 uBones[72];  // ES2_BONES x 3 rows of each joint's skinning matrix
-varying vec3 vN;
+varying float vNdl;
 varying vec2 vUv;
-varying float vFog;
+varying vec3 vRel;
 void main() {
   ivec4 j = ivec4(aJoints) * 3;
   vec4 r0 = aWeights.x * uBones[j.x] + aWeights.y * uBones[j.y] + aWeights.z * uBones[j.z] + aWeights.w * uBones[j.w];
@@ -378,41 +381,39 @@ void main() {
   p = vec4(dot(r0, p), dot(r1, p), dot(r2, p), 1.0);
   vec3 n = vec3(dot(r0.xyz, aNrm), dot(r1.xyz, aNrm), dot(r2.xyz, aNrm));
   gl_Position = uMvp * p;
-  vN = mat3(uModel[0].xyz, uModel[1].xyz, uModel[2].xyz) * n;
+  n = normalize(mat3(uModel[0].xyz, uModel[1].xyz, uModel[2].xyz) * n);
+  vNdl = dot(n, uWorld3D == 1 ? -uLightDir : vec3(0.3980, 0.7960, 0.4975));
   vUv = aUv;
-  vFog = clamp((length((uModel * p).xyz - uCamPos) - uFog.x) / max(uFog.y - uFog.x, 0.001), 0.0, 1.0);
+  vRel = (uModel * p).xyz - uCamPos;
 })";
 const char* FS_ES2 = R"(#version 100
 precision mediump float;
-varying vec3 vN;
+varying float vNdl;
 varying vec2 vUv;
-varying float vFog;
+varying vec3 vRel;
 uniform vec4 uColor;
 uniform int uTex;
 uniform int uLit;
 uniform sampler2D tex;
-uniform int uWorld3D;
-uniform vec3 uLightDir;
+uniform mediump int uWorld3D;
 uniform vec3 uLightColor;
 uniform float uAmbient;
 uniform vec3 uFogColor;
+uniform vec2 uFog;  // near, far
 void main() {
   vec4 c = uColor;
   if (uTex == 1) c *= texture2D(tex, vec2(vUv.x, 1.0 - vUv.y));
   if (c.a < 0.5) discard;
   if (uWorld3D == 0) {
     float l = 1.0;
-    if (uLit == 1) l = 0.45 + 0.55 * max(dot(normalize(vN), normalize(vec3(0.4, 0.8, 0.5))), 0.0);
+    if (uLit == 1) l = 0.45 + 0.55 * max(vNdl, 0.0);
     gl_FragColor = vec4(c.rgb * l, c.a);
     return;
   }
   vec3 rgb = c.rgb;
-  if (uLit == 1) {
-    vec3 n = normalize(vN);
-    if (!gl_FrontFacing) n = -n;
-    rgb = c.rgb * (uAmbient + (1.0 - uAmbient) * max(dot(n, -uLightDir), 0.0) * uLightColor);
-  }
-  gl_FragColor = vec4(mix(rgb, uFogColor, vFog), c.a);
+  if (uLit == 1) rgb = c.rgb * (uAmbient + (1.0 - uAmbient) * max(gl_FrontFacing ? vNdl : -vNdl, 0.0) * uLightColor);
+  float f = clamp((length(vRel) - uFog.x) / max(uFog.y - uFog.x, 0.001), 0.0, 1.0);
+  gl_FragColor = vec4(mix(rgb, uFogColor, f), c.a);
 })";
 // The last resort when a GLES2 program doesn't link: unlit, untextured-or-textured, no fog. Logged loudly.
 const char* VS_ES2_MIN = R"(#version 100
