@@ -113,6 +113,8 @@ namespace bicycle {
     return wm.push( shared );
   }
 
+  static float s_frameRate{};  // see frameRate()
+
   extern "C" {
     // DIALOGUES
 
@@ -454,6 +456,19 @@ namespace bicycle {
       return scene ? scene->addHudBar( label, max, len, x, y ) : -1;
     }
 
+    // A text label on the current scene (see Scene::addHudText for x and y); returns its id (-1 if no scene).
+    int addHudText( const char* text, int x, int y ) {
+      auto scene = currScene();
+      return scene ? scene->addHudText( text ? text : "", x, y ) : -1;
+    }
+
+    void setHudText( int id, const char* text ) {
+      if ( auto scene = currScene() ) scene->setHudText( id, text ? text : "" );
+    }
+
+    // Frames per second, measured by the main loop over the last half second or so (0 until then).
+    float frameRate() { return s_frameRate; }
+
     void setHudBar( int id, int val ) {
       auto scene = currScene();
       if ( Bar* bar = scene ? scene->getHudBar( id ) : nullptr ) {
@@ -729,6 +744,8 @@ namespace bicycle {
     unsigned scriptedButtons{};
     const bool frameStats = std::getenv( "BICYCLE_FRAME_STATS" ) && *std::getenv( "BICYCLE_FRAME_STATS" ) == '1';
     std::array<double, 3> acc{};
+    auto fpsFrom = std::chrono::steady_clock::now();
+    int fpsFrames{};
 
     while ( wm.size() > 0 ) {
       if ( maxFrames > 0 && frames >= maxFrames ) break;
@@ -776,6 +793,12 @@ namespace bicycle {
       }
       using clk = std::chrono::steady_clock;
       const auto t0 = clk::now();
+      ++fpsFrames;  // frameRate(): frames over the last half second or so
+      if ( const double dt = std::chrono::duration<double>( t0 - fpsFrom ).count(); dt >= 0.5 ) {
+        s_frameRate = static_cast<float>( fpsFrames / dt );
+        fpsFrames = 0;
+        fpsFrom = t0;
+      }
       Kinematics::getInstance().run();  // 2D motions, then the 3D layer (physics, camera rig)
       MidiPlayer::getInstance().tickFade();
       CollisionDetector::check();

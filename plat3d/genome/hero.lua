@@ -6,7 +6,7 @@
 local ffi = require( "ffi" )
 local Scene = require( "Scene" )
 local RUN = { [ffi.C.W] = { 0, 1 }, [ffi.C.S] = { 0, -1 }, [ffi.C.A] = { -1, 0 }, [ffi.C.D] = { 1, 0 } }
-local AUTO_TIMER, LOG_TIMER = 1, 2
+local AUTO_TIMER, LOG_TIMER, FPS_TIMER = 1, 2, 3
 local hero = {
   model = "pilgrim3d",
   body = { kind = "character", radius = 0.35, height = 1.6, modelYaw = 90, jumpSpeed = 10, gravity = 28,
@@ -22,6 +22,8 @@ local hero = {
 function hero:onSpawn()
   self.hud = require( "Hud" ).bar( "Coins", self.coinsTotal )
   self.hud:set( self.coins )
+  self.fpsLabel = require( "Hud" ).text( "", "right", "top" )
+  self:every( 500, FPS_TIMER )
   self.runKeys = {}
   focusOn( self.id )
   -- PLAT3D_AUTOCOLLECT=N (tests/coin_collect_test.sh): every N frames, put the hero on a coin still out there.
@@ -74,6 +76,8 @@ function hero:onTimer( id, kind )
     for _, b in ipairs( W.live ) do
       if b.genomeName == "coin" then local cx, cy, cz = b:pos() self:setPos( cx, cy - 0.4, cz ) break end
     end
+  elseif kind == FPS_TIMER then
+    self.fpsLabel:set( string.format( "%.0f fps", fps() ) )
   elseif kind == LOG_TIMER then
     local x, y, z = self:pos()
     local ex, ey, ez = W.Camera.eye()

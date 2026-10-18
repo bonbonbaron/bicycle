@@ -274,6 +274,9 @@ ffi.cdef([[
   int getSfxChannel();
   int addHudBar( const char* label, int max, int len, int x, int y );
   void setHudBar( int id, int val );
+  int addHudText( const char* text, int x, int y );
+  void setHudText( int id, const char* text );
+  float frameRate();
   bool setHudBarSprites( int id, const char* framePath, const char* fillPath );
   void setHidden( Entity entity, bool hidden );
 
@@ -423,6 +426,9 @@ function Camera.track( target, opts )
   Camera.target, Camera.opts = target, opts
   track( ffi.C.cameraEntity(), target, opts )
 end
+
+-- Frames per second, smoothed over about half a second (0 for the first half second), e.g. for a HUD label.
+function fps() return tonumber( ffi.C.frameRate() ) end
 
 function focusOn( entity )
   focus = entity

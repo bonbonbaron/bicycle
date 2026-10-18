@@ -443,6 +443,14 @@ fraction (green, then yellow/amber, then red), take optional bar sprites (`hp:sp
 `scripts/Hud.lua`), and render text with TrueType (`fonts/ui.ttf`, stb_truetype). In the pixel modes, ASCII-art
 images that have no pixel version are drawn as solid cell blocks, not characters.
 
+HUD text labels: `local t = Hud.text( text, ax, ay )` with `ax` = `"left"`, `"right"`, `"center"` or a cell x and
+`ay` = `"top"`, `"bottom"` or a cell y; `t:set( text )` changes it ("right" keeps its right edge at the screen's
+edge). Like bars they come back after a scene change (`Hud.rebuild`) until `Hud.forget( t )`. ASCII prints plain
+text; 2D and 3D draw it on the bars' plate (`drawHudText`). `fps()` (C `frameRate()`) is the main loop's frame
+rate over about half a second, in every mode. Update labels from `onTimer`, e.g. plat3d's hero:
+`self.fpsLabel = Hud.text( "", "right", "top" )`, `self:every( 500, FPS_TIMER )`, and in `onTimer`
+`self.fpsLabel:set( string.format( "%.0f fps", fps() ) )`.
+
 ASCII follows the terminal's size. Each frame the renderer polls it: `TIOCGWINSZ` on Linux/macOS, PDCurses'
 `is_termresized()` on Windows. On a change it resizes curses (`resize_term`) and tells every window
 (`Window::onTermResize`):

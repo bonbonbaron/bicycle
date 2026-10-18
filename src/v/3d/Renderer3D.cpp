@@ -584,6 +584,18 @@ class Renderer3D final : public PixelRenderer {
       drawString( w, px, top, nums, 0xFFFFFFFFu, UI_TEXT_PX );
     }
 
+    // A HUD label on the same translucent plate as drawBar's.
+    void drawHudText( WinHandle win, int y, int x, int align, const std::string& s ) override {
+      const Win* w = static_cast<Win*>( win );
+      if ( !w || ( w->attr & ATTR_INVISIBLE ) || s.empty() ) return;
+      const int tw = measureString( s, UI_TEXT_PX );
+      const int anchor = ( w->x + x ) * CELL_W;
+      const int px = align == 1 ? anchor - 12 - tw : align == 2 ? anchor - tw / 2 : anchor + 6;
+      const int top = ( w->y + y ) * CELL_H + 2;
+      gradientRoundRect( nullptr, px - 6, top - 4, tw + 12, 16 + 8, 8, 0xA0202838u, 0xA0101420u );
+      drawString( w, px, top, s, 0xFFFFFFFFu, UI_TEXT_PX );
+    }
+
     void drawMenuCursor( WinHandle win, int y, int x, const std::string& ) override {
       const Win* w = static_cast<Win*>( win );
       if ( !w || ( w->attr & ATTR_INVISIBLE ) ) return;

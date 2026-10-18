@@ -185,6 +185,15 @@ auto Scene::getHudBar( const int id ) -> Bar* {
   return ( id >= 0 && id < static_cast<int>( _hud.size() ) ) ? &_hud.at( id ) : nullptr;
 }
 
+auto Scene::addHudText( const std::string& text, const int x, const int y ) -> int {
+  _hudText.push_back( { text, x, y } );
+  return static_cast<int>( _hudText.size() ) - 1;
+}
+
+void Scene::setHudText( const int id, const std::string& text ) {
+  if ( id >= 0 && id < static_cast<int>( _hudText.size() ) ) _hudText[id].text = text;
+}
+
 void Scene::setHidden( const Entity entity, const bool hidden ) {
   _hidden[entity] = hidden;
 }
@@ -192,6 +201,15 @@ void Scene::setHidden( const Entity entity, const bool hidden ) {
 void Scene::renderHud() {
   for ( const auto& bar : _hud ) {
     bar.draw( *this );
+  }
+  const int w = static_cast<int>( getWidth() ), h = static_cast<int>( getHeight() );
+  for ( const auto& t : _hudText ) {
+    if ( t.text.empty() ) continue;
+    // The named edges sit inside the scene's border, on the bars' first row and column.
+    const int x = t.x >= 0 ? t.x : t.x == -2 ? w : t.x == -3 ? w / 2 : 2;
+    const int align = t.x == -2 ? 1 : t.x == -3 ? 2 : 0;
+    const int y = t.y >= 0 ? t.y : t.y == -2 ? std::max( 0, h - 2 ) : 1;
+    gfx::renderer().drawHudText( getHandle(), y, x, align, t.text );
   }
 }
 

@@ -7,11 +7,40 @@ require("bicycle")
 -- colored by how full it is. hp:sprites( "genome/ui/hp_frame.bimg", "genome/ui/hp_fill.bimg" ) draws it from
 -- images in the pixel modes instead (the fill is cropped to the fraction).
 -- Bars stack down from the top-left inside the scene's border unless you pass x and y (screen cells).
+--
+-- Text labels: Hud.text( text, ax, ay ), ax = "left" | "right" | "center" | a cell x, ay = "top" | "bottom" | a
+-- cell y (defaults "left", "top"). "right" keeps the text's right edge at the screen's right edge as it changes.
+--   local label = Hud.text( "", "right", "top" )
+--   label:set( string.format( "%.0f fps", fps() ) )   -- e.g. from onTimer
+-- ASCII prints it as plain text; 2D and 3D draw it on a plate like the bars'.
 local Hud = {}
 local Bar = {}
 Bar.__index = Bar
 local nextRow = 1
 local bars = {}  -- every bar, so a scene change can put them back (the HUD is drawn by the scene)
+local Text = {}
+Text.__index = Text
+local texts = {}  -- every text label, likewise
+local AX = { left = -1, right = -2, center = -3 }
+local AY = { top = -1, bottom = -2 }
+
+function Hud.text( text, ax, ay )
+  local x = type( ax ) == "number" and ax or AX[ax or "left"]
+  local y = type( ay ) == "number" and ay or AY[ay or "top"]
+  if not x then error( "Hud.text: ax is \"left\", \"right\", \"center\" or a cell x, not "..tostring( ax ) ) end
+  if not y then error( "Hud.text: ay is \"top\", \"bottom\" or a cell y, not "..tostring( ay ) ) end
+  local t = setmetatable( { text = tostring( text or "" ), x = x, y = y }, Text )
+  t.id = ffi.C.addHudText( t.text, x, y )
+  if t.id < 0 then error( "Hud.text needs a scene to draw on; make one first." ) end
+  table.insert( texts, t )
+  return t
+end
+
+function Text:set( text )
+  self.text = tostring( text or "" )
+  ffi.C.setHudText( self.id, self.text )
+  return self.text
+end
 
 function Hud.bar( label, max, len, x, y )
   len = len or max
@@ -34,11 +63,16 @@ function Hud.rebuild()
     ffi.C.setHudBar( b.id, b.value )
     if b.frame then ffi.C.setHudBarSprites( b.id, b.frame, b.fill ) end
   end
+  for _, t in ipairs( texts ) do t.id = ffi.C.addHudText( t.text, t.x, t.y ) end
 end
 
-function Hud.forget( bar )
+-- A text label forgotten is also blanked in the current scene.
+function Hud.forget( item )
   for i, b in ipairs( bars ) do
-    if b == bar then table.remove( bars, i ) return end
+    if b == item then table.remove( bars, i ) return end
+  end
+  for i, t in ipairs( texts ) do
+    if t == item then ffi.C.setHudText( t.id, "" ) table.remove( texts, i ) return end
   end
 end
 
