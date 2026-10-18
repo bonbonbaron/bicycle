@@ -69,7 +69,9 @@ enum : GLenum {
   GL_TEXTURE_COMPARE_MODE = 0x884C, GL_COMPARE_REF_TO_TEXTURE = 0x884E, GL_TEXTURE_COMPARE_FUNC = 0x884D,
   GL_CLAMP_TO_BORDER = 0x812D, GL_TEXTURE_BORDER_COLOR = 0x1004, GL_TEXTURE1 = 0x84C1, GL_FRAMEBUFFER_COMPLETE = 0x8CD5,
   GL_CULL_FACE = 0x0B44, GL_BACK = 0x0405, GL_DEPTH_COMPONENT16 = 0x81A5, GL_UNSIGNED_SHORT = 0x1403, GL_EXTENSIONS = 0x1F03,
-  GL_READ_FRAMEBUFFER = 0x8CA8, GL_DRAW_FRAMEBUFFER = 0x8CA9,
+  GL_READ_FRAMEBUFFER = 0x8CA8, GL_DRAW_FRAMEBUFFER = 0x8CA9, GL_ACTIVE_UNIFORMS = 0x8B86,
+  GL_MAX_VERTEX_UNIFORM_VECTORS = 0x8DFB, GL_MAX_FRAGMENT_UNIFORM_VECTORS = 0x8DFD, GL_MAX_VARYING_VECTORS = 0x8DFC,
+  GL_DEPTH_BITS = 0x0D56, GL_SHADING_LANGUAGE_VERSION = 0x8B8C,
 };
 
 #define BGL_FUNCS( X ) \
@@ -129,7 +131,10 @@ enum : GLenum {
   X( void, Uniform1f, GLint, GLfloat ) \
   X( void, Uniform2fv, GLint, GLsizei, const GLfloat* ) \
   X( void, DisableVertexAttribArray, GLuint ) \
-  X( void, BindAttribLocation, GLuint, GLuint, const GLchar* )
+  X( void, BindAttribLocation, GLuint, GLuint, const GLchar* ) \
+  X( GLenum, GetError ) \
+  X( void, GetIntegerv, GLenum, GLint* ) \
+  X( void, GetActiveUniform, GLuint, GLuint, GLsizei, GLsizei*, GLint*, GLenum*, GLchar* )
 
 struct GL {
 #define BGL_DECL( ret, name, ... ) ret( BGL_API* name )( __VA_ARGS__ ) = nullptr;
@@ -310,9 +315,10 @@ void main() {
 
 const char* OVERLAY_VS = R"(#version 330 core
 layout(location = 0) in vec2 aPos;
+uniform vec2 uUvScale;  // the screen's part of the texture (GLES2 without NPOT textures: a power-of-two texture)
 out vec2 vUv;
 void main() {
-  vUv = vec2(aPos.x * 0.5 + 0.5, 0.5 - aPos.y * 0.5);  // framebuffer rows are top first
+  vUv = vec2(aPos.x * 0.5 + 0.5, 0.5 - aPos.y * 0.5) * uUvScale;  // framebuffer rows are top first
   gl_Position = vec4(aPos, 0.0, 1.0);
 })";
 
@@ -322,9 +328,119 @@ uniform sampler2D tex;
 out vec4 o;
 void main() { o = texture(tex, vUv); })";
 
+// OpenGL ES 2.0 (Pi Zero / Zero 2 / 3: vc4). vc4's vertex shader compiler fails register allocation on the
+// GL 3.3 shader above (32 bone matrices = 512 uniform floats, a 4-matrix blend, the light matrix): it rejects the
+// shader when it's first drawn ("Failed to register allocate", no GL error) and nothing 3D is drawn. So GLES2 has
+// its own small shaders: a static one (MVP + model, fog per vertex; no shadow map on GLES2) and a skinned one with
+// at most ES2_BONES joints as 3 rows each. Skinned meshes are skinned on the CPU by default (vc4 may still reject
+// the skinned shader, and that can't be detected); BICYCLE_GLES2_GPU_SKIN=1 tries the skinned shader.
+constexpr int ES2_BONES = 24;
+const char* VS_ES2 = R"(#version 100
+precision highp float;
+attribute vec3 aPos;
+attribute vec3 aNrm;
+attribute vec2 aUv;
+uniform mat4 uMvp;
+uniform mat4 uModel;
+uniform vec3 uCamPos;
+uniform vec2 uFog;  // near, far
+varying vec3 vN;
+varying vec2 vUv;
+varying float vFog;
+void main() {
+  vec4 p = vec4(aPos, 1.0);
+  gl_Position = uMvp * p;
+  vN = mat3(uModel[0].xyz, uModel[1].xyz, uModel[2].xyz) * aNrm;
+  vUv = aUv;
+  vFog = clamp((length((uModel * p).xyz - uCamPos) - uFog.x) / max(uFog.y - uFog.x, 0.001), 0.0, 1.0);
+})";
+const char* VS_ES2_SKIN = R"(#version 100
+precision highp float;
+attribute vec3 aPos;
+attribute vec3 aNrm;
+attribute vec2 aUv;
+attribute vec4 aJoints;
+attribute vec4 aWeights;
+uniform mat4 uMvp;
+uniform mat4 uModel;
+uniform vec3 uCamPos;
+uniform vec2 uFog;
+uniform vec4 uBones[72];  // ES2_BONES x 3 rows of each joint's skinning matrix
+varying vec3 vN;
+varying vec2 vUv;
+varying float vFog;
+void main() {
+  ivec4 j = ivec4(aJoints) * 3;
+  vec4 r0 = aWeights.x * uBones[j.x] + aWeights.y * uBones[j.y] + aWeights.z * uBones[j.z] + aWeights.w * uBones[j.w];
+  vec4 r1 = aWeights.x * uBones[j.x + 1] + aWeights.y * uBones[j.y + 1] + aWeights.z * uBones[j.z + 1] + aWeights.w * uBones[j.w + 1];
+  vec4 r2 = aWeights.x * uBones[j.x + 2] + aWeights.y * uBones[j.y + 2] + aWeights.z * uBones[j.z + 2] + aWeights.w * uBones[j.w + 2];
+  vec4 p = vec4(aPos, 1.0);
+  p = vec4(dot(r0, p), dot(r1, p), dot(r2, p), 1.0);
+  vec3 n = vec3(dot(r0.xyz, aNrm), dot(r1.xyz, aNrm), dot(r2.xyz, aNrm));
+  gl_Position = uMvp * p;
+  vN = mat3(uModel[0].xyz, uModel[1].xyz, uModel[2].xyz) * n;
+  vUv = aUv;
+  vFog = clamp((length((uModel * p).xyz - uCamPos) - uFog.x) / max(uFog.y - uFog.x, 0.001), 0.0, 1.0);
+})";
+const char* FS_ES2 = R"(#version 100
+precision mediump float;
+varying vec3 vN;
+varying vec2 vUv;
+varying float vFog;
+uniform vec4 uColor;
+uniform int uTex;
+uniform int uLit;
+uniform sampler2D tex;
+uniform int uWorld3D;
+uniform vec3 uLightDir;
+uniform vec3 uLightColor;
+uniform float uAmbient;
+uniform vec3 uFogColor;
+void main() {
+  vec4 c = uColor;
+  if (uTex == 1) c *= texture2D(tex, vec2(vUv.x, 1.0 - vUv.y));
+  if (c.a < 0.5) discard;
+  if (uWorld3D == 0) {
+    float l = 1.0;
+    if (uLit == 1) l = 0.45 + 0.55 * max(dot(normalize(vN), normalize(vec3(0.4, 0.8, 0.5))), 0.0);
+    gl_FragColor = vec4(c.rgb * l, c.a);
+    return;
+  }
+  vec3 rgb = c.rgb;
+  if (uLit == 1) {
+    vec3 n = normalize(vN);
+    if (!gl_FrontFacing) n = -n;
+    rgb = c.rgb * (uAmbient + (1.0 - uAmbient) * max(dot(n, -uLightDir), 0.0) * uLightColor);
+  }
+  gl_FragColor = vec4(mix(rgb, uFogColor, vFog), c.a);
+})";
+// The last resort when a GLES2 program doesn't link: unlit, untextured-or-textured, no fog. Logged loudly.
+const char* VS_ES2_MIN = R"(#version 100
+attribute vec3 aPos;
+attribute vec2 aUv;
+uniform mat4 uMvp;
+varying vec2 vUv;
+void main() { vUv = aUv; gl_Position = uMvp * vec4(aPos, 1.0); })";
+const char* FS_ES2_MIN = R"(#version 100
+precision mediump float;
+varying vec2 vUv;
+uniform vec4 uColor;
+uniform int uTex;
+uniform sampler2D tex;
+void main() {
+  vec4 c = uColor;
+  if (uTex == 1) c *= texture2D(tex, vec2(vUv.x, 1.0 - vUv.y));
+  if (c.a < 0.5) discard;
+  gl_FragColor = c;
+})";
+
 struct GpuMesh {
   GLuint vao{}, vbo{};
   std::shared_ptr<const Skin> skin;  // skinned meshes: skeleton + actions (.bskin)
+  // GLES2 CPU skinning: the bind-pose vertices, and a dynamic buffer the skinned ones are written to per draw.
+  std::vector<float> bindVerts;
+  mutable std::vector<float> skinVerts;
+  mutable GLuint skinVbo{};
   struct Range { int first{}, count{}; std::array<float, 4> rgba{}; GLuint tex{}; };
   std::vector<Range> ranges;  // one per material
   m3::Vec3 center{};          // bounding sphere (model space), for frustum culling
@@ -551,13 +667,41 @@ class Renderer3D final : public PixelRenderer {
       std::fprintf( stderr, "bicycle 3D: %s tier (GL %s on %s)\n", tierName( s_tier ), gl.GetString( GL_VERSION ), gl.GetString( GL_RENDERER ) );
       SDL_GL_SetSwapInterval( 0 );
       startup::mark( "  window + GL context" );
-      _prog = program( VS, FS );
-      _depthProg = program( VS, DEPTH_FS );
+      if ( s_tier != CORE ) glInfo();
+      if ( s_es2 ) {
+        bool ok = false;
+        _prog = program( VS_ES2, FS_ES2, true, &ok );
+        if ( !ok ) {
+          std::fprintf( stderr, "bicycle 3D: *** the GLES2 shader failed; falling back to the minimal unlit shader ***\n" );
+          _prog = program( VS_ES2_MIN, FS_ES2_MIN, true, &ok );
+          if ( !ok ) std::fprintf( stderr, "bicycle 3D: *** even the minimal GLES2 shader failed: nothing 3D will draw ***\n" );
+        }
+        const char* g = std::getenv( "BICYCLE_GLES2_GPU_SKIN" );
+        if ( g && *g && *g != '0' ) {
+          bool sok = false;
+          _skinProg = program( VS_ES2_SKIN, FS_ES2, true, &sok );
+          if ( !sok ) _skinProg = 0;
+        }
+        std::fprintf( stderr, "bicycle 3D: GLES2 skinning on the %s\n", _skinProg ? "GPU (BICYCLE_GLES2_GPU_SKIN)" : "CPU" );
+        _depthProg = 0;  // no shadow map on GLES2
+      }
+      else {
+        _prog = program( VS, FS );
+        _depthProg = program( VS, DEPTH_FS );
+      }
+      if ( s_tier != CORE || glDebug() ) {
+        reportUniforms( "main", _prog );
+        if ( _skinProg ) reportUniforms( "skinned", _skinProg );
+      }
       startup::mark( "  shaders (compile + link)" );
       // The color texture is on unit 0 and the shadow map on unit 1, always (two sampler types may not share a unit).
+      for ( GLuint pr : { _prog, _skinProg } ) {
+        if ( !pr ) continue;
+        gl.UseProgram( pr );
+        gl.Uniform1i( gl.GetUniformLocation( pr, "tex" ), 0 );
+        gl.Uniform1i( gl.GetUniformLocation( pr, "uShadowMap" ), 1 );
+      }
       gl.UseProgram( _prog );
-      gl.Uniform1i( gl.GetUniformLocation( _prog, "tex" ), 0 );
-      gl.Uniform1i( gl.GetUniformLocation( _prog, "uShadowMap" ), 1 );
       // Shadow map: a depth texture compared in the shader (sampler2DShadow, hardware PCF where available), made on
       // first use at the quality's size (ensureShadowMap). GLES2: none (no depth textures or shadow samplers).
       _shadowOk = !s_es2;
@@ -571,6 +715,10 @@ class Renderer3D final : public PixelRenderer {
         _autoQuality = slow ? Q_LOW : Q_HIGH;
         const char* ext = s_tier != CORE ? reinterpret_cast<const char*>( gl.GetString( GL_EXTENSIONS ) ) : nullptr;
         s_bgraExt = ext && std::strstr( ext, "GL_EXT_texture_format_BGRA8888" );
+        // Strict GLES2 without OES_texture_npot: a non-power-of-two texture may be incomplete (samples black), so
+        // the screen-sized overlay goes into a power-of-two texture.
+        s_npot = !s_es2 || ( ext && std::strstr( ext, "GL_OES_texture_npot" ) );
+        if ( !s_npot ) std::fprintf( stderr, "bicycle 3D: no GL_OES_texture_npot: power-of-two overlay texture\n" );
       }
       _envQuality = parseQuality( std::getenv( "BICYCLE_SHADOWS" ) );
       if ( std::getenv( "BICYCLE_NO_SHADOWS" ) ) _envQuality = Q_OFF;
@@ -595,6 +743,58 @@ class Renderer3D final : public PixelRenderer {
       overlayLayout();
       gl.GenTextures( 1, &_overlayTex );
       texParams( _overlayTex, GL_CLAMP_TO_EDGE );
+      glCheck( "setup" );
+    }
+
+    // --- diagnostics (GLES tiers always; BICYCLE_GL_DEBUG=1 adds the first frames' draw counts and camera) -------
+    static auto glDebug() -> bool {
+      static const bool on = [] { const char* e = std::getenv( "BICYCLE_GL_DEBUG" ); return e && *e && *e != '0'; }();
+      return on;
+    }
+    static void glCheck( const char* where ) {
+      for ( int i = 0; i < 8; ++i ) {
+        const GLenum e = gl.GetError();
+        if ( e == 0 ) break;
+        std::fprintf( stderr, "bicycle 3D: GL error 0x%04x after %s\n", e, where );
+      }
+    }
+    static void glInfo() {
+      auto str = []( GLenum n ) { const char* s = reinterpret_cast<const char*>( gl.GetString( n ) ); return s ? s : "?"; };
+      GLint vu{}, fu{}, vv{}, db{};
+      gl.GetIntegerv( GL_MAX_VERTEX_UNIFORM_VECTORS, &vu );
+      gl.GetIntegerv( GL_MAX_FRAGMENT_UNIFORM_VECTORS, &fu );
+      gl.GetIntegerv( GL_MAX_VARYING_VECTORS, &vv );
+      gl.GetIntegerv( GL_DEPTH_BITS, &db );
+      gl.GetError();  // GL_DEPTH_BITS isn't core in every profile
+      std::fprintf( stderr, "bicycle 3D: GL_RENDERER %s | GL_VERSION %s | GLSL %s\n", str( GL_RENDERER ), str( GL_VERSION ),
+                    str( GL_SHADING_LANGUAGE_VERSION ) );
+      std::fprintf( stderr, "bicycle 3D: max uniform vectors vertex %d fragment %d, varyings %d, depth bits %d\n", vu, fu, vv, db );
+      std::fprintf( stderr, "bicycle 3D: GL_EXTENSIONS %s\n", str( GL_EXTENSIONS ) );
+    }
+    // The active uniforms of a program and their total size in vec4 slots (vc4: a vertex shader's uniforms and
+    // temporaries must fit its register file; the GL 3.3 shader's 32 bone matrices alone are 128 vec4s).
+    static void reportUniforms( const char* name, GLuint p ) {
+      GLint n{};
+      gl.GetProgramiv( p, GL_ACTIVE_UNIFORMS, &n );
+      int vec4s = 0, floats = 0;
+      for ( GLint i = 0; i < n; ++i ) {
+        char nm[64];
+        GLint size{};
+        GLenum type{};
+        gl.GetActiveUniform( p, static_cast<GLuint>( i ), sizeof nm, nullptr, &size, &type, nm );
+        int comps = 4, slots = 1;
+        switch ( type ) {
+          case 0x1406: case 0x1404: case 0x8B56: case 0x8B5E: case 0x8B62: comps = 1; break;  // float int bool samplers
+          case 0x8B50: case 0x8B53: comps = 2; break;
+          case 0x8B51: case 0x8B54: comps = 3; break;
+          case 0x8B5B: comps = 9; slots = 3; break;   // mat3
+          case 0x8B5C: comps = 16; slots = 4; break;  // mat4
+          default: break;
+        }
+        floats += comps * size;
+        vec4s += slots * size;
+      }
+      std::fprintf( stderr, "bicycle 3D: %s shader: %d active uniforms, %d floats (%d vec4 slots)\n", name, n, floats, vec4s );
     }
 
     void onWindowDestroyed() override {
@@ -604,19 +804,31 @@ class Renderer3D final : public PixelRenderer {
 
     void presentFramebuffer() override {
       fpsBegin();
+      const size_t draws0 = _frameDraws;
       gl.Viewport( 0, 0, _fbW, _fbH );
       auto& w3 = phys3d::World3D::get();
       const m3::Vec3 sky = w3.active() ? w3.view().sky : m3::Vec3{ 0.45f, 0.65f, 0.90f };
       gl.ClearColor( sky.x, sky.y, sky.z, 1.0f );
       gl.Clear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
+      if ( glDebug() && _dbgFrame < 2 ) glCheck( "clear" );
       if ( _haveScene ) {
         if ( w3.active() ) drawWorld3D();
         else drawWorld();
       }
+      if ( glDebug() && _dbgFrame < 2 ) glCheck( "the scene" );
       fpsMark( P_MAIN );  // 2.5D scenes: all of it
       drawOverlay();
+      if ( glDebug() && _dbgFrame < 2 ) glCheck( "the overlay" );
       fpsMark( P_OVERLAY );
       if ( screenshotDue() ) readBack();
+      ++_dbgFrame;
+      if ( _dbgFrame == 1 || ( glDebug() && ( _dbgFrame == 2 || _dbgFrame == 30 || _dbgFrame == 120 ) ) ) {
+        glCheck( _dbgFrame == 1 ? "the first frame" : "a frame" );
+        if ( glDebug() || s_tier != CORE )
+          std::fprintf( stderr, "bicycle 3D: frame %d: %zu draws, %s, camera at %.2f %.2f %.2f, %zu meshes drawn, %zu culled\n",
+                        _dbgFrame, _frameDraws - draws0, w3.active() ? "true 3D" : "2.5D", _dbgEye.x, _dbgEye.y, _dbgEye.z,
+                        _stats3d.meshes, _stats3d.culled );
+      }
       SDL_GL_SwapWindow( _window );
       fpsMark( P_SWAP );
       fpsEnd();
@@ -652,6 +864,7 @@ class Renderer3D final : public PixelRenderer {
     // Textures from ARGB words (BGRA bytes): GLES has no BGRA upload, so swap to RGBA first.
     // GL_EXT_texture_format_BGRA8888 (most Mesa GLES drivers, v3d and vc4 included) takes BGRA as is.
     // sub: the bound texture already has this size, so update it in place instead of reallocating.
+    static void uploadSubBGRA( int w, int h, const uint32_t* px ) { uploadBGRA( w, h, px, true ); }
     static void uploadBGRA( int w, int h, const uint32_t* px, bool sub = false ) {
       if ( s_tier == CORE || s_bgraExt ) {
         if ( sub ) gl.TexSubImage2D( GL_TEXTURE_2D, 0, 0, 0, w, h, GL_BGRA, GL_UNSIGNED_BYTE, px );
@@ -711,10 +924,11 @@ class Renderer3D final : public PixelRenderer {
                                             : "#version 300 es\nprecision highp float;\nprecision highp int;\nprecision highp sampler2DShadow;\n" );
       return src;
     }
-    static auto program( const char* vs, const char* fs ) -> GLuint {
+    static auto program( const char* vs, const char* fs, bool raw = false, bool* linked = nullptr ) -> GLuint {
       std::string vsEs, fsEs;
-      if ( s_es2 ) { vsEs = toEs2( vs, true ); fsEs = toEs2( fs, false ); vs = vsEs.c_str(); fs = fsEs.c_str(); }
-      if ( s_tier == GLES3 ) { vsEs = toEs3( vs, true ); fsEs = toEs3( fs, false ); vs = vsEs.c_str(); fs = fsEs.c_str(); }
+      if ( raw ) {}
+      else if ( s_es2 ) { vsEs = toEs2( vs, true ); fsEs = toEs2( fs, false ); vs = vsEs.c_str(); fs = fsEs.c_str(); }
+      if ( !raw && s_tier == GLES3 ) { vsEs = toEs3( vs, true ); fsEs = toEs3( fs, false ); vs = vsEs.c_str(); fs = fsEs.c_str(); }
       auto compile = []( GLenum type, const char* src ) {
         GLuint s = gl.CreateShader( type );
         gl.ShaderSource( s, 1, &src, nullptr );
@@ -724,7 +938,7 @@ class Renderer3D final : public PixelRenderer {
         if ( !ok ) {
           char log[1024];
           gl.GetShaderInfoLog( s, sizeof log, nullptr, log );
-          std::fprintf( stderr, "bicycle 3D: shader: %s\n", log );
+          std::fprintf( stderr, "bicycle 3D: %s shader didn't compile: %s\n", type == GL_VERTEX_SHADER ? "vertex" : "fragment", log );
         }
         return s;
       };
@@ -740,8 +954,9 @@ class Renderer3D final : public PixelRenderer {
       if ( !ok ) {
         char log[1024];
         gl.GetProgramInfoLog( p, sizeof log, nullptr, log );
-        std::fprintf( stderr, "bicycle 3D: link: %s\n", log );
+        std::fprintf( stderr, "bicycle 3D: shader program didn't link: %s\n", log );
       }
+      if ( linked ) *linked = ok != 0;
       return p;
     }
 
@@ -861,6 +1076,7 @@ class Renderer3D final : public PixelRenderer {
       gl.BindBuffer( GL_ARRAY_BUFFER, g->vbo );
       gl.BufferData( GL_ARRAY_BUFFER, verts.size() * sizeof( float ), verts.data(), GL_STATIC_DRAW );
       meshLayout();
+      if ( s_es2 && g->skin ) g->bindVerts.assign( verts.begin(), verts.end() );  // CPU skinning's source
       _meshes[path] = g;
       return g;
     }
@@ -873,16 +1089,65 @@ class Renderer3D final : public PixelRenderer {
       auto u = [&]( const char* n ) { return gl.GetUniformLocation( prog, n ); };
       return _meshLocs[prog] = { u( "uSkinned" ), u( "uBones" ), u( "uMvp" ), u( "uModel" ), u( "uLit" ), u( "uColor" ), u( "uTex" ) };
     }
+    // GLES2 CPU skinning: the bind-pose vertices blended by their 4 joints' matrices into the mesh's dynamic buffer.
+    static void skinOnCpu( const GpuMesh& m, const float* bones ) {
+      const auto& src = m.bindVerts;
+      m.skinVerts.resize( src.size() );
+      const int nj = static_cast<int>( m.skin->joints.size() );
+      for ( size_t v = 0; v + 16 <= src.size(); v += 16 ) {
+        const float* in = &src[v];
+        float* out = &m.skinVerts[v];
+        float s[16]{};
+        for ( int k = 0; k < 4; ++k ) {
+          const float w = in[12 + k];
+          if ( w == 0 ) continue;
+          const int j = std::clamp( static_cast<int>( in[8 + k] ), 0, nj - 1 );
+          const float* b = bones + 16 * j;
+          for ( int i = 0; i < 16; ++i ) s[i] += w * b[i];
+        }
+        for ( int r = 0; r < 3; ++r ) {
+          out[r] = s[r] * in[0] + s[4 + r] * in[1] + s[8 + r] * in[2] + s[12 + r];
+          out[3 + r] = s[r] * in[3] + s[4 + r] * in[4] + s[8 + r] * in[5];
+        }
+        for ( int i = 6; i < 16; ++i ) out[i] = in[i];
+      }
+      if ( !m.skinVbo ) gl.GenBuffers( 1, &m.skinVbo );
+      gl.BindBuffer( GL_ARRAY_BUFFER, m.skinVbo );
+      gl.BufferData( GL_ARRAY_BUFFER, m.skinVerts.size() * sizeof( float ), m.skinVerts.data(), GL_DYNAMIC_DRAW );
+      meshLayout();
+    }
     void drawMesh( const GpuMesh& m, const Mat4& viewProj, const Mat4& model, const float* bones = nullptr, GLuint prog = 0 ) {
       if ( !prog ) prog = _prog;
-      const MeshLocs& l = meshLocs( prog );
+      if ( s_es2 && prog == _prog && bones && m.skin ) {  // GLES2: skinned on the CPU, or with the small skinned shader
+        if ( _skinProg && m.skin->joints.size() <= static_cast<size_t>( ES2_BONES ) ) {
+          float rows[4 * 3 * ES2_BONES];
+          const size_t nj = m.skin->joints.size();
+          for ( size_t j = 0; j < nj; ++j )
+            for ( int r = 0; r < 3; ++r )
+              for ( int c = 0; c < 4; ++c ) rows[12 * j + 4 * r + c] = bones[16 * j + 4 * c + r];
+          gl.UseProgram( _skinProg );
+          gl.Uniform4fv( gl.GetUniformLocation( _skinProg, "uBones" ), static_cast<GLsizei>( 3 * nj ), rows );
+          drawRanges( m, meshLocs( _skinProg ), viewProj, model, false, nullptr );
+          gl.UseProgram( _prog );
+          return;
+        }
+        drawRanges( m, meshLocs( prog ), viewProj, model, false, bones );
+        return;
+      }
+      drawRanges( m, meshLocs( prog ), viewProj, model, bones && m.skin, nullptr, bones );
+    }
+    // cpuBones: skin on the CPU first (GLES2); gpuBones: the GL 3.3 / ES 3 shader's uBones.
+    void drawRanges( const GpuMesh& m, const MeshLocs& l, const Mat4& viewProj, const Mat4& model, bool gpuSkin,
+                     const float* cpuBones, const float* gpuBones = nullptr ) {
+      const float* bones = gpuBones;
       const Mat4 mvp = mul( viewProj, model );
-      gl.Uniform1i( l.skinned, bones && m.skin ? 1 : 0 );
-      if ( bones && m.skin ) gl.UniformMatrix4fv( l.bones, static_cast<GLsizei>( m.skin->joints.size() ), 0, bones );
+      gl.Uniform1i( l.skinned, gpuSkin ? 1 : 0 );
+      if ( gpuSkin ) gl.UniformMatrix4fv( l.bones, static_cast<GLsizei>( m.skin->joints.size() ), 0, bones );
       gl.UniformMatrix4fv( l.mvp, 1, 0, mvp.data() );
       gl.UniformMatrix4fv( l.model, 1, 0, model.data() );
       gl.Uniform1i( l.lit, 1 );
-      bindVertices( m.vao, m.vbo, meshLayout );
+      if ( cpuBones && !m.bindVerts.empty() ) skinOnCpu( m, cpuBones );
+      else bindVertices( m.vao, m.vbo, meshLayout );
       for ( const auto& r : m.ranges ) {
         gl.Uniform4fv( l.color, 1, r.rgba.data() );
         gl.Uniform1i( l.tex, r.tex ? 1 : 0 );
@@ -906,6 +1171,10 @@ class Renderer3D final : public PixelRenderer {
       gl.Enable( GL_DEPTH_TEST );
       gl.DepthFunc( GL_LEQUAL );
       gl.Disable( GL_BLEND );
+      if ( _skinProg ) {
+        gl.UseProgram( _skinProg );
+        gl.Uniform1i( gl.GetUniformLocation( _skinProg, "uWorld3D" ), 0 );
+      }
       gl.UseProgram( _prog );
       gl.Uniform1i( gl.GetUniformLocation( _prog, "uWorld3D" ), 0 );
       gl.ActiveTexture( GL_TEXTURE0 );
@@ -1008,7 +1277,16 @@ class Renderer3D final : public PixelRenderer {
     }
 
     void setWorldUniforms( const phys3d::View& v, const m3::Vec3& eye, const m3::Mat4& lightVP, bool shadows ) {
-      auto u = [&]( const char* n ) { return gl.GetUniformLocation( _prog, n ); };
+      if ( _skinProg ) {
+        gl.UseProgram( _skinProg );
+        setWorldUniforms( _skinProg, v, eye, lightVP, shadows );
+        gl.UseProgram( _prog );
+      }
+      setWorldUniforms( _prog, v, eye, lightVP, shadows );
+      _dbgEye = eye;
+    }
+    void setWorldUniforms( GLuint prog, const phys3d::View& v, const m3::Vec3& eye, const m3::Mat4& lightVP, bool shadows ) {
+      auto u = [&]( const char* n ) { return gl.GetUniformLocation( prog, n ); };
       gl.Uniform1i( u( "uWorld3D" ), 1 );
       const m3::Vec3 ld = m3::normalize( v.lightDir );
       gl.Uniform3fv( u( "uLightDir" ), 1, &ld.x );
@@ -1183,6 +1461,7 @@ class Renderer3D final : public PixelRenderer {
           _shadowDynHash = dynHash;
         }
       }
+      if ( glDebug() && _dbgFrame < 2 ) glCheck( "the shadow pass" );
       fpsMark( P_SHADOW );
 
       // Main pass.
@@ -1205,6 +1484,7 @@ class Renderer3D final : public PixelRenderer {
         ++_stats3d.meshes;
       }
 
+      if ( glDebug() && _dbgFrame < 2 ) glCheck( "the meshes" );
       fpsMark( P_MAIN );
       // Billboards: 3D entities with a sprite and no model, upright and turned to the camera (cylindrical).
       const m3::Vec3 right = m3::flatRight( cam.yaw );
@@ -1281,9 +1561,22 @@ class Renderer3D final : public PixelRenderer {
       gl.BindTexture( GL_TEXTURE_2D, _overlayTex );
       gl.PixelStorei( GL_UNPACK_ALIGNMENT, 4 );
       const bool same = _overlayW == _fbW && _overlayH == _fbH;
-      uploadBGRA( _fbW, _fbH, reinterpret_cast<const uint32_t*>( _fb.data() ), same );  // ARGB words
+      float scale[2] = { 1, 1 };
+      if ( s_npot ) uploadBGRA( _fbW, _fbH, reinterpret_cast<const uint32_t*>( _fb.data() ), same );  // ARGB words
+      else {
+        auto pot = []( int v ) { int p = 1; while ( p < v ) p <<= 1; return p; };
+        const int tw = pot( _fbW ), th = pot( _fbH );
+        if ( !same ) {  // allocate the power-of-two texture (contents come from the sub-upload)
+          std::vector<uint32_t> zero( static_cast<size_t>( tw ) * th, 0 );
+          uploadBGRA( tw, th, zero.data() );
+        }
+        uploadSubBGRA( _fbW, _fbH, reinterpret_cast<const uint32_t*>( _fb.data() ) );
+        scale[0] = static_cast<float>( _fbW ) / tw;
+        scale[1] = static_cast<float>( _fbH ) / th;
+      }
       _overlayW = _fbW;
       _overlayH = _fbH;
+      gl.Uniform2fv( gl.GetUniformLocation( _overlayProg, "uUvScale" ), 1, scale );
       gl.Uniform1i( gl.GetUniformLocation( _overlayProg, "tex" ), 0 );
       bindVertices( _overlayVao, _overlayVbo, overlayLayout );
       gl.DrawArrays( GL_TRIANGLE_STRIP, 0, 4 );
@@ -1302,6 +1595,7 @@ class Renderer3D final : public PixelRenderer {
     static GL gl;
     static inline int s_tier = CORE;   // context tier (see contextAttributes)
     static inline bool s_es2 = false;  // OpenGL ES 2.0 context (see contextAttributes)
+    static inline bool s_npot = true;  // non-power-of-two textures are complete (all but strict GLES2)
     SDL_GLContext _ctx{};
     // Shadow quality: map size, depth compares per pixel, reach (meters; 0 = high's fixed square around the focus).
     enum { Q_OFF, Q_LOW, Q_MED, Q_HIGH };
@@ -1408,6 +1702,9 @@ class Renderer3D final : public PixelRenderer {
     GLuint _depthProg{}, _shadowTex{}, _shadowFbo{};
     bool _shadowOk{};
     struct Stats3D { size_t meshes{}, culled{}, billboards{}; } _stats3d;
+    GLuint _skinProg{};
+    int _dbgFrame{};
+    m3::Vec3 _dbgEye{};  // GLES2: the skinned shader (BICYCLE_GLES2_GPU_SKIN=1), else 0 (CPU skinning)
     GLuint _prog{}, _overlayProg{}, _quadVao{}, _quadVbo{}, _overlayVao{}, _overlayVbo{}, _overlayTex{};
     Box _cam{};
     bool _haveScene{};
