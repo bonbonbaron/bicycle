@@ -5,17 +5,26 @@ bicycle plays music and sound effects with fluidsynth. A song is a **MIDI file**
 underneath yours. Any program your SoundFont doesn't define falls back to it (`BICYCLE_GM_SF2` overrides which
 file; Debian: `apt install fluid-soundfont-gm`).
 
-## Wire it into a scene
+## Wire it into a scene and its genomes
 
-Put the files under `<game>/genome/music/` and add them to the scene (`test/genome/scene/intro.lua` is the demo):
+Put the files under `<game>/genome/music/` and name them by their bare file names (no folder, no extension: the
+field says it's a SoundFont or a song). Music belongs to the scene (`test/genome/scene/intro.lua`):
 
 ```lua
-intro.music = { soundfont = "music/meadow.sf2", song = "music/meadow.mid" }          -- loops forever
-intro.sfx   = { soundfont = "music/meadow.sf2", program = 120,                        -- SFX instrument
-                sounds = { bump = 60, neigh = 64, coin = 72 } }                       -- name = key
+intro.music = { soundfont = "meadow", song = "meadow" }   -- music/meadow.sf2 + music/meadow.mid, loops forever
 ```
 
-In a genome: `require("Sound").play("coin")`. Sound effects play on MIDI channel 15 (channel 16 in 1-based
+Sound effects belong to the genome that makes them (`test/genome/coin.lua`), with names of its own:
+
+```lua
+local coin = { sprite = "goldcoin", coll = { type = "coin" },
+               sfx = { soundfont = "meadow", program = 120, sounds = { collect = 72 } } }   -- name = MIDI key
+function coin:onCollision( other ) self:sound( "collect" ) end
+```
+
+A sound can also be `{ key = 64, program = 121, soundfont = "other", vel = 90 }`. A SoundFont several genomes use is
+loaded once and shared. Scenes don't list sound effects any more (an old `scene.sfx` still works, with a warning).
+Sound effects play on MIDI channel 15 (channel 16 in 1-based
 tools). Songs must not use it; `midi_prep.py` moves it if they do.
 
 Environment: `BICYCLE_AUDIO_DRIVER=pulseaudio|alsa|jack|sdl2` picks the output. `BICYCLE_AUDIO_FILE=out.wav`

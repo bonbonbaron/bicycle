@@ -142,13 +142,70 @@ engine and the Aseprite exporters get these paths from):
   body/graybody/colormap/      *_colormap.lua, *.txt                    ASCII art (and img gene text images)
   tilemap/                     *_tilemap.lua, *_tileset.lua             background tile layouts and tilesets
   scene/                       scene tables (scene/bg/<name>/: text backgrounds)
-  level/                       3D level / scenery lists (scene3d.lua from scripts/blender/export.py)
-  model/                       meshes (.obj/.mtl, packed .bmesh), skins (.bskin), mesh textures
+  body/model/                  genome models: meshes a genome's model = "..." names (.obj/.mtl -> .bmesh, .bskin)
+  level/                       3D levels from Blender (tools/blender): meshes, placed genomes, spawn points
+  model/                       level meshes (.obj/.mtl, packed .bmesh) and mesh textures
   music/                       songs (.mid) and SoundFonts (.sf2)
 ```
 
+**Asset references are bare names.** A genome or scene names an asset by its file name alone, never a folder or
+an extension; the field says what kind it is and `scripts/GenomeLayout.lua` (`Layout.REFS`) says where that kind
+lives: `soundfont = "meadow"` is `genome/music/meadow.sf2`, `song = "house"` is `genome/music/house.mid`,
+`model = "pilgrim3d"` is `genome/body/model/pilgrim3d` (.bmesh in a pack, the loose .obj in dev),
+`level = "courtyard"` is `genome/level/courtyard.lua`, `sprite = "goldcoin"` is `genome/body/goldcoin.lua`. The
+ID generator (below) finds every such file, so a typo'd or missing name is a build error that lists what the game
+has, and a name two files share (`music/house.mid` and `music/more/house.mid`) is reported as ambiguous. Old
+paths (`"music/meadow.sf2"`) still work.
+
+### Self-contained genomes
+
+A genome (`genome/<name>.lua`) is everything about one kind of thing, so it can be dropped into any scene as is:
+its sprite or model, animation, collision, motion, sounds, timer, behavior and the parameters each placed copy
+may change. A scene only says where its copies go. plat3d's coin:
+
+```lua
+local coin = {
+  model = "coin3d",                                         -- genome/body/model/coin3d
+  body = { kind = "kinematic", radius = 0.4, height = 0.8, pitch = 90 },
+  coll = { type = "coin" },
+  motion = { type = "spin", speed = 180, bob = 0.12, bobHz = 0.8 },     -- the engine spins and bobs it
+  sfx = { soundfont = "sfx", program = 120, sounds = { collect = 72 } }, -- its own sounds, named its own way
+}
+function coin:onCollision( other, collType )
+  if collType ~= 1 then return end                          -- Genome.COLL.hero
+  self:sound( "collect", 115 )
+  entityOf( other ):collect( self )
+  require( "Scene" ).removeForever( self )                  -- stays collected when the hero comes back
+end
+return coin
+```
+
+* **Sounds** (`sfx` gene): `soundfont`, `program` (and `bank`), and `sounds = { <name> = <MIDI key> | { key,
+  program, soundfont, bank, vel } }`. Names are the genome's own: two genomes can both have a "hit".
+  `self:sound( "collect" [, vel] )` plays one (where the body is, in 3D). A SoundFont several genomes use is loaded
+  once (`Sound.soundfonts`, outside the scene's memory scope). Scenes have no sound-effect lists any more (an old
+  `scene.sfx` still loads, with a warning). Samples go into a SoundFont (`tools/audio/make_sf2.py`).
+* **Behavior** is events only: `onSpawn`, `onInput( key, pressed, dx, dy )` (see "Input" below),
+  `onCollision( other, type )`, `onUncollision`, `onTimer( timerId, type )`, `onSceneEnter( scene, spawn )`,
+  `onDespawn`; in 3D also `onLand( self )`, `onFallOut( self )` (below the genome's `killY`, default -15) and
+  `onLevelReady( self )` (everything the level places exists). `listen = true` (3D genomes; `listenInput( id )` for
+  anything) makes it get every input event without having the focus (a camera genome). `timer = <ms> | { ms, rep, type }`
+  starts a timer at spawn; `self:after( ms, type )`, `self:every( ms, type )` and `self:stopTimer( id )` add more.
+  Continuous motion is data (`motion`: linear paths, orbits, spin and bob, follow; or an animation), moved by the
+  engine's Kinematics, not per-frame Lua.
+* **Per-instance parameters**: whatever a placement adds (a door's `door = { to = "bonus" }`, a mover's
+  `motion = { path = ... }`) is merged over the genome's own fields (nested tables merge, lists replace).
+  `params = { ["door.to"] = "scene", ["door.spawn"] = "spawn:door.to", ["motion.path"] = "path", ... }` tells the
+  Blender add-on which ones to offer, and how (a scene drop-down, the spawn points of that scene, path points, a
+  number...): see [docs/blender-entities.md](docs/blender-entities.md).
+
+**Placing them.** 2D scenes: on the background sprite in Aseprite (below). 3D scenes: in Blender with the add-on in
+`tools/blender` (genome drop-down, door and spawn drop-downs, path points, spawn points); the exporter writes
+`genome/level/<scene>.lua` and the engine spawns its genomes when the scene loads. A 3D scene file is then only
+its look: `world3d = { level = "courtyard", sky, fog, light }` (and `music`).
+
 New game: `scripts/new_game.sh mygame` (or by hand: `mkdir -p mygame/genome/body/palette/{color,collision}
-mygame/genome/body/graybody/{animation,collision,colormap} mygame/genome/{tilemap,scene,level,model,music}`).
+mygame/genome/body/graybody/{animation,collision,colormap} mygame/genome/{tilemap,scene,level,model,body/model,music}`).
 
 **Graybody + palettes (palette swaps).** The graybody is shared by every variant of a body: its gray pixels,
 animation and collision regions are loaded once (`Sprite.load` caches it in Lua; `newPixelImage` shares one
@@ -277,9 +334,11 @@ The pixel modes use the `.bimg` files when a sprite has them, and a genome can n
 
 ### 3D art: Blender
 
-See `scripts/blender/README.md`: `make_scene.py` authors the test scene headless, `export.py` exports it
-(`blender -b scene.blend --python scripts/blender/export.py -- test/genome`), and the pack turns the OBJs
-into `.bmesh`. Genomes pick a mesh with `model = "<object>"`.
+Install the add-on `tools/blender/bicycle_blender.py` (Edit > Preferences > Add-ons > Install from Disk) and use the
+Bicycle tab of the 3D Viewport's sidebar to place genomes and export levels: [docs/blender-entities.md](docs/blender-entities.md)
+walks through it click by click. Headless, `scripts/blender/export.py` does the same export
+(`blender -b plat3d/blender/plat3d.blend --python scripts/blender/export.py`); see `scripts/blender/README.md`. The pack
+turns the OBJs into `.bmesh`. Genomes pick a mesh with `model = "<object>"` (genome/body/model/).
 
 ### Scene tools in Aseprite: doors and music
 
@@ -289,7 +348,7 @@ doorway with the marquee (or add a slice named `door`), run File > Scripts > add
 and its spawn (both drop-downs list what's in `<game>/genome/scene/`; the spawn list follows the scene). It
 writes `{ genome = "door", pos = {...}, door = { to, spawn, w, h, on } }` into the scene's first fg layer and can
 add the return spawn here (`from_<target>`, beside the door). `scripts/aseprite/addsong.lua` sets a scene's
-`music = { soundfont, song, transition }` from the game's `genome/music/*.mid` / `*.sf2` (transition:
+`music = { soundfont = "meadow", song = "house", transition }` (bare names) from the game's `genome/music/*.mid` / `*.sf2` (transition:
 crossfade, cut or keep, used when the scene is entered unless `Scene.go` says otherwise).
 
 Batch mode (`--script-param list=1` prints the drop-downs' choices):
@@ -298,7 +357,7 @@ Batch mode (`--script-param list=1` prints the drop-downs' choices):
 aseprite -b --script-param game=test --script-param scene=house --script-param to=intro \
   --script-param spawn=from_house --script-param x=140 --script-param y=36 --script-param w=6 --script-param h=10 \
   --script-param on=press --script-param return_spawn=from_intro --script scripts/aseprite/adddoor.lua
-aseprite -b --script-param game=test --script-param scene=house --script-param song=music/house.mid \
+aseprite -b --script-param game=test --script-param scene=house --script-param song=house \
   --script-param transition=cut --script scripts/aseprite/addsong.lua
 ```
 
@@ -311,7 +370,7 @@ order) and `extra` (other fields as Lua, e.g. `focus = true, persist = true` or 
 "entry" }`). The entities layer draws an outline for each so you can see them; it's never exported as art.
 
 * `scripts/aseprite/addentity.lua`: select a spot, pick a genome (the game's `genome/*.lua`, the same names as
-  `ids.genome`), the fg layer, persist/focus, a motion preset (linear, orbital, spin) and any more fields.
+  `ids.genome`), the fg layer, persist/focus, a motion preset (linear, orbital, combo) and any more fields.
 * `scripts/aseprite/adddoor.lua` with the scene's background open makes the door a slice there too (its size is
   the door's `w`/`h`); without it, it edits the scene file as before.
 * Move or resize slices in Aseprite, then re-run either script (`--script-param sync=1`) or export with
@@ -324,12 +383,11 @@ converted, with identical output). Batch:
 
 ```sh
 aseprite -b test/aseprite/meadow.aseprite --script-param genome=coin --script-param x=30 --script-param y=42 \
-  [--script-param fg=4] [--script-param persist=1] [--script-param motion=spin] --script scripts/aseprite/addentity.lua
+  [--script-param fg=4] [--script-param persist=1] [--script-param motion=orbital] --script scripts/aseprite/addentity.lua
 aseprite -b test/aseprite/meadow.aseprite --script-param list=1 --script scripts/aseprite/addentity.lua
 ```
 
-plat3d and fps3d build their 3D scenes in Lua (`world3d.build`), with no Aseprite background, so they have no
-entities layer.
+plat3d and fps3d place their entities in Blender instead (docs/blender-entities.md).
 
 `ctest -R aseprite-scene-scripts` runs both on a copy of the test game (configure with
 `-DBICYCLE_ASEPRITE=/path/to/aseprite`).
@@ -384,6 +442,14 @@ keeps curses boxes and the text bar. 2D (`src/v/2d`) draws flat pixel-art panels
 fraction (green, then yellow/amber, then red), take optional bar sprites (`hp:sprites( frame, fill )` in
 `scripts/Hud.lua`), and render text with TrueType (`fonts/ui.ttf`, stb_truetype). In the pixel modes, ASCII-art
 images that have no pixel version are drawn as solid cell blocks, not characters.
+
+HUD text labels: `local t = Hud.text( text, ax, ay )` with `ax` = `"left"`, `"right"`, `"center"` or a cell x and
+`ay` = `"top"`, `"bottom"` or a cell y; `t:set( text )` changes it ("right" keeps its right edge at the screen's
+edge). Like bars they come back after a scene change (`Hud.rebuild`) until `Hud.forget( t )`. ASCII prints plain
+text; 2D and 3D draw it on the bars' plate (`drawHudText`). `fps()` (C `frameRate()`) is the main loop's frame
+rate over about half a second, in every mode. Update labels from `onTimer`, e.g. plat3d's hero:
+`self.fpsLabel = Hud.text( "", "right", "top" )`, `self:every( 500, FPS_TIMER )`, and in `onTimer`
+`self.fpsLabel:set( string.format( "%.0f fps", fps() ) )`.
 
 ASCII follows the terminal's size. Each frame the renderer polls it: `TIOCGWINSZ` on Linux/macOS, PDCurses'
 `is_termresized()` on Windows. On a change it resizes curses (`resize_term`) and tells every window
@@ -484,7 +550,9 @@ build/_deps/src/luajit/src/host/minilua tools/ids/genids.lua --root . --out gen 
 ```
 
 The generator also checks references: a door to a missing scene or spawn, a scene's song/SoundFont that isn't
-in `genome/music/`, a literal `Scene.go("...")`, `Sound.play("...")`/`Sound.key("...")` naming nothing, an
+in `genome/music/`, a genome's model or SoundFont that isn't there, a `self:sound("...")` that isn't one of that
+genome's own sounds, a level placing a genome that doesn't exist, a literal `Scene.go("...")`,
+`Sound.play("...")`/`Sound.key("...")` naming nothing, an
 `initAnim` that isn't one of its sprite's tags, unknown collision types. Dev builds print these as warnings; release
 builds (`BICYCLE_RELEASE`, `BICYCLE_RELEASE_ASSETS`) run it with `--strict`, the packs depend on it, and a typo fails
 the build. Release embeds `gen/ids.lua` in the pack.
@@ -521,6 +589,48 @@ is); a non-GC64 build falls back to LuaJIT's own allocator with a warning. fluid
 its own malloc'd memory, so only the sf2/mid bytes are in AUDIO. Third-party C code (SDL, fluidsynth, GL drivers)
 still uses malloc. fluidsynth's cpp11 thread code is patched at fetch time (new vs free mismatch).
 
+## Input
+
+Input is events, in every render mode: `onInput( self, key, pressed, dx, dy )` on the focused entity
+(`focusOn( id )`) and on every listener (`listen = true` genomes, or `listenInput( id )`), in the order it happened.
+
+* `key` is a `LogicalKey` (`include/c/Input.h`, `ffi.C.<name>`): `A`..`Z`, `Key0`..`Key9`, `Enter`, `Escape`,
+  `Tab`, `Space`, `LeftShift`, `RightShift`, `LeftCtrl`, `RightCtrl`, `LeftAlt`, `RightAlt`, `LeftMeta`,
+  `RightMeta`, `MouseLeft`, `MouseRight`, `MouseMiddle`, and `Look`. Arrows are `W`/`A`/`S`/`D`.
+* `pressed` is `true` when the key or button goes down and `false` when it comes up: one press and one release per
+  hold (auto-repeat is not a new press). Things that should keep happening while a key is held are a value set on
+  the press and cleared on the release (`hero:move( right, fwd )`, `W.Camera.turn( yawRate, pitchRate )`) or a
+  repeating timer started on the press and stopped on the release (the test hero's grid steps, fps3d's trigger).
+* `Look` is mouse look: once per frame, only when the mouse moved (while captured, `Input3D.captureMouse`), with
+  `dx, dy` the pixels since the last frame; the gamepad's right stick adds to it (600 px/s at full tilt). It is an
+  event like the rest rather than a polled value or one event per motion report: one call a frame with the sum is
+  the smallest form that keeps a frame's motion exact and costs nothing when the mouse is still.
+* Gamepad (SDL): the left stick is `W`/`A`/`S`/`D` (past half tilt), A is `Space`, the right trigger and bumper are
+  `MouseLeft`, the left stick's click is `LeftShift`.
+* Dialogues and menus page and select on presses; releases don't reach them. During a scene transition presses are
+  dropped but releases still arrive (a key held through a door is let go).
+* `scripts/Input3D.lua` (held keys, axes, `Input.look()`) still works for code that polls.
+
+**Terminals (ASCII mode, SSH).** Terminals send bytes, not key events, so `src/c/SshInputListener.cpp` with
+`include/c/TermInput.h`:
+
+* parses escape sequences (arrows are `W`/`A`/`S`/`D`, not `ESC [ A` = A; a lone ESC is `Escape` a frame later);
+* asks for the kitty keyboard protocol (`CSI > 11 u`: kitty, foot, WezTerm, Ghostty, recent Alacritty and
+  iTerm2...) and, if the terminal answers the `CSI ? u` query, uses its real press/repeat/release events;
+* turns on SGR mouse (`?1000` + `?1006`): button presses and releases (`MouseLeft`/`MouseRight`/`MouseMiddle`);
+* otherwise infers releases from auto-repeat: a key's first byte is a press, and while its repeat bytes keep coming
+  it stays held; it's released when none arrives within the timeout: `initial` ms before the first repeat (the
+  typematic delay; it adapts to the measured delay, within 0.5x..2x of `initial`), then `factor` times the measured
+  repeat interval, clamped to [`min`, `max`]. Tune with `BICYCLE_TTY_KEYUP="initial,min,max,factor"` (default
+  `500,60,150,2.5`). A key let go before its first repeat is released `initial` ms after it was pressed. xterm's
+  modifyOtherKeys reports no releases, so xterm uses the heuristic. Terminals repeat only the newest key, so a key
+  held under another one is released by its timeout. `BICYCLE_TTY_KITTY=0` / `BICYCLE_TTY_MOUSE=0` turn the
+  protocols off; both are undone at exit.
+* Tests: `tests/term_input_test.cpp` (ctest `term-input`: synthetic bytes and timings) and
+  `tests/tty_input_test.py` (ctest `tty-input`, ASCII builds: the game in a pty).
+
+`BICYCLE_INPUT_LOG=1` prints every event (`input <key> down|up`) to stderr, `=<file>` appends them to a file.
+
 ## Environment variables
 
 * `BICYCLE_SCENE_STATS=1`: print the memory pools on every scene change. `BICYCLE_SCENE_CYCLE=<n>[:<a>:<b>:<frames>]`:
@@ -530,7 +640,8 @@ still uses malloc. fluidsynth's cpp11 thread code is patched at fetch time (new 
 
 `BICYCLE_MAX_FRAMES=<n>`: quit after n frames (headless tests).
 
-`BICYCLE_SCRIPTED_INPUT="w@20-34/2,d@36-170/2"`: press a key on frames 20..34, every 2nd frame (dev only).
+`BICYCLE_SCRIPTED_INPUT="w@20-34/2,d@36-170"`: input on frame ranges: `/2` taps the key every 2nd frame
+(pressed, released the next frame), no step (or `/1`) holds it from the first frame and releases it after the last.
 
 `BICYCLE_LOOSE_ASSETS`, `BICYCLE_WINDOW_SIZE`, `BICYCLE_SCREENSHOT=<file.bmp>` (`%d` = frame number; in
 ASCII the file is a text dump of the screen) (+ `BICYCLE_SCREENSHOT_FRAME`, default 90, or a list in

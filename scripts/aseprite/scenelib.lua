@@ -142,14 +142,23 @@ function L.sceneOfSprite(game, spriteName)
   return nil
 end
 
--- Songs (.mid) and SoundFonts (.sf2) of a game, genome-relative ("music/meadow.mid").
+-- The bare name of an asset reference: "meadow" for "meadow" or an old path like "music/meadow.sf2".
+function L.bare(v)
+  if type(v) ~= "string" then return v end
+  return (v:gsub("\\", "/"):match("([^/]*)$"):gsub("%.[^.]*$", ""))
+end
+
+-- Songs (.mid) and SoundFonts (.sf2) of a game, as the bare names scenes and genomes use ("meadow": the folder
+-- and extension come from the field, scripts/GenomeLayout.lua).
 function L.songs(game)
   local mids, sf2s = {}, {}
   for _, f in ipairs(L.listFiles(L.genome(game) .. Layout.MUSIC)) do
     local low = f:lower()
-    if low:find("%.midi?$") then mids[#mids + 1] = Layout.MUSIC .. f end
-    if low:find("%.sf2$") then sf2s[#sf2s + 1] = Layout.MUSIC .. f end
+    if low:find("%.midi?$") then mids[#mids + 1] = L.bare(f) end
+    if low:find("%.sf2$") then sf2s[#sf2s + 1] = L.bare(f) end
   end
+  table.sort(mids)
+  table.sort(sf2s)
   return mids, sf2s
 end
 
@@ -237,8 +246,8 @@ function L.setMusic(game, scene, m)
   local src = readAll(file)
   local var = assert(sceneVar(src), file .. ": can't find the scene table's name")
   local fields = {}
-  if m.soundfont and m.soundfont ~= "" then fields[#fields + 1] = 'soundfont = "' .. m.soundfont .. '"' end
-  if m.song and m.song ~= "" then fields[#fields + 1] = 'song = "' .. m.song .. '"' end
+  if m.soundfont and m.soundfont ~= "" then fields[#fields + 1] = 'soundfont = "' .. L.bare(m.soundfont) .. '"' end
+  if m.song and m.song ~= "" then fields[#fields + 1] = 'song = "' .. L.bare(m.song) .. '"' end
   if m.transition and m.transition ~= "" and m.transition ~= "crossfade" then
     fields[#fields + 1] = 'transition = "' .. m.transition .. '"'
   end

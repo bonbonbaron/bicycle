@@ -1,4 +1,5 @@
 #pragma once
+#include <algorithm>
 // The one interface between the engine and whatever draws it. The engine (Scene, Camera, Window, Dialogue, Bar,
 // TextMenu, WindowManager, input) only talks to gfx::renderer(); each render mode implements it:
 //   ASCII  src/v/ascii  curses (ncurses / PDCurses) in a terminal          (BICYCLE_RENDER=ASCII)
@@ -73,6 +74,12 @@ class Renderer {
     virtual void setPanel( WinHandle win, Panel kind ) {}  // set before the window clears (Window::clear)
     // UI widgets, each mode its own way (cells are the window's).
     virtual void drawBar( WinHandle win, int y, int x, const BarSpec& bar ) = 0;
+    // A HUD text label on row y. align 0: starts at cell x; 1: ends just before cell x (right-aligned); 2: centered
+    // on cell x. ASCII prints it as plain text; the pixel modes draw it on a plate like drawBar's.
+    virtual void drawHudText( WinHandle win, int y, int x, int align, const std::string& s ) {
+      const int n = static_cast<int>( s.size() );
+      text( win, y, align == 1 ? std::max( 0, x - n - 1 ) : align == 2 ? std::max( 0, x - n / 2 ) : x, s );
+    }
     // A menu's selection marker in front of row y; ASCII prints the menu's cursor string.
     virtual void drawMenuCursor( WinHandle win, int y, int x, const std::string& asciiCursor ) = 0;
     virtual void text( WinHandle win, int y, int x, const std::string& s ) = 0;

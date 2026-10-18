@@ -16,9 +16,15 @@
 #include <cmath>
 #include <SDL3/SDL.h>
 #include <algorithm>
+#include <array>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <fstream>
+#include <string>
+#if defined( __linux__ )
+#include <unistd.h>
+#endif
 
 namespace gfx {
 
@@ -52,12 +58,69 @@ auto PixelRenderer::windowFlags() const -> uint64_t {
   return SDL_WINDOW_RESIZABLE;
 }
 
+#if defined( __linux__ )
+// On the Linux console (KMSDRM, no X11/Wayland) SDL reads keyboards and mice straight from /dev/input/event*. It
+// finds them through libudev; an SDL built without it (no libudev-dev at build time) finds none and the game gets
+// no input at all. So list them ourselves from /proc/bus/input/devices in SDL_EVDEV_DEVICES ("class:path,...";
+// class 2 keyboard, 1 mouse), which such an SDL reads instead (an SDL with udev ignores it). Returns how many
+// devices exist but can't be opened (not in the input group).
+static auto consoleInputDevices() -> int {
+  if ( std::getenv( "DISPLAY" ) || std::getenv( "WAYLAND_DISPLAY" ) || std::getenv( "SDL_EVDEV_DEVICES" ) ) return 0;
+  std::ifstream f( "/proc/bus/input/devices" );
+  std::string line, list;
+  int unreadable = 0;
+  while ( std::getline( f, line ) ) {
+    if ( line.rfind( "H: Handlers=", 0 ) != 0 ) continue;
+    const std::string h = " " + line.substr( 12 ) + " ";
+    const auto ev = h.find( " event" );
+    if ( ev == std::string::npos ) continue;
+    const std::string node = "/dev/input/" + h.substr( ev + 1, h.find( ' ', ev + 1 ) - ev - 1 );
+    const bool kbd = h.find( " kbd " ) != std::string::npos, mouse = h.find( " mouse" ) != std::string::npos;
+    if ( !kbd && !mouse ) continue;
+    if ( access( node.c_str(), R_OK ) != 0 ) { ++unreadable; continue; }
+    if ( !list.empty() ) list += ',';
+    list += ( mouse ? "1:" : "2:" ) + node;
+  }
+  if ( !list.empty() ) SDL_SetHint( SDL_HINT_EVDEV_DEVICES, list.c_str() );
+  return unreadable;
+}
+#endif
+
+void PixelRenderer::reportInput() {
+  const char* driver = SDL_GetCurrentVideoDriver();
+  _console = driver && std::strcmp( driver, "kmsdrm" ) == 0;
+  int nk{}, nm{};
+  SDL_KeyboardID* kb = SDL_GetKeyboards( &nk );
+  SDL_MouseID* mice = SDL_GetMice( &nm );
+  std::fprintf( stderr, "bicycle: SDL video driver %s, %d keyboard(s)", driver ? driver : "?", nk );
+  for ( int i = 0; i < nk; ++i ) std::fprintf( stderr, "%s%s", i ? ", " : " (", SDL_GetKeyboardNameForID( kb[i] ) ? SDL_GetKeyboardNameForID( kb[i] ) : "?" );
+  std::fprintf( stderr, "%s, %d mouse/mice", nk ? ")" : "", nm );
+  for ( int i = 0; i < nm; ++i ) std::fprintf( stderr, "%s%s", i ? ", " : " (", SDL_GetMouseNameForID( mice[i] ) ? SDL_GetMouseNameForID( mice[i] ) : "?" );
+  std::fprintf( stderr, "%s\n", nm ? ")" : "" );
+  SDL_free( kb );
+  SDL_free( mice );
+  if ( _console && nk == 0 ) {
+    std::fprintf( stderr, "bicycle: *** no keyboard found on the console (KMSDRM)%s. Add yourself to the input group: "
+                          "sudo usermod -aG input $USER (then log out and back in), and install libudev-dev and rebuild "
+                          "SDL (delete the build's _deps/sdl3* and deps-prefix dirs; see docs/raspberry-pi.md) ***\n",
+                  _unreadableInput ? ", and some /dev/input/event* can't be opened" : "" );
+  }
+  if ( _console ) {  // one fullscreen window that always has the keyboard: grab the mouse for looking right away
+    setMouseCapture( true );
+    std::fprintf( stderr, "bicycle: console: mouse grabbed, relative mouse mode %s\n",
+                  SDL_GetWindowRelativeMouseMode( _window ) ? "on" : "failed" );
+  }
+}
+
 void PixelRenderer::init( const std::string& gameName ) {
 #if defined( BICYCLE_RELEASE ) && defined( __linux__ )
   // Release builds keep the OS libraries' own file traffic down too (unless the user set these): no mesa shader
   // cache in ~/.cache (the shaders are compiled from the strings in the executable each run; that takes
   // milliseconds).
   setenv( "MESA_SHADER_CACHE_DISABLE", "true", 0 );
+#endif
+#if defined( __linux__ )
+  _unreadableInput = consoleInputDevices();
 #endif
   if ( !SDL_Init( SDL_INIT_VIDEO | SDL_INIT_EVENTS ) ) {
     std::fprintf( stderr, "SDL_Init failed: %s\n", SDL_GetError() );
@@ -88,6 +151,7 @@ void PixelRenderer::init( const std::string& gameName ) {
   SDL_GetWindowSizeInPixels( _window, &_fbW, &_fbH );
   _fb.assign( static_cast<size_t>( _fbW ) * _fbH, frameClearColor() );
   onWindowCreated();
+  reportInput();
   _up = true;
 }
 
@@ -122,6 +186,12 @@ static auto sdlKeyToLogical( SDL_Keycode k ) -> LogicalKey {
     case SDLK_RETURN: case SDLK_KP_ENTER: return LogicalKey::Enter;
     case SDLK_ESCAPE: return LogicalKey::Escape;
     case SDLK_TAB: return LogicalKey::Tab;
+    case SDLK_LSHIFT: return LogicalKey::LeftShift;
+    case SDLK_RSHIFT: return LogicalKey::RightShift;
+    case SDLK_LCTRL: return LogicalKey::LeftCtrl;
+    case SDLK_RCTRL: return LogicalKey::RightCtrl;
+    case SDLK_LALT: return LogicalKey::LeftAlt;
+    case SDLK_RALT: return LogicalKey::RightAlt;
     // Arrows drive the same keys as WASD.
     case SDLK_UP: return LogicalKey::W;
     case SDLK_LEFT: return LogicalKey::A;
@@ -129,6 +199,18 @@ static auto sdlKeyToLogical( SDL_Keycode k ) -> LogicalKey {
     case SDLK_RIGHT: return LogicalKey::D;
     default: return LogicalKey::COUNT;
   }
+}
+
+// Several physical sources can drive one logical key (W and the up arrow, the left stick): a key is pressed when its
+// first source goes down and released when its last one comes up, so games see one clean press/release pair.
+static std::array<uint8_t, static_cast<size_t>( LogicalKey::COUNT )> sourcesDown{};
+static void keyEdge( LogicalKey k, bool down ) {
+  auto& n = sourcesDown[static_cast<size_t>( k )];
+  if ( down ? n++ != 0 : ( n == 0 || --n != 0 ) ) return;
+  Input in{};
+  in.lastPressed = k;
+  if ( down ) in.currKeysPressed.set( static_cast<unsigned>( k ) );
+  Trigger::sendInput( in, down );
 }
 
 void PixelRenderer::handleEvent( const SDL_Event& e ) {
@@ -141,30 +223,31 @@ void PixelRenderer::handleEvent( const SDL_Event& e ) {
     case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
       _resized = true;
       break;
-    case SDL_EVENT_KEY_DOWN: {
-      // Like the terminal: each press (and each auto-repeat while held) is one input event.
+    case SDL_EVENT_KEY_DOWN:
+    case SDL_EVENT_KEY_UP: {
+      // One press when a key goes down, one release when it comes up (auto-repeats are not new presses).
+      if ( e.key.repeat ) break;
       const auto lkey = sdlKeyToLogical( e.key.key );
-      if ( lkey != LogicalKey::COUNT ) {
-        Input in{};
-        in.currKeysPressed.set( static_cast<unsigned>( lkey ) );
-        in.lastPressed = lkey;
-        Trigger::sendInput( in );
-      }
+      if ( lkey != LogicalKey::COUNT ) keyEdge( lkey, e.type == SDL_EVENT_KEY_DOWN );
       break;
     }
     case SDL_EVENT_MOUSE_MOTION:
       inputState().mouseDx += e.motion.xrel;
       inputState().mouseDy += e.motion.yrel;
+      // Mouse look only while the mouse is captured: an uncaptured pointer is just passing over the window.
+      if ( inputState().mouseCaptured ) Trigger::sendLook( e.motion.xrel, e.motion.yrel );
       break;
     case SDL_EVENT_MOUSE_BUTTON_DOWN:
     case SDL_EVENT_MOUSE_BUTTON_UP: {
       const int b = e.button.button == SDL_BUTTON_LEFT ? 0 : e.button.button == SDL_BUTTON_RIGHT ? 1 : e.button.button == SDL_BUTTON_MIDDLE ? 2 : -1;
       if ( b < 0 ) break;
-      if ( e.type == SDL_EVENT_MOUSE_BUTTON_DOWN ) {
+      const bool down = e.type == SDL_EVENT_MOUSE_BUTTON_DOWN;
+      if ( down ) {
         inputState().mouseButtons |= 1u << b;
         inputState().mousePressed |= 1u << b;
       }
       else inputState().mouseButtons &= ~( 1u << b );
+      keyEdge( static_cast<LogicalKey>( static_cast<int>( LogicalKey::MouseLeft ) + ( b == 0 ? 0 : b == 1 ? 1 : 2 ) ), down );
       break;
     }
     case SDL_EVENT_MOUSE_WHEEL:
@@ -179,8 +262,8 @@ void PixelRenderer::handleEvent( const SDL_Event& e ) {
         _pad = nullptr;
       }
       break;
-    case SDL_EVENT_WINDOW_FOCUS_LOST:
-      if ( inputState().mouseCaptured ) setMouseCapture( false );
+    case SDL_EVENT_WINDOW_FOCUS_LOST:  // the console has one window, always focused: keep the grab there
+      if ( inputState().mouseCaptured && !_console ) setMouseCapture( false );
       break;
     default:
       break;
@@ -239,6 +322,28 @@ void PixelRenderer::pollInput() {
   }
   else in.axes = {};
   in.padPressed = in.padButtons & ~padBefore;
+  // The gamepad as events too: the left stick is WASD, A is Space, the right trigger or bumper is the left mouse
+  // button, the left stick's click is Shift, and the right stick is mouse look (600 px/s at full tilt).
+  {
+    static Bitset padKeys{};
+    Bitset now{};
+    auto key = []( LogicalKey k ) { return static_cast<unsigned>( k ); };
+    const auto& a = in.axes;
+    if ( a[1] < -0.5f ) now.set( key( LogicalKey::W ) );
+    if ( a[1] > 0.5f ) now.set( key( LogicalKey::S ) );
+    if ( a[0] < -0.5f ) now.set( key( LogicalKey::A ) );
+    if ( a[0] > 0.5f ) now.set( key( LogicalKey::D ) );
+    if ( in.padButtons & ( 1u << SDL_GAMEPAD_BUTTON_SOUTH ) ) now.set( key( LogicalKey::Space ) );
+    if ( a[5] > 0.5f || ( in.padButtons & ( 1u << SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER ) ) ) now.set( key( LogicalKey::MouseLeft ) );
+    if ( in.padButtons & ( 1u << SDL_GAMEPAD_BUTTON_LEFT_STICK ) ) now.set( key( LogicalKey::LeftShift ) );
+    for ( unsigned k = 1; k < static_cast<unsigned>( LogicalKey::COUNT ); ++k ) {
+      if ( now.test( k ) != padKeys.test( k ) ) keyEdge( static_cast<LogicalKey>( k ), now.test( k ) );
+    }
+    padKeys = now;
+    constexpr float DEAD = 0.2f, STICK_LOOK = 600.f * static_cast<float>( Constants::MILLISECONDS_PER_FRAME / 1000.0 );
+    const float rx = std::abs( a[2] ) > DEAD ? a[2] : 0, ry = std::abs( a[3] ) > DEAD ? a[3] : 0;
+    if ( rx != 0 || ry != 0 ) Trigger::sendLook( rx * STICK_LOOK, ry * STICK_LOOK );
+  }
 }
 
 // --- windows --------------------------------------------------------------------------------------------------------

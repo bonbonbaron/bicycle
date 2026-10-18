@@ -44,11 +44,11 @@ namespace bicycle {
 
   void init( const std::string& gameName ) {
     // Release builds mount the pack linked into the executable (BICYCLE_RELEASE) or <game>/assets.bpak
-    // (BICYCLE_RELEASE_ASSETS); see include/data/Pack.h. Dev builds read loose files only. First, so the renderer
-    // can load its fonts from it.
+    // (BICYCLE_RELEASE_ASSETS); see include/data/Pack.h. Dev builds read loose files only (mount() refuses there and
+    // notes a stale pack it ignores). First, so the renderer can load its fonts from it.
 #ifdef BICYCLE_RELEASE
     if ( !assets::mount( gameName ) ) die( "bicycle: the embedded asset pack is corrupt" );
-#elif defined( BICYCLE_RELEASE_ASSETS )
+#else
     assets::mount( gameName );
 #endif
     startup::mark( "asset pack" );
@@ -112,6 +112,8 @@ namespace bicycle {
     auto& wm = WindowManager::getInstance();
     return wm.push( shared );
   }
+
+  static float s_frameRate{};  // see frameRate()
 
   extern "C" {
     // DIALOGUES
@@ -454,6 +456,19 @@ namespace bicycle {
       return scene ? scene->addHudBar( label, max, len, x, y ) : -1;
     }
 
+    // A text label on the current scene (see Scene::addHudText for x and y); returns its id (-1 if no scene).
+    int addHudText( const char* text, int x, int y ) {
+      auto scene = currScene();
+      return scene ? scene->addHudText( text ? text : "", x, y ) : -1;
+    }
+
+    void setHudText( int id, const char* text ) {
+      if ( auto scene = currScene() ) scene->setHudText( id, text ? text : "" );
+    }
+
+    // Frames per second, measured by the main loop over the last half second or so (0 until then).
+    float frameRate() { return s_frameRate; }
+
     void setHudBar( int id, int val ) {
       auto scene = currScene();
       if ( Bar* bar = scene ? scene->getHudBar( id ) : nullptr ) {
@@ -634,6 +649,11 @@ namespace bicycle {
       return timer.create( timeMs, entity, timeoutType, repeat, addr );
     }
 
+    // Stops a timer (createTimer's id) before it times out again.
+    void stopTimer( const TimerId timerId ) {
+      Timer::getInstance().stop( timerId );
+    }
+
     // ASSETS (the game's asset pack, or loose files; see include/data/Pack.h)
     // Returns the asset's bytes (valid until the next call) and their length, or null.
     const char* assetRead( const char* path, size_t* len ) {
@@ -685,7 +705,9 @@ namespace bicycle {
 
     // BICYCLE_SCRIPTED_INPUT="d@30-60/3,a@70-90/2": press D every 3rd frame from frame 30 to 60, then A every 2nd
     // from 70 to 90 (WASD/E/space), through the same path as real keys. For headless captures and tests, any mode.
-    struct Press { LogicalKey key; long from, to, every; };
+    // "/1" (or no step) holds the key: pressed on the first frame, released after the last. A step taps: each
+    // occurrence presses and the next frame releases.
+    struct Press { LogicalKey key; long from, to, every; bool down; };
     std::vector<Press> script;
     if ( const char* s = std::getenv( "BICYCLE_SCRIPTED_INPUT" ) ) {
       std::stringstream ss( s );
@@ -696,7 +718,7 @@ namespace bicycle {
         if ( std::sscanf( item.c_str(), "%c@%ld-%ld/%ld", &k, &from, &to, &every ) >= 3 && every > 0 ) {
           const char c = static_cast<char>( std::tolower( static_cast<unsigned char>( k ) ) );
           const LogicalKey key = c == ' ' ? LogicalKey::Space : c >= 'a' && c <= 'z' ? static_cast<LogicalKey>( c - 'a' + 1 ) : LogicalKey::NOTHING;
-          if ( key != LogicalKey::NOTHING ) script.push_back( { key, from, to, every } );
+          if ( key != LogicalKey::NOTHING ) script.push_back( { key, from, to, every, false } );
         }
       }
     }
@@ -722,32 +744,45 @@ namespace bicycle {
     unsigned scriptedButtons{};
     const bool frameStats = std::getenv( "BICYCLE_FRAME_STATS" ) && *std::getenv( "BICYCLE_FRAME_STATS" ) == '1';
     std::array<double, 3> acc{};
+    auto fpsFrom = std::chrono::steady_clock::now();
+    int fpsFrames{};
 
     while ( wm.size() > 0 ) {
       if ( maxFrames > 0 && frames >= maxFrames ) break;
       // Inputs
       Timer::run();
       auto& held = inputState();
-      if ( gfx::renderer().mode() == gfx::Mode::Ascii ) {  // terminals report presses only: no held state
+      if ( gfx::renderer().mode() == gfx::Mode::Ascii ) {  // the terminal listener re-marks the keys it holds down
         held.beginFrame();
         held.held.reset();
       }
       gfx::renderer().pollInput();
-      for ( const auto& p : script ) {
-        if ( frames >= p.from && frames <= p.to && ( frames - p.from ) % p.every == 0 ) {
+      for ( auto& p : script ) {
+        const bool down = frames >= p.from && frames <= p.to && ( frames - p.from ) % p.every == 0;
+        if ( down != p.down ) {
           Input in{};
-          in.currKeysPressed.set( static_cast<unsigned>( p.key ) );
+          if ( down ) in.currKeysPressed.set( static_cast<unsigned>( p.key ) );
           in.lastPressed = p.key;
-          Trigger::sendInput( in );
-          if ( frames == p.from || p.every > 1 ) held.pressed.set( static_cast<unsigned>( p.key ) );
-          held.held.set( static_cast<unsigned>( p.key ) );
+          Trigger::sendInput( in, down );
+          if ( down ) held.pressed.set( static_cast<unsigned>( p.key ) );
+          p.down = down;
         }
+        if ( down ) held.held.set( static_cast<unsigned>( p.key ) );
       }
       unsigned buttons{};
+      float lookDx{}, lookDy{};
       for ( const auto& m : mouseScript ) {
         if ( frames < m.from || frames > m.to ) continue;
-        if ( m.button < 0 ) { held.mouseDx += m.dx; held.mouseDy += m.dy; }
+        if ( m.button < 0 ) { held.mouseDx += m.dx; held.mouseDy += m.dy; lookDx += m.dx; lookDy += m.dy; }
         else buttons |= 1u << m.button;
+      }
+      if ( lookDx != 0 || lookDy != 0 ) Trigger::sendLook( lookDx, lookDy );
+      for ( unsigned b = 0; b < 3; ++b ) {  // scripted buttons are events too (MouseLeft/Right/Middle)
+        const bool now = buttons & ( 1u << b ), before = scriptedButtons & ( 1u << b );
+        if ( now == before ) continue;
+        Input in{};
+        in.lastPressed = static_cast<LogicalKey>( static_cast<int>( LogicalKey::MouseLeft ) + static_cast<int>( b ) );
+        Trigger::sendInput( in, now );
       }
       held.mouseButtons = ( held.mouseButtons & ~scriptedButtons ) | buttons;
       held.mousePressed |= buttons & ~scriptedButtons;
@@ -758,6 +793,12 @@ namespace bicycle {
       }
       using clk = std::chrono::steady_clock;
       const auto t0 = clk::now();
+      ++fpsFrames;  // frameRate(): frames over the last half second or so
+      if ( const double dt = std::chrono::duration<double>( t0 - fpsFrom ).count(); dt >= 0.5 ) {
+        s_frameRate = static_cast<float>( fpsFrames / dt );
+        fpsFrames = 0;
+        fpsFrom = t0;
+      }
       Kinematics::getInstance().run();  // 2D motions, then the 3D layer (physics, camera rig)
       MidiPlayer::getInstance().tickFade();
       CollisionDetector::check();

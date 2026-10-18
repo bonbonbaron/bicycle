@@ -1,8 +1,12 @@
--- written by scripts/blender/export.py from meadow3d.blend
+-- written by tools/blender (bicycle add-on) from meadow3d.blend, Blender scene "Scene": don't edit, re-export.
+-- objects: the level's meshes; entities: genomes placed in it (genome/<name>.lua) with per-instance
+-- parameters; spawns: { x, y, z, yaw } where doors and Scene.go put the player.
 return {
   objects = {
-    { name = "pilgrim3d", mesh = "model/pilgrim3d", role = "character" },
     { name = "ground", mesh = "model/ground", role = "static" },
     { name = "crate", mesh = "model/crate", role = "static" },
-  }
+  },
+  entities = {
+  },
+  spawns = {},
 }

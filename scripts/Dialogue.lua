@@ -23,7 +23,8 @@ Dialogue.new = function( text, x, y, w, h, onClose )
   return instance
 end
 
-function Dialogue:onInput( input )
+function Dialogue:onInput( input, pressed )
+  if pressed == false then return end  -- releases (and the release of the key that opened us) change nothing
   -- The C++ Dialogue has already seen this key (it pages forward on E and Space).
   if ffi.C.isDialogueDone() or input == ffi.C.Escape then
     ffi.C.popWindow()

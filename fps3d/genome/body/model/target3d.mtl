@@ -1,0 +1,11 @@
+newmtl target_red
+Kd 0.9000 0.1200 0.1000
+d 1.0000
+
+newmtl target_white
+Kd 0.9500 0.9500 0.9500
+d 1.0000
+
+newmtl metal
+Kd 0.4500 0.4800 0.5200
+d 1.0000

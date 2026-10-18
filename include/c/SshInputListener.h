@@ -6,6 +6,7 @@
 #endif
 #include <iostream>
 #include "c/Input.h"
+#include "c/TermInput.h"
 
 using namespace std;
 
@@ -26,6 +27,9 @@ class SshInput {
 #ifndef _WIN32
     struct termios origTerm;  // let's us restore terminal to its original state before starting the game in dtor
 #endif
-    auto convertCodeToLogicalInt(int code) -> LogicalKey;
+    term::Decoder _decoder{};            // bytes -> key/mouse events (escape sequences, kitty protocol, SGR mouse)
+    term::KeyReleaseDetector _keys{};    // press/hold/release from auto-repeat timing (or real kitty events)
+    void onEvent( const term::Event& ev, double tMs );
+    void send( LogicalKey k, bool pressed );
 };
 

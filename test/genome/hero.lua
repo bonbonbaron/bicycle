@@ -1,5 +1,4 @@
 require('bicycle')
-local Sound = require('Sound')
 local Scene = require('Scene')
 local Hud = require('Hud')
 require('Dialogue')
@@ -7,7 +6,15 @@ require('Dialogue')
 -- is blocked by solid things, gets hurt by enemies (health bar up top), and talks to NPCs with E or Space.
 -- model: in 3D mode the hero is the Blender character test/genome/model/pilgrim3d (scripts/blender/make_scene.py).
 -- persist: the hero survives scene changes (Scene.go in scripts/Scene.lua): carried through doors, HUD and camera kept.
-local hero = { sprite="pilgrim", model="pilgrim3d", initAnim="walk_down", coll={ type="hero" }, persist=true }
+-- timer: the flash/invulnerability tick (onTimer); sfx: the hero's own sounds.
+local TICK_MS = 100             -- flash/invulnerability timer period
+local WALK_MS = 90              -- while a direction key is held: one step this often (the first on the press)
+local WALK_TIMER = 7            -- its timer type (the timer gene's is 0)
+local hero = {
+  sprite = "pilgrim", model = "pilgrim3d", initAnim = "walk_down", coll = { type = "hero" }, persist = true,
+  timer = { ms = TICK_MS },
+  sfx = { soundfont = "meadow", program = 120, sounds = { bump = 60, hurt = 55, blip = 76 } },
+}
 
 local STEP = 256  -- one cell in fixed-point (FIXEDPT_DEC_BITS = 8)
 local DIRS = {
@@ -21,10 +28,8 @@ local BLOCKERS = { [SOLID]=true, [ENEMY]=true, [NPC]=true }
 local MAX_HEALTH = 10
 local DAMAGE = 2
 local KNOCKBACK = 6 * STEP      -- columns pushed away from whatever hurt us
-local TICK_MS = 100             -- flash/invulnerability timer period
 local INVULNERABLE_TICKS = 10   -- ~1 s of invulnerability (and flashing) after a hit
 local TALK_REACH = 2            -- cells of gap allowed between us and someone we talk to
-local TICK = 1                  -- timeout type of our timer
 
 local function box( id ) return ffi.C.World_getBoxes().arr[id] end
 
@@ -34,7 +39,6 @@ function hero:onSpawn()
   self.health = MAX_HEALTH
   self.hp = Hud.bar( "HP", MAX_HEALTH )
   self.invulnerable = 0
-  ffi.C.createTimer( TICK_MS, self.id, TICK, true, ffi.C.TO_BRIDGE )
   -- The camera is a kinematic body tracking us (Camera.track in scripts/bicycle.lua). It glides after us with a
   -- dead zone; BICYCLE_CAMERA=hard makes it hard-track instead (snap, no dead zone).
   if os.getenv( "BICYCLE_CAMERA" ) == "hard" then
@@ -68,8 +72,24 @@ function hero:speakerInReach()
   end
 end
 
-function hero:onInput(input)
+-- Input: a direction key steps once when pressed and keeps stepping (a walk timer) until it's released; the newest
+-- held direction wins. Releases of other keys mean nothing here.
+function hero:onInput(input, pressed)
   input = tonumber( input )
+  if DIRS[input] then
+    self.held = self.held or {}
+    for i = #self.held, 1, -1 do if self.held[i] == input then table.remove( self.held, i ) end end
+    if pressed then table.insert( self.held, input ) end
+    if #self.held == 0 and self.walkTimer then
+      self:stopTimer( self.walkTimer )
+      self.walkTimer = nil
+    elseif #self.held > 0 and not self.walkTimer then
+      self.walkTimer = self:every( WALK_MS, WALK_TIMER )
+    end
+    if pressed then self:step( DIRS[input] ) end
+    return
+  end
+  if not pressed then return end
   if input == ffi.C.Q then
     ffi.C.popWindow()
     return
@@ -79,18 +99,20 @@ function hero:onInput(input)
     if Scene.useDoor() then return end  -- standing in a door (on = "press" doors wait for this)
     local npc = self:speakerInReach()
     if npc then
-      Sound.play( "blip" )
+      self:sound( "blip" )
       dbglog( "talk to %s", npc.name )
       Dialogue.new( npc.name..":\n"..table.concat( npc.lines, "\n\n" ), nil, nil, nil, nil, function() dbglog( "talk done" ) end )
     end
     return
   end
-  local dir = DIRS[input]
-  if dir and self:blockedBy( dir ) then
+end
+
+function hero:step( dir )
+  if self:blockedBy( dir ) then
     self.anim:set( dir.strip )
-    Sound.play( "bump" )
+    self:sound( "bump" )
     dbglog( "hero blocked" )
-  elseif dir then
+  else
     self.anim:set( dir.strip )  -- no-op if already walking this way
     local pos = box( self.id ).pos
     self.prevPos = { x = pos.x, y = pos.y }  -- where to step back to if this move bumps into something solid
@@ -107,7 +129,7 @@ function hero:hurt( by )
   end
   self.health = self.hp:set( self.health - DAMAGE )
   self.invulnerable = INVULNERABLE_TICKS
-  Sound.play( "hurt" )
+  self:sound( "hurt" )
   -- Knock back, away from whatever hit us.
   local me, b = box( self.id ), box( by )
   local away = ( me.pos.x + me.size.w / 2 ) < ( b.pos.x + b.size.w / 2 ) and -1 or 1
@@ -138,8 +160,19 @@ function hero:onSceneEnter( sceneName, spawnName )
   dbglog( "hero entered %s (spawn %s)", sceneName, tostring( spawnName ) )
 end
 
--- Flash while invulnerable.
-function hero:onTimeout(timerId, timeoutType)
+-- The walk timer steps in the newest held direction; the timer gene's tick flashes while invulnerable.
+function hero:onTimer(timerId, timeoutType)
+  if timeoutType == WALK_TIMER then
+    local held = self.held or {}
+    if getFocus() ~= self.id then  -- a dialogue took the input (and will get the key's release): stop walking
+      self.held = {}
+      self:stopTimer( timerId )
+      self.walkTimer = nil
+    elseif #held > 0 then
+      self:step( DIRS[held[#held]] )
+    end
+    return
+  end
   if self.invulnerable > 0 then
     self.invulnerable = self.invulnerable - 1
     ffi.C.setHidden( self.id, self.invulnerable % 2 == 1 )
@@ -154,7 +187,7 @@ function hero:onCollision(other, collType)
       local pos = box( self.id ).pos
       pos.x, pos.y = self.prevPos.x, self.prevPos.y
       self.prevPos = nil
-      if collType ~= ENEMY then Sound.play( "bump" ) end
+      if collType ~= ENEMY then self:sound( "bump" ) end
       dbglog( "hero bumped; back to %d,%d", pos.x / STEP, pos.y / STEP )
     end
   end

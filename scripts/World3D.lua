@@ -2,10 +2,10 @@
 -- yaw 0 looks down -Z. An entity's position is its feet. 2D games don't need this module.
 --
 --   local W = require("World3D")
---   W.level( "./plat3d/genome/level/scene3d.lua" )       -- draw + collide every static object
+--   W.level( "courtyard" )                               -- genome/level/courtyard.lua: draw + collide its static meshes
 --   local hero = W.Body.new{ kind = "character", x = 0, y = 1, z = 0, model = "hero3d", modelYaw = -90 }
 --   W.Camera.orbit( hero.id, { distance = 6, height = 1.4, rate = 10 } )
---   function onFrame( dt ) hero:wish( vx, vz ) if jump then hero:jump() end end
+--   hero:move( right, fwd ) (camera-relative, on a key press/release) or hero:wish( vx, vz ); hero:jump()
 --   local hit = W.raycast( eye, dir, 100, hero.id )      -- hitscan: { x, y, z, nx, ny, nz, t, entity }
 local ffi = require("ffi")
 ffi.cdef([[
@@ -19,10 +19,13 @@ ffi.cdef([[
   void xfSetScale( unsigned e, float x, float y, float z );
   void xfSetModelYaw( unsigned e, float deg );
   void xfSetVisible( unsigned e, bool v );
+  void xfSetShadow( unsigned e, float radius, float alpha );
   void xfRemove( unsigned e );
   void bodySet( unsigned e, int kind, float r, float h, float d, unsigned collType, bool solid );
   void bodyTune( unsigned e, float gravity, float jumpSpeed, float accelGround, float accelAir, float maxSlopeDeg, float stepHeight );
   void bodyWish( unsigned e, float vx, float vz );
+  void bodyMove( unsigned e, float right, float fwd );
+  void bodyTurnRate( unsigned e, float rate );
   void bodyJump( unsigned e );
   void bodySetVel( unsigned e, float x, float y, float z );
   Vec3f bodyGetVel( unsigned e );
@@ -38,10 +41,13 @@ ffi.cdef([[
   void motionOrbit3D( unsigned e, unsigned center, float cx, float cy, float cz, float r, float degPerSec, float phaseDeg, float bobAmp, float bobHz );
   void motionFollow3D( unsigned e, unsigned tgt, float ox, float oy, float oz, float rate );
   void motionSpin3D( unsigned e, float degPerSec );
+  void motionView3D( unsigned e, unsigned tgt, float right, float up, float fwd );
+  void motionKick3D( unsigned e, float back, float pitchDeg, float rate );
   void cam3dRig( unsigned camera, int mode, unsigned target );
   void cam3dParams( float distance, float height, float eyeHeight, float rate, bool collide, float sideDistance );
   void cam3dPitchLimits( float minDeg, float maxDeg );
   void cam3dLook( float dYawDeg, float dPitchDeg );
+  void cam3dTurn( float yawDegPerSec, float pitchDegPerSec );
   void cam3dSetAngles( float yawDeg, float pitchDeg );
   float cam3dYaw();
   float cam3dPitch();
@@ -55,20 +61,23 @@ ffi.cdef([[
   void view3dLight( float dx, float dy, float dz, float r, float g, float b, float ambient, bool shadows );
   void view3dBillboardPixel( float meters );
   void view3dCrosshair( bool on );
+  void view3dShadowQuality( int q );
   void playSoundFXAt( int key, int vel, float x, float y, float z, float ref, float maxDist );
 ]])
 local C = ffi.C
 local W = {}
 local rad, deg = math.rad, math.deg
 
--- The level: every object of an exported scene3d.lua (scripts/blender/export.py). role "static" is drawn and
--- collides, "decor" is only drawn, "collider" only collides (invisible walls), "character" is skipped (placed by
--- the game). Returns the scene table.
+-- The level: every object of an exported level file (genome/level/<name>.lua, tools/blender). role "static" is drawn
+-- and collides, "decor" is only drawn, "collider" only collides (invisible walls), "character" is skipped (genome
+-- models, drawn where entities are placed). Returns the level table (its entities and spawns are Scene.lua's).
+-- level: a bare level name ("courtyard") or an old file path.
 function W.level( scenePath, cell )
+  if not scenePath:find( "/", 1, true ) then scenePath = require( "Ids" ).asset( "level", scenePath ) end
   -- mesh names in the list are relative to the game's genome/ (e.g. "model/ground")
   local dir = scenePath:match( "^(.*/genome/)" ) or scenePath:match( "^(.*/)" )
   local scene = Asset.dofile( scenePath )
-  for _, obj in ipairs( scene.objects ) do
+  for _, obj in ipairs( scene.objects or {} ) do
     local mesh = dir..obj.mesh..".bmesh"
     if obj.role == "static" or obj.role == "decor" then
       if not ffi.C.addStaticModel( mesh ) then error( "3D: can't load "..mesh.." (build the 'assets' target)" ) end
@@ -94,6 +103,7 @@ local KIND = { character = 1, kinematic = 2, box = 3 }
 -- placed on the next scene's spawn point (companions keep their offset from it).
 W.live = {}        -- this scene's bodies
 W.persistent = {}  -- id -> body
+W.persistentByName = {}  -- genome name -> its persistent body (Genome.spawn3d): not spawned again by the next scene
 W.player = false
 local function scoped( persist, fn )
   local S = package.loaded["Scene"]
@@ -127,7 +137,7 @@ function W.Body.make( opts )
     C.bodyTune( id, opts.gravity or 25, opts.jumpSpeed or 9, opts.accel or 60, opts.airAccel or 18, opts.maxSlope or 50, opts.step or 0.35 )
   end
   if opts.model then
-    if not ffi.C.setModel( id, "./"..gameName.."/genome/model/"..opts.model..".bmesh" ) then
+    if not ffi.C.setModel( id, require( "Ids" ).asset( "model", opts.model ) ) then
       error( "3D: can't load model "..opts.model )
     end
   end
@@ -135,6 +145,15 @@ function W.Body.make( opts )
     if not ffi.C.newPixelImage( id, opts.image ) then error( "3D: can't load image "..opts.image ) end
   end
   if opts.modelYaw then C.xfSetModelYaw( id, opts.modelYaw ) end
+  -- shadow: the blob shadow under a modelled body (drawn when shadow maps are off: GLES2 / Pi Zero, BICYCLE_SHADOWS=off).
+  -- nil/true: on, sized from the body; false: none; a number: the radius (m); { radius =, alpha = } (alpha 0..1).
+  if opts.shadow ~= nil and opts.shadow ~= true then
+    local s = opts.shadow
+    if s == false then C.xfSetShadow( id, 0, 0 )
+    elseif type( s ) == "number" then C.xfSetShadow( id, s, 0.55 )
+    else C.xfSetShadow( id, s.radius or -1, s.alpha or 0.55 ) end
+  end
+  if opts.turnRate then C.bodyTurnRate( id, opts.turnRate ) end
   if opts.scale then
     local s = type( opts.scale ) == "number" and { opts.scale, opts.scale, opts.scale } or opts.scale
     C.xfSetScale( id, s[1], s[2], s[3] )
@@ -159,6 +178,10 @@ function W.Body:setPos( x, y, z ) C.xfSet( self.id, x, y, z ) end
 function W.Body:setYaw( d ) C.xfSetRot( self.id, d, 0, 0 ) end
 function W.Body:yaw() return C.xfGetYaw( self.id ) end
 function W.Body:wish( vx, vz ) C.bodyWish( self.id, vx, vz ) end
+-- Camera-relative movement, set when it changes (a key press or release), not every frame: (right, forward) m/s
+-- relative to wherever the camera faces, re-aimed by the physics step as the camera turns. With the body's
+-- turnRate (body gene) it also turns to face the way it moves. wish() (world space) switches this off.
+function W.Body:move( right, fwd ) C.bodyMove( self.id, right, fwd ) end
 function W.Body:jump() C.bodyJump( self.id ) end
 function W.Body:vel() local v = C.bodyGetVel( self.id ) return v.x, v.y, v.z end
 function W.Body:setVel( x, y, z ) C.bodySetVel( self.id, x, y, z ) end
@@ -174,8 +197,18 @@ function W.Body:remove()
   table.insert( W.dying, self.id )
   unregister( self.id )
   W.persistent[self.id] = nil
+  if self.genomeName and W.persistentByName[self.genomeName] == self then W.persistentByName[self.genomeName] = nil end
   for i, b in ipairs( W.live ) do if b == self then table.remove( W.live, i ) break end end
 end
+-- One of the body's genome sounds (its sfx gene; scripts/Sound.lua), played where the body is.
+function W.Body:sound( name, vel )
+  local x, y, z = self:pos()
+  require( "Sound" ).playFor( self, name, vel, x, y, z )
+end
+-- Timers (onTimer( self, timerId, type )), as on 2D genome instances.
+function W.Body:after( ms, ttype ) return C.createTimer( ms, self.id, ttype or 0, false, C.TO_BRIDGE ) end
+function W.Body:every( ms, ttype ) return C.createTimer( ms, self.id, ttype or 0, true, C.TO_BRIDGE ) end
+function W.Body:stopTimer( id ) C.stopTimer( id ) end
 -- Kinematics-driven motions (the same system as the 2D motions, on the transform).
 function W.Body:path( points, speed, pingPong )
   for _, p in ipairs( points ) do C.motionWaypoint3D( self.id, p[1], p[2], p[3] ) end
@@ -188,8 +221,14 @@ end
 function W.Body:follow( target, opts )
   opts = opts or {}
   local o = opts.offset or { 0, 0, 0 }
+  if opts.view then  -- ride in the target's view: offset = { right, up, forward }, turned with its yaw and pitch
+    C.motionView3D( self.id, target, o[1], o[2], o[3] )
+    return
+  end
   C.motionFollow3D( self.id, target, o[1], o[2], o[3], opts.mode == "hard" and 0 or ( opts.rate or 6 ) )
 end
+-- Recoil for a view rider (follow{ view = true }): back meters and pitchDeg up, easing out at rate per second.
+function W.Body:kick( back, pitchDeg, rate ) C.motionKick3D( self.id, back or 0.06, pitchDeg or 6, rate or 8 ) end
 function W.Body:spin( degPerSec ) C.motionSpin3D( self.id, degPerSec ) end
 
 -- Raycast (hitscan): origin and direction tables { x, y, z }; returns nil or { x, y, z, nx, ny, nz, t, entity }
@@ -208,6 +247,7 @@ end
 --   W.Camera.look( dYawDeg, dPitchDeg )                  -- feed mouse / stick deltas
 --   W.Camera.fov( 70 )
 W.Camera = {}
+function W.Camera.id() return ffi.C.cameraEntity() end
 local function rig( mode, target, opts )
   opts = opts or {}
   W.Camera.last = { mode = mode, target = target or 0, opts = opts }  -- re-applied after a scene change
@@ -235,6 +275,8 @@ function W.Camera.reapply()
   rig( l.mode, l.target, keep )
 end
 function W.Camera.look( dy, dp ) C.cam3dLook( dy, dp ) end
+-- Keeps turning (degrees per second) until told otherwise: held camera keys set it on press, clear it on release.
+function W.Camera.turn( yawRate, pitchRate ) C.cam3dTurn( yawRate or 0, pitchRate or 0 ) end
 function W.Camera.angles() return C.cam3dYaw(), C.cam3dPitch() end
 function W.Camera.setAngles( y, p ) C.cam3dSetAngles( y, p ) end
 function W.Camera.fly( r, u, b ) C.cam3dFreeVel( r, u, b ) end
@@ -263,8 +305,28 @@ function W.View.light( dir, color, ambient, shadows )
 end
 function W.View.billboardPixel( m ) C.view3dBillboardPixel( m ) end
 function W.View.crosshair( on ) C.view3dCrosshair( on ) end
+-- Shadow quality: "off" | "low" (512 map, 1 tap) | "med" (1024, 4-tap PCF) | "high" (2048, 9-tap) | "auto" (default:
+-- low on Raspberry Pi / Mali / llvmpipe, high otherwise). The BICYCLE_SHADOWS environment variable overrides it.
+local SHADOW_Q = { auto = -1, off = 0, low = 1, med = 2, high = 3 }
+function W.View.shadows( q ) C.view3dShadowQuality( SHADOW_Q[q or "auto"] or -1 ) end
 
 -- Positional sound: a SoundFont SFX key at a point, panned/attenuated for the camera.
 function W.sound( key, vel, x, y, z, ref, maxDist ) C.playSoundFXAt( key, vel or 100, x, y, z, ref or 3, maxDist or 60 ) end
+
+-- Engine events from 3D body state (so games don't poll it every frame): a character's onLand( self, speed ) when
+-- it touches down, and onFallOut( self ) when it drops below its killY (a genome field, default -15).
+local function bodyEvents()
+  local function check( b )
+    if b.removed then return end
+    if b.onLand and C.bodyJustLanded( b.id ) then b:onLand() end
+    if b.onFallOut then
+      local _, y = b:pos()
+      if y < ( b.killY or -15 ) then b:onFallOut() end
+    end
+  end
+  for _, b in ipairs( W.live ) do check( b ) end
+  for _, b in pairs( W.persistent ) do check( b ) end
+end
+table.insert( engineFrameHooks, bodyEvents )
 
 return W

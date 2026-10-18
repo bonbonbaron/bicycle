@@ -50,6 +50,19 @@ class Renderer2D final : public PixelRenderer {
       drawString( w, px, top, nums, 0xFFFFF4D8u, UI_TEXT_PX );
     }
 
+    // A HUD label: crisp text with a drop shadow on a dark translucent plate.
+    void drawHudText( WinHandle win, int y, int x, int align, const std::string& s ) override {
+      const Win* w = static_cast<Win*>( win );
+      if ( !w || ( w->attr & ATTR_INVISIBLE ) || s.empty() ) return;
+      const int tw = measureString( s, UI_TEXT_PX );
+      const int anchor = ( w->x + x ) * CELL_W;
+      const int px = align == 1 ? anchor - 8 - tw : align == 2 ? anchor - tw / 2 : anchor + 4;
+      const int top = ( w->y + y ) * CELL_H;
+      blendRect( w, px - 4, top - 1, tw + 8, CELL_H + 2, 0x90000000u );
+      drawString( w, px + 1, top + 1, s, 0xC0000000u, UI_TEXT_PX );
+      drawString( w, px, top, s, 0xFFFFF4D8u, UI_TEXT_PX );
+    }
+
     // A right-pointing gold arrow, pixel-art style.
     void drawMenuCursor( WinHandle win, int y, int x, const std::string& ) override {
       const Win* w = static_cast<Win*>( win );

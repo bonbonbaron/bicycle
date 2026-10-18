@@ -14,6 +14,5 @@ house.fg = {
     -- END entities
   }
 }
-house.music = { soundfont = "music/meadow.sf2", song = "music/house.mid" }
-house.sfx = { soundfont = "music/meadow.sf2", program = 120, sounds = { bump = 60, coin = 72, hurt = 55, blip = 76 } }
+house.music = { soundfont = "meadow", song = "house" }
 return house

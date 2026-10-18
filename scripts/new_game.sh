@@ -6,7 +6,7 @@ set -e
 G="$1"
 mkdir -p "$G"/genome/body/palette/color "$G"/genome/body/palette/collision \
          "$G"/genome/body/graybody/animation "$G"/genome/body/graybody/collision "$G"/genome/body/graybody/colormap \
-         "$G"/genome/tilemap "$G"/genome/scene "$G"/genome/level "$G"/genome/model "$G"/genome/music "$G"/aseprite
+         "$G"/genome/tilemap "$G"/genome/scene "$G"/genome/level "$G"/genome/model "$G"/genome/body/model "$G"/genome/music "$G"/aseprite "$G"/blender
 [ -e "$G/main.lua" ] || cat > "$G/main.lua" <<LUA
 require('bicycle')
 local Scene = require('Scene')

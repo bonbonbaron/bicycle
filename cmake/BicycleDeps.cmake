@@ -81,9 +81,22 @@ endfunction()
 
 # Configures, builds and installs a CMake project into BICYCLE_DEPS_PREFIX with this build's compilers.
 function( bicycle_build_cmake_dep name src )
+  # The stamp holds the dep's options, so changing them (e.g. SDL_LIBUDEV) rebuilds it on the next configure.
   set( stamp "${BICYCLE_DEPS_PREFIX}/.${name}-installed" )
+  string( REPLACE ";" " " opts "${ARGN}" )
   if ( EXISTS "${stamp}" )
-    return()
+    file( READ "${stamp}" old )
+    if ( old STREQUAL opts )
+      return()
+    endif()
+    # Stamps from before options were recorded are empty: keep those deps (no surprise full rebuild), except SDL3,
+    # whose options did change (libudev on, for keyboard/mouse input on the Linux console).
+    if ( old STREQUAL "" AND NOT name STREQUAL "sdl3" )
+      file( WRITE "${stamp}" "${opts}" )
+      return()
+    endif()
+    message( STATUS "bicycle: ${name}'s options changed; rebuilding it from a clean configure" )
+    file( REMOVE_RECURSE "${BICYCLE_DEPS_DIR}/build/${name}" )  # cached checks (e.g. a missing libudev.h) are redone
   endif()
   set( bin "${BICYCLE_DEPS_DIR}/build/${name}" )
   set( args -S "${src}" -B "${bin}" -G "${CMAKE_GENERATOR}"
@@ -109,7 +122,7 @@ function( bicycle_build_cmake_dep name src )
   bicycle_run( "configuring ${name}" "${CMAKE_COMMAND}" ${args} ${ARGN} )
   bicycle_run( "building ${name}" "${CMAKE_COMMAND}" --build "${bin}" --config Release --parallel ${BICYCLE_JOBS} )
   bicycle_run( "installing ${name}" "${CMAKE_COMMAND}" --install "${bin}" --config Release )
-  file( TOUCH "${stamp}" )
+  file( WRITE "${stamp}" "${opts}" )
 endfunction()
 
 # ncurses with terminfo compiled in and no database (release builds; see bicycle_curses).
@@ -135,8 +148,8 @@ function( bicycle_ncurses_embedded_terminfo )
     file( REMOVE_RECURSE "${bin}" "${prefix}" )
     file( MAKE_DIRECTORY "${bin}" )
     message( STATUS "bicycle: building ncurses 6.5 with built-in terminfo for ${fallbacks}" )
-    bicycle_run( "configuring ncurses" "${CMAKE_COMMAND}" -E env "CC=${CMAKE_C_COMPILER}"
-      sh "${src}/configure" "--prefix=${prefix}" --without-shared --without-debug --without-cxx
+    bicycle_run( "configuring ncurses" "${CMAKE_COMMAND}" -E env "CC=${CMAKE_C_COMPILER}" ${BICYCLE_NCURSES_CROSS_ENV}
+      sh "${src}/configure" ${BICYCLE_NCURSES_CROSS} "--prefix=${prefix}" --without-shared --without-debug --without-cxx
       --without-cxx-binding --without-ada --without-progs --without-tests --without-manpages --enable-overwrite
       --disable-database --disable-home-terminfo --disable-termcap "--with-fallbacks=${fallbacks}"
       "--with-tic-path=${BICYCLE_TIC}" "--with-infocmp-path=${BICYCLE_INFOCMP}"
@@ -217,8 +230,8 @@ function( bicycle_curses )
     set( bin "${BICYCLE_DEPS_DIR}/build/ncurses" )
     file( MAKE_DIRECTORY "${bin}" )
     message( STATUS "bicycle: building ncurses 6.5 (first configure only; this takes a minute)" )
-    bicycle_run( "configuring ncurses" "${CMAKE_COMMAND}" -E env "CC=${CMAKE_C_COMPILER}"
-      sh "${src}/configure" "--prefix=${BICYCLE_DEPS_PREFIX}" --without-shared --without-debug --without-cxx
+    bicycle_run( "configuring ncurses" "${CMAKE_COMMAND}" -E env "CC=${CMAKE_C_COMPILER}" ${BICYCLE_NCURSES_CROSS_ENV}
+      sh "${src}/configure" ${BICYCLE_NCURSES_CROSS} "--prefix=${BICYCLE_DEPS_PREFIX}" --without-shared --without-debug --without-cxx
       --without-cxx-binding --without-ada --without-progs --without-tests --without-manpages --enable-overwrite
       --with-default-terminfo-dir=/usr/share/terminfo
       --with-terminfo-dirs=/etc/terminfo:/lib/terminfo:/usr/share/terminfo:/usr/lib/terminfo
@@ -229,7 +242,12 @@ function( bicycle_curses )
   endif()
   add_library( bicycle_curses INTERFACE )
   target_include_directories( bicycle_curses INTERFACE "${BICYCLE_DEPS_PREFIX}/include" )
-  target_link_libraries( bicycle_curses INTERFACE "${BICYCLE_DEPS_PREFIX}/lib/libncurses.a" )
+  # ncurses 6.5 builds the wide-character library (libncursesw) by default.
+  set( lib "${BICYCLE_DEPS_PREFIX}/lib/libncursesw.a" )
+  if ( NOT EXISTS "${lib}" AND EXISTS "${BICYCLE_DEPS_PREFIX}/lib/libncurses.a" )
+    set( lib "${BICYCLE_DEPS_PREFIX}/lib/libncurses.a" )
+  endif()
+  target_link_libraries( bicycle_curses INTERFACE "${lib}" )
   message( STATUS "bicycle: ncurses 6.5 (fetched)" )
 endfunction()
 
@@ -270,7 +288,7 @@ function( bicycle_luajit )
       endif()
       if ( CMAKE_CROSSCOMPILING )
         # LuaJIT builds code generators (buildvm, minilua) for the build machine first.
-        list( APPEND margs "HOST_CC=${BICYCLE_HOST_CC}" "TARGET_SYS=${CMAKE_SYSTEM_NAME}" )
+        list( APPEND margs "HOST_CC=${BICYCLE_LUAJIT_HOST_CC}" "TARGET_SYS=${CMAKE_SYSTEM_NAME}" )
       endif()
       if ( APPLE AND CMAKE_OSX_DEPLOYMENT_TARGET )
         list( APPEND margs "MACOSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET}" )
@@ -294,6 +312,16 @@ function( bicycle_luajit )
   message( STATUS "bicycle: LuaJIT 2.1 (fetched): ${lib}" )
 endfunction()
 set( BICYCLE_HOST_CC "cc" CACHE STRING "Host C compiler for LuaJIT's build tools when cross-compiling" )
+# LuaJIT's buildvm must have the target's pointer size: a 32-bit target (armhf) needs e.g. "gcc -m32" here.
+set( BICYCLE_LUAJIT_HOST_CC "${BICYCLE_HOST_CC}" CACHE STRING "Host C compiler for LuaJIT's buildvm/minilua (32-bit targets: gcc -m32)" )
+# Cross-compiling ncurses (e.g. for a Raspberry Pi): autoconf needs --host, and ncurses builds helper programs
+# with BUILD_CC for the build machine.
+set( BICYCLE_NCURSES_CROSS )
+set( BICYCLE_NCURSES_CROSS_ENV )
+if ( CMAKE_CROSSCOMPILING AND NOT WIN32 )
+  set( BICYCLE_NCURSES_CROSS "--host=${CMAKE_SYSTEM_PROCESSOR}-linux-gnu" )
+  set( BICYCLE_NCURSES_CROSS_ENV "BUILD_CC=${BICYCLE_HOST_CC}" "AR=${CMAKE_AR}" "RANLIB=${CMAKE_RANLIB}" )
+endif()
 
 # --- fluidsynth ---------------------------------------------------------------------------------------------------
 function( bicycle_fluidsynth )
@@ -380,7 +408,7 @@ function( bicycle_sdl3 )
     -DSDL_INSTALL_DOCS=OFF -DSDL_DISABLE_INSTALL_DOCS=ON -DSDL_CAMERA=OFF -DSDL_SENSOR=OFF -DSDL_HAPTIC=OFF
     -DSDL_JOYSTICK=OFF -DSDL_HIDAPI=OFF -DSDL_POWER=OFF -DSDL_AUDIO=OFF -DSDL_GPU=OFF -DSDL_VULKAN=OFF
     -DSDL_DIALOG=OFF -DSDL_TRAY=OFF -DSDL_PIPEWIRE=OFF -DSDL_PULSEAUDIO=OFF -DSDL_ALSA=OFF -DSDL_JACK=OFF
-    -DSDL_SNDIO=OFF -DSDL_IBUS=OFF -DSDL_LIBURING=OFF -DSDL_DBUS=OFF -DSDL_LIBUDEV=OFF
+    -DSDL_SNDIO=OFF -DSDL_IBUS=OFF -DSDL_LIBURING=OFF -DSDL_DBUS=OFF -DSDL_LIBUDEV=ON
     -DSDL_X11_XTEST=OFF -DSDL_X11_XSCRNSAVER=OFF )
   find_package( SDL3 CONFIG REQUIRED PATHS "${BICYCLE_DEPS_PREFIX}" NO_DEFAULT_PATH )
   add_library( bicycle_sdl3 INTERFACE )

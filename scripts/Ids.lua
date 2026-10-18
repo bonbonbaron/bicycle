@@ -6,6 +6,8 @@
 --                             exported after the last build gets the next free id (with a "rebuild" warning) so
 --                             you can keep working; in release builds the generated ids are complete.
 --   Ids.name( kind, id )      the name of an id (debugging)
+--   Ids.asset( kind, name )   the file of a bare-name asset reference (soundfont = "meadow" -> ./<game>/genome/
+--                             music/meadow.sf2; kinds in scripts/GenomeLayout.lua's Layout.REFS), as the build found it
 require( "bicycle" )
 local Ids = {}
 
@@ -63,5 +65,17 @@ function Ids.define( kind, name )
 end
 
 function Ids.name( kind, id ) return ( gen.names[kind] or {} )[id] end
+
+local Layout = require( "GenomeLayout" )
+function Ids.asset( kind, name, game )
+  game = game or gameName
+  if type( name ) ~= "string" or name == "" then error( "Ids.asset: " .. kind .. " needs a name, got " .. tostring( name ), 2 ) end
+  local found = gen.paths and gen.paths[game] and gen.paths[game][kind]
+  local rel = Layout.path( kind, name, found )
+  if not Layout.isPath( name ) and not ( found and found[name] ) and release then
+    error( "no " .. kind .. " '" .. name .. "' in " .. game .. "/genome/" .. Layout.REFS[kind].dir, 2 )
+  end
+  return "./" .. game .. "/genome/" .. rel
+end
 
 return Ids

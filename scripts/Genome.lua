@@ -478,6 +478,15 @@ end
 -- The generator (tools/ids/genids.lua) reads this table: the ids in gen/ids.lua/ids.h (ids::Coll) are these values.
 local COLL = { hero = 1, solid = 2, coin = 3, enemy = 4, npc = 5, door = 6, fire = 7 }
 
+-- The timer gene: timer = <ms> | { ms, rep = true, type = 0 }.
+local function startTimer( entity, t, tbl )
+  if type( t ) == "number" then t = { ms = t } end
+  checkType( t, "table" )
+  local id = ffi.C.createTimer( t.ms or 1000, entity, t.type or 0, t.rep ~= false, ffi.C.TO_BRIDGE )
+  if tbl then tbl.timerId = id end
+  return id
+end
+
 Gene["GeneLoader"] = {
   scene = function(entity, gene)
     checkType( entity, "number" )
@@ -539,11 +548,11 @@ Gene["GeneLoader"] = {
   initAnim = 0,  -- do nothing; read by the sprite loader
   palette = 0,   -- color palette variant: read by the sprite loader (Sprite.paletteSpec)
   collpal = 0,   -- collision palette: read by the coll loader (Sprite.collisionType)
-  -- model = "<Blender object>": in 3D mode the entity is drawn as test/genome/model/<name>.bmesh (exported by
-  -- scripts/blender/export.py) instead of its sprite; other modes ignore it.
+  -- model = "<Blender object>": in 3D mode the entity is drawn as genome/body/model/<name> (exported by
+  -- tools/blender; packed as .bmesh) instead of its sprite; other modes ignore it.
   model = function(entity, gene)
     if Sprite.renderMode() ~= "3d" then return end
-    if not ffi.C.setModel( entity, "./"..gameName.."/genome/model/"..gene.val..".bmesh" ) then
+    if not ffi.C.setModel( entity, Ids.asset( "model", gene.val ) ) then
       error( "Couldn't load model '"..gene.val.."' (meshes come from the asset pack: build the 'assets' target)." )
     end
     Animation.rigged[entity] = true
@@ -568,6 +577,19 @@ Gene["GeneLoader"] = {
     Scene.armDoor( tbl )
   end,
   sprite2d = 0,  -- read by Genome.new: the sprite pixel modes use instead of img/sprite (ASCII keeps its own art)
+  -- sfx = { soundfont = "sfx", program = 120, sounds = { collect = 72 } }: the genome's own sound effects, played
+  -- with self:sound( "collect" ) (scripts/Sound.lua). Resolved (and the SoundFont loaded, once per run) at spawn.
+  sfx = function( entity, gene ) require( "Sound" ).prepare( gene.val ) end,
+  -- timer = 1500 or { ms = 1500, rep = true, type = 0 }: starts with the entity; each time-out calls
+  -- self:onTimer( timerId, type ). (A once-only timer: rep = false.) Despawning stops it.
+  timer = function( entity, gene, tbl ) startTimer( entity, gene.val, tbl ) end,
+  timerId = 0,    -- set by the timer gene
+  params = 0,     -- per-instance parameters a scene / the Blender add-on may set (tools/blender; README, "Genomes")
+  body = 0,       -- 3D physics body (Genome.spawn3d); 2D/2.5D entities ignore it
+  shadow = 0,     -- 3D blob shadow: false = none, a radius (m) or { radius =, alpha = } (Genome.spawn3d; default on)
+  genomeName = 0, -- set by Genome.get
+  player = 0,     -- 3D: the persistent body put on the next scene's spawn point (Genome.spawn3d)
+  key = 0,        -- the instance's saved-state key (Scene.keyOf)
   onSpawn = 0,  -- do nothing; called by Scene once the entity is placed
   onUncollision = 0,  -- do nothing, just allow it to exist
   spriteData = 0,  -- do nothing; set by the sprite loader
@@ -582,7 +604,7 @@ Gene["GeneLoader"] = {
   lines = 0,  -- what an NPC says when talked to (see Dialogue.lua); read by its genome
   onInput = function(entity, gene) end,  -- do nothing, just allow it to exist
   onCollision = function(entity, gene) end,  -- do nothing, just allow it to exist
-  onTimer = function(entity, gene) end,  -- do nothing, just allow it to exist
+  onTimer = 0,  -- the timer gene's (or any createTimer's) time-outs: self:onTimer( timerId, type )
 }
 
 -- gameSupportedGenes is expected to be a table mapping to true.
@@ -625,7 +647,7 @@ Genome.__index = Genome
 -- overrides: fields a scene sets on this instance (e.g. a door's target), copied over the genome's own.
 Genome.new = function( name, overrides )
   local tbl = Genome.get( name ) -- tbl is the table of type-value pairs of genes (e.g. { img = "shopkeeper", ... })
-  for k, v in pairs( overrides or {} ) do tbl[k] = v end
+  Genome.merge( tbl, overrides )
   -- sprite2d = "<aseprite sprite>": pixel modes draw this instead of the img/sprite gene, so a genome can keep
   -- hand-made ASCII art for the ASCII mode and still have pixel art in 2D/3D.
   if tbl.sprite2d and Sprite.renderMode() ~= "ascii" then
@@ -646,13 +668,146 @@ Genome.new = function( name, overrides )
   return instance
 end
 
+-- What every genome instance can do (its table's metatable), whatever the render mode:
+--   self:sound( "collect" [, vel] )   one of the genome's own sounds (its sfx gene); 3D bodies play it where they are
+Genome.methods = {}
+Genome.instanceMeta = { __index = Genome.methods }
+function Genome.methods:sound( name, vel )
+  local Sound = require( "Sound" )
+  if self.pos and type( self.pos ) == "function" then  -- a 3D body (World3D.Body): positional
+    local x, y, z = self:pos()
+    return Sound.playFor( self, name, vel, x, y, z )
+  end
+  return Sound.playFor( self, name, vel )
+end
+-- Timers beyond the timer gene: onTimer( self, timerId, type ) gets them; type tells yours apart.
+--   self:after( ms, type )   once        self:every( ms, type )   repeatedly        self:stopTimer( id )
+function Genome.methods:after( ms, ttype ) return ffi.C.createTimer( ms, self.id, ttype or 0, false, ffi.C.TO_BRIDGE ) end
+function Genome.methods:every( ms, ttype ) return ffi.C.createTimer( ms, self.id, ttype or 0, true, ffi.C.TO_BRIDGE ) end
+function Genome.methods:stopTimer( id ) ffi.C.stopTimer( id ) end
+
 -- Returns a fresh copy of the genome's table so several instances (e.g. coins) each keep their own state.
 function Genome.get(genomeName)
   checkType(genomeName, "string")
   local proto = require("./"..gameName.."/genome/"..genomeName)
   local tbl = {}
   for k, v in pairs( proto ) do tbl[k] = v end
+  tbl.genomeName = genomeName
+  return setmetatable( tbl, Genome.instanceMeta )
+end
+
+-- Per-instance parameters over a genome's own fields (a scene's entry, a Blender placement): nested tables merge
+-- ({ door = { to = "bonus" } } keeps the genome's door.radius), lists (a path) replace. The genome's tables are
+-- copied, never changed, so other instances keep the defaults.
+local function isList( t ) return t[1] ~= nil or next( t ) == nil end
+function Genome.merge( tbl, overrides )
+  for k, v in pairs( overrides or {} ) do
+    if type( v ) == "table" and type( tbl[k] ) == "table" and not isList( v ) and not getmetatable( v ) then
+      local copy = {}
+      for kk, vv in pairs( tbl[k] ) do copy[kk] = vv end
+      tbl[k] = Genome.merge( copy, v )
+    else
+      tbl[k] = v
+    end
+  end
   return tbl
+end
+
+Genome.startTimer = startTimer
+
+local entityNamed  -- (MOTION, below)
+
+-- Entry fields that are about where/how it's placed, not genome fields.
+local PLACEMENT = { genome = true, pos = true, focus = true, key = true, yaw = true, persist = true }
+Genome.PLACEMENT = PLACEMENT
+
+--------------------
+---- 3D GENOMES (true-3D scenes, World3D.lua)
+--------------------
+-- The same genome files, spawned as World3D bodies where a 3D level (or scene) places them:
+--   model  = "coin3d"                             drawn as genome/body/model/coin3d (tools/blender exports it)
+--   body   = { kind = "kinematic" | "character" | "box", radius, height, half = { x, y, z }, solid, pitch, yaw,
+--              modelYaw, scale, gravity, jumpSpeed, accel, airAccel, maxSlope, step }   (no kind: drawn only)
+--   coll   = { type = "coin" }                    its collision type (Genome.COLL): overlaps call onCollision
+--   motion = { type = "spin", speed = 180, bob = 0.12, bobHz = 0.8 }           turns in place (and bobs)
+--            { type = "linear", speed = 2, path = { {0,0,0}, {0,3,0} }, pingpong = true }  (relative to its spot)
+--            { type = "orbital", radius = 2, speed = 45, around = "<genome>" | { x, y, z }, bob, bobHz }
+--            { type = "follow", target = "hero", offset = { x, y, z }, rate = 6 }
+--   door   = { to = "bonus", spawn = "entry", radius = 1, height = 2.5, on = "touch" | "press" }   a scene change
+--   body.turnRate = 14                          turns to face the way it moves (1/s), e.g. after self:move( r, f )
+--   killY = -15                                   below it: onFallOut( self ); landing: onLand( self )
+--   listen = true                                 gets every onInput( self, key, pressed, dx, dy ), focused or not
+--   onLevelReady( self )                          after the whole level is placed (find another placed genome)
+--   sfx, timer, persist, onSpawn, onCollision, onUncollision, onTimer, onInput, onSceneEnter, onDespawn as in 2D.
+-- entry = { genome = "coin", pos = { x, y, z }, yaw = <deg>, key = "<saved-state key>", focus = true (the player),
+--           persist = true, <any genome field, e.g. door = { to = "bonus" } or motion = { path = {...} }> }.
+-- Returns the body (its table is the instance: genome fields + World3D.Body methods + self:sound).
+function Genome.spawn3d( name, entry )
+  local W = require( "World3D" )
+  entry = entry or {}
+  local tbl = Genome.get( name )
+  local over = {}
+  for k, v in pairs( entry ) do if not PLACEMENT[k] then over[k] = v end end
+  Genome.merge( tbl, over )
+  local b = tbl.body or {}
+  local p = entry.pos or { 0, 0, 0 }
+  local collType = 0
+  if type( tbl.coll ) == "table" then
+    local t = tbl.coll.type or "solid"
+    collType = type( t ) == "number" and t or COLL[t] or error( "Genome '"..name.."': unknown collision type '"..tostring( t ).."'" )
+  end
+  local kind = b.kind
+  if tbl.door then  -- a trigger zone (unless the genome gives it a body of its own)
+    collType = COLL.door
+    kind = kind or "kinematic"
+  end
+  local persist = entry.persist or tbl.persist
+  local player = entry.focus or tbl.player
+  local body = W.Body.new{ kind = kind, x = p[1], y = p[2], z = p[3], yaw = ( entry.yaw or 0 ) + ( b.yaw or 0 ),
+    pitch = b.pitch, radius = b.radius or ( tbl.door and tbl.door.radius ), height = b.height or ( tbl.door and tbl.door.height ),
+    half = b.half, solid = b.solid, collType = collType, model = tbl.model, modelYaw = b.modelYaw, scale = b.scale,
+    image = b.image, gravity = b.gravity, jumpSpeed = b.jumpSpeed, accel = b.accel, airAccel = b.airAccel,
+    maxSlope = b.maxSlope, step = b.step, turnRate = b.turnRate, persist = persist, player = player,
+    shadow = tbl.shadow }
+  for k, v in pairs( tbl ) do if body[k] == nil then rawset( body, k, v ) end end
+  body.key = entry.key or ( name.."@"..p[1]..","..p[2]..","..p[3] )
+  body.spawnPos = { p[1], p[2], p[3] }
+  register( body.id, body )
+  if tbl.listen then listenInput( body.id ) end  -- every input event, focused or not (e.g. a camera)
+  Genome.byName[name] = Genome.byName[name] or body.id
+  if persist then W.persistentByName[name] = body end
+  Scene.withScope( not persist, function()
+    if tbl.sfx then require( "Sound" ).prepare( tbl.sfx ) end
+    if tbl.door then Scene.armDoor( body ) end
+    if tbl.timer then Genome.startTimer( body.id, tbl.timer, body ) end
+    if tbl.motion then Genome.startMotion3d( body ) end
+    if body.onSpawn then body:onSpawn() end
+  end )
+  return body
+end
+
+function Genome.startMotion3d( body )
+  local m = body.motion
+  checkType( m, "table" )
+  local p = body.spawnPos
+  if m.type == "spin" then
+    if m.bob and m.bob ~= 0 then body:orbit{ center = p, radius = 0, speed = 0, bob = m.bob, bobHz = m.bobHz } end
+    body:spin( m.speed or 90 )
+  elseif m.type == "linear" then
+    local pts = {}
+    for i, q in ipairs( m.path or {} ) do
+      pts[i] = m.absolute and q or { p[1] + q[1], p[2] + q[2], p[3] + q[3] }
+    end
+    if #pts > 0 then body:path( pts, m.speed or 2, m.pingpong and true or false ) end
+  elseif m.type == "orbital" then
+    local around = type( m.around ) == "string" and entityNamed( m.around, "orbit" ) or nil
+    body:orbit{ center = type( m.around ) == "table" and m.around or p, around = around, radius = m.radius,
+                speed = m.speed, phase = m.phase, bob = m.bob, bobHz = m.bobHz }
+  elseif m.type == "follow" then
+    body:follow( entityNamed( m.target, "follow" ), m )
+  else
+    error( "motion: unknown 3D type '"..tostring( m.type ).."' (spin, linear, orbital or follow)" )
+  end
 end
 
 -- TODO call this from the loader to put a different position, dialogue, etc. on every instance of the same genome (e.g. shopkeepers w/ different items)
@@ -680,7 +835,7 @@ Genome.COLL = COLL
 --            Camera.track( id, opts ) (scripts/bicycle.lua).
 Genome.byName = {}  -- genome name -> entity id of the first instance spawned
 
-local function entityNamed( ref, what )
+entityNamed = function( ref, what )
   if type( ref ) == "number" then return ref end
   local id = Genome.byName[ref]
   if not id then error( "motion: no entity '"..tostring( ref ).."' to "..what ) end

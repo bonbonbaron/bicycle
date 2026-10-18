@@ -31,6 +31,7 @@ endif()
 message( STATUS "bicycle: render mode ${BICYCLE_RENDER}" )
 
 # Release: zero file I/O at run time (see "Release builds" below and README).
+option( BICYCLE_GLES2 "3D: use OpenGL ES 2.0 (GLSL 100, no VAOs, no shadows) instead of trying GL 3.3 core first" OFF )
 option( BICYCLE_RELEASE "Embed all assets and scripts in the executable; no file I/O at run time" OFF )
 option( BICYCLE_EMBED_GM_SF2 "Release: embed sf2/default-GM.sf2 (the GM fallback, ~30 MB) in the executable" OFF )
 
@@ -156,7 +157,9 @@ endforeach()
 # SoundFont, and that pack is linked into the executable (src/data/EmbeddedPack.c). The engine's file readers,
 # Lua's file searchers/io.open/dofile and fluidsynth's file loader are compiled out or disabled; see README.
 if ( BICYCLE_RELEASE )
-  set( BICYCLE_RELEASE_ASSETS ON CACHE BOOL "" FORCE )
+  # A plain variable, not the cache: forcing the cache option ON here used to leave it ON after BICYCLE_RELEASE was
+  # turned off again in the same build directory, so that "dev" build kept mounting a (stale) <game>/assets.bpak.
+  set( BICYCLE_RELEASE_ASSETS ON )
   if ( MSVC )
     message( FATAL_ERROR "BICYCLE_RELEASE embeds the pack with .incbin: build with GCC/clang/MinGW/llvm-mingw." )
   endif()
@@ -219,6 +222,10 @@ if ( NOT CMAKE_CROSSCOMPILING )
   set_tests_properties( pack-assets PROPERTIES FIXTURES_SETUP packed )
   add_test( NAME codecs COMMAND bicycle-tests "test=${codecsPack}" WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}" )
   add_test( NAME motion COMMAND bicycle-motion-tests )
+  # Terminal input (include/c/TermInput.h): escape sequences, kitty/SGR events, the key-release heuristic.
+  add_executable( bicycle-term-input-tests tests/term_input_test.cpp )
+  target_include_directories( bicycle-term-input-tests PRIVATE include )
+  add_test( NAME term-input COMMAND bicycle-term-input-tests )
   add_executable( bicycle-mem-scene-tests tests/mem_scene_test.cpp src/data/Mem.cpp )
   target_include_directories( bicycle-mem-scene-tests PRIVATE include )
   add_test( NAME mem-scene COMMAND bicycle-mem-scene-tests )
@@ -269,10 +276,18 @@ add_executable( o ${BICYCLE_SOURCES} )
 add_dependencies( o ids )
 target_include_directories( o PRIVATE "${CMAKE_SOURCE_DIR}" )  # gen/ids.h
 target_include_directories( o PRIVATE include )
+if ( BICYCLE_GLES2 )
+  target_compile_definitions( o PRIVATE BICYCLE_GLES2 )
+endif()
+# 32-bit ARM cross builds with clang/zig (compiler-rt): libgcc-named helpers LuaJIT calls.
+if ( CMAKE_SYSTEM_PROCESSOR MATCHES "^arm" AND CMAKE_C_COMPILER_ID STREQUAL "Clang" AND CMAKE_SIZEOF_VOID_P EQUAL 4 )
+  target_sources( o PRIVATE src/platform/arm32_libgcc_compat.c )
+endif()
 target_link_libraries( o PRIVATE bicycle_data bicycle_luajit bicycle_fluidsynth Threads::Threads )
 target_compile_definitions( o PRIVATE BICYCLE_RENDER_${BICYCLE_RENDER} )
 if ( BICYCLE_RELEASE_ASSETS )
   target_compile_definitions( o PRIVATE BICYCLE_RELEASE_ASSETS )
+  target_compile_definitions( bicycle_data PRIVATE BICYCLE_RELEASE_ASSETS )  # Pack.cpp: dev builds never mount a pack
 endif()
 if ( BICYCLE_RELEASE )
   target_compile_definitions( o PRIVATE BICYCLE_RELEASE "BICYCLE_RELEASE_GAME=\"${BICYCLE_RELEASE_GAME}\"" )
@@ -285,17 +300,20 @@ else()
   target_link_libraries( o PRIVATE bicycle_sdl3 )
 endif()
 # The executable is o (ASCII), o-2d or o-3d, so builds of different modes can sit side by side in the repo root.
+# Where o/o-2d/o-3d go: the repo root (default), or e.g. the build directory for cross builds, so they don't
+# replace the machine's own executables.
+set( BICYCLE_OUTPUT_DIR "${CMAKE_SOURCE_DIR}" CACHE PATH "Directory for the o/o-2d/o-3d executable" )
 set( BICYCLE_EXE_NAME o )
 if ( NOT BICYCLE_RENDER STREQUAL "ASCII" )
   string( TOLOWER "o-${BICYCLE_RENDER}" BICYCLE_EXE_NAME )
 endif()
 set_target_properties( o PROPERTIES
   OUTPUT_NAME ${BICYCLE_EXE_NAME}
-  RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}
-  RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_SOURCE_DIR}
-  RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_SOURCE_DIR}
-  RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO ${CMAKE_SOURCE_DIR}
-  RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL ${CMAKE_SOURCE_DIR}
+  RUNTIME_OUTPUT_DIRECTORY ${BICYCLE_OUTPUT_DIR}
+  RUNTIME_OUTPUT_DIRECTORY_DEBUG ${BICYCLE_OUTPUT_DIR}
+  RUNTIME_OUTPUT_DIRECTORY_RELEASE ${BICYCLE_OUTPUT_DIR}
+  RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO ${BICYCLE_OUTPUT_DIR}
+  RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL ${BICYCLE_OUTPUT_DIR}
   # Lua finds the engine's extern "C" functions through LuaJIT's FFI (ffi.C.*), which looks them up among the
   # executable's exported symbols: -rdynamic on Linux, an export table on Windows.
   ENABLE_EXPORTS ON
@@ -394,8 +412,22 @@ if ( NOT CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_NAME STREQUAL "Linux" )
               ${lifecycleGame} ${lifecyclePair} WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}" )
     set_tests_properties( scene-lifecycle PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 400 )
   endif()
+  # Terminal key events end to end (tests/tty_input_test.py): auto-repeat bytes, an arrow, SGR mouse and kitty
+  # keyboard events into the ASCII build through a pty, each hold one press and one release in Lua's onInput.
+  if ( BICYCLE_RENDER STREQUAL "ASCII" AND lifecycleGame STREQUAL "test" )
+    find_package( Python3 COMPONENTS Interpreter QUIET )
+    if ( Python3_FOUND )
+      add_test( NAME tty-input COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tests/tty_input_test.py" "${BICYCLE_TEST_EXE}"
+                WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}" )
+      set_tests_properties( tty-input PROPERTIES TIMEOUT 120 )
+    endif()
+  endif()
   # The Aseprite door/song scripts in batch mode (skipped unless BICYCLE_ASEPRITE points at an aseprite binary).
   set( BICYCLE_ASEPRITE "$ENV{BICYCLE_ASEPRITE}" CACHE FILEPATH "Aseprite binary for the aseprite-scene-scripts test" )
   add_test( NAME aseprite-scene-scripts COMMAND sh "${CMAKE_SOURCE_DIR}/tests/aseprite_scene_scripts_test.sh" "${CMAKE_SOURCE_DIR}" )
   set_tests_properties( aseprite-scene-scripts PROPERTIES SKIP_RETURN_CODE 77 ENVIRONMENT "BICYCLE_ASEPRITE=${BICYCLE_ASEPRITE}" )
+  # The Blender add-on (tools/blender) in background mode (skipped unless BICYCLE_BLENDER points at blender).
+  set( BICYCLE_BLENDER "$ENV{BICYCLE_BLENDER}" CACHE FILEPATH "Blender binary for the blender-addon test" )
+  add_test( NAME blender-addon COMMAND sh "${CMAKE_SOURCE_DIR}/tests/blender_addon_test.sh" "${CMAKE_SOURCE_DIR}" )
+  set_tests_properties( blender-addon PROPERTIES SKIP_RETURN_CODE 77 ENVIRONMENT "BICYCLE_BLENDER=${BICYCLE_BLENDER}" )
 endif()

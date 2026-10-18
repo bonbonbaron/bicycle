@@ -28,6 +28,11 @@ int main( int argc, char** argv ) {
     std::cerr << "Expected use:\n\t./o <game-name>\nIf you're including the directory or extension of your game's name, don't.\n";
     exit(1);
   }
-  bicycle::init( argv[1] );
+  // Tab completion adds a trailing slash ("plat3d/") and some shells a leading "./"; the engine joins paths
+  // as "./<game>/...", so strip both rather than load from "./plat3d//...".
+  std::string game = argv[1];
+  while ( game.size() > 1 && ( game.back() == '/' || game.back() == '\\' ) ) game.pop_back();
+  while ( game.rfind( "./", 0 ) == 0 || game.rfind( ".\\", 0 ) == 0 ) game.erase( 0, 2 );
+  bicycle::init( game );
   return bicycle::run();
 }

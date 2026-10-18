@@ -29,8 +29,8 @@ intro.fg = {
     -- END entities
   }
 }
--- Music and sound effects (see tools/audio/README.md for making these from FL Studio, LMMS or midish).
-intro.music = { soundfont = "music/meadow.sf2", song = "music/meadow.mid" }
-intro.sfx = { soundfont = "music/meadow.sf2", program = 120, sounds = { bump = 60, neigh = 64, coin = 72, hurt = 55, blip = 76 } }
+-- Music (bare names: genome/music/meadow.sf2 and meadow.mid; see tools/audio/README.md for making these from
+-- FL Studio, LMMS or midish). Sound effects aren't the scene's: each genome declares its own (its sfx gene).
+intro.music = { soundfont = "meadow", song = "meadow" }
 -- TODO: Demonstrate that you can populate the bg and fg with onTimer() too.
 return intro

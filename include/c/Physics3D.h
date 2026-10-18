@@ -25,6 +25,8 @@ struct Transform {
   bool useQuat{};
   Vec3 scale{ 1, 1, 1 };
   float modelYaw{};  // extra yaw for the drawn model (e.g. Blender characters face +X: -pi/2 makes them face -Z)
+  // Blob shadow (the shadow gene): radius in m at ground contact (-1: from the body; 0: none) and darkness 0..1.
+  float shadow{ -1.f }, shadowAlpha{ 0.55f };
 };
 
 enum BodyKind : int {
@@ -42,7 +44,13 @@ struct Body {
   Vec3 half{ 0.5f, 0.5f, 0.5f };  // BOX: half extents (pos is the box center)
   float maxSlopeCos{ 0.64f };  // ~50 degrees: steeper is a wall
   float stepHeight{ 0.35f };
-  Vec3 wish{};                 // desired horizontal velocity (m/s), camera-relative steering is Lua's job
+  Vec3 wish{};                 // desired horizontal velocity (m/s), world space
+  // Camera-relative steering, set once per change (a key press or release), not per frame: move = (right, forward)
+  // in m/s relative to the camera rig's current yaw; the wish follows the camera as it turns. turnRate (1/s, 0 =
+  // never) turns the body to face the way it moves.
+  bool steerCam{};
+  float moveRight{}, moveFwd{};
+  float turnRate{};
   float accelGround{ 60.f }, accelAir{ 18.f };
   float jumpSpeed{ 9.f };
   bool jumpReq{};
@@ -76,6 +84,7 @@ struct CamRig {
   bool collide{ true };       // push in when the level is between the pivot and the eye
   float sideDistance{ 9.f };  // SIDE: camera at target + (0, height, sideDistance)
   Vec3 freeVel{};             // FREE: camera-space velocity (m/s) set by Lua
+  float yawRate{}, pitchRate{};  // rad/s of continuous turning (held camera keys), set when they change
   // state
   Vec3 eased{};
   bool started{};
@@ -90,6 +99,7 @@ struct View {
   Vec3 lightColor{ 1.0f, 0.97f, 0.9f };
   float ambient{ 0.38f };
   bool shadows{ true };
+  int shadowQuality{ -1 };            // -1 auto (by GPU), 0 off, 1 low, 2 med, 3 high (BICYCLE_SHADOWS overrides)
   float billboardPixel{ 1.f / 16 };  // meters per sprite pixel (billboards)
   bool crosshair{};                  // a center-screen crosshair (first person)
 };

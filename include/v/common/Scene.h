@@ -109,6 +109,9 @@ class Scene : public Window {
     // HUD: meters glued to the screen, drawn over every layer.
     auto addHudBar( const std::string& label, const int max, const int len, const int x, const int y ) -> int;
     auto getHudBar( const int id ) -> Bar*;
+    // Text labels: x >= 0 a cell, -1 left, -2 right (right-aligned), -3 centered; y >= 0 a row, -1 top, -2 bottom.
+    auto addHudText( const std::string& text, const int x, const int y ) -> int;
+    void setHudText( const int id, const std::string& text );
     void setHidden( const Entity entity, const bool hidden );  // e.g. to flash a character
 
   private:
@@ -117,6 +120,8 @@ class Scene : public Window {
     void renderFg( const Layer& layer );
     void updateCameraLimits();
     std::vector<Bar> _hud{};
+    struct HudText { std::string text; int x, y; };
+    std::vector<HudText> _hudText{};
     EntitySlots<bool> _hidden{};
     void renderHud();
 };

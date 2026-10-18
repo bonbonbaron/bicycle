@@ -340,6 +340,14 @@ void World3D::step( float dt ) {
     auto& t = _xf[e];
     if ( b.kind != CHARACTER || !t.on ) continue;
     if ( b.grounded && b.groundEntity && _body[b.groundEntity].kind == BOX ) t.pos += boxDelta[b.groundEntity];
+    if ( b.steerCam ) {
+      const float y = _rig.yaw;
+      b.wish = { std::cos( y ) * b.moveRight - std::sin( y ) * b.moveFwd, 0, -std::sin( y ) * b.moveRight - std::cos( y ) * b.moveFwd };
+    }
+    if ( b.turnRate > 0 && ( b.wish.x * b.wish.x + b.wish.z * b.wish.z ) > 0.01f ) {
+      const float want = std::atan2( -b.wish.x, -b.wish.z );
+      t.yaw = wrapAngle( t.yaw + wrapAngle( want - t.yaw ) * std::min( 1.f, b.turnRate * dt ) );
+    }
     // Steer the horizontal velocity toward the wish (snappy on the ground, less in the air).
     const float accel = b.grounded ? b.accelGround : b.accelAir;
     Vec3 dv{ b.wish.x - b.vel.x, 0, b.wish.z - b.vel.z };

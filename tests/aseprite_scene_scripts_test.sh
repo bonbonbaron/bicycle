@@ -14,17 +14,17 @@ out=$(run --script-param game=test --script-param list=1 --script "$src/scripts/
 echo "$out" | grep -qx "scene house" && echo "$out" | grep -qx "spawn house entry" &&
   echo "$out" | grep -qx "spawn intro from_house" || fail "door choices: $out"
 out=$(run --script-param game=test --script-param list=1 --script "$src/scripts/aseprite/addsong.lua")
-echo "$out" | grep -qx "song music/house.mid" && echo "$out" | grep -qx "soundfont music/meadow.sf2" || fail "song choices: $out"
+echo "$out" | grep -qx "song house" && echo "$out" | grep -qx "soundfont meadow" || fail "song choices: $out"
 run --script-param game=test --script-param scene=house --script-param to=intro --script-param spawn=from_house \
   --script-param x=140 --script-param y=36 --script-param w=6 --script-param h=10 --script-param on=press \
   --script-param return_spawn=from_intro --script "$src/scripts/aseprite/adddoor.lua" >/dev/null || fail "adddoor failed"
-run --script-param game=test --script-param scene=house --script-param song=music/meadow.mid \
+run --script-param game=test --script-param scene=house --script-param song=meadow \
   --script-param transition=cut --script "$src/scripts/aseprite/addsong.lua" >/dev/null || fail "addsong failed"
 out=$(run --script-param game=test --script-param list=1 --script-param to=house --script "$src/scripts/aseprite/adddoor.lua")
 echo "$out" | grep -qx "spawn house from_intro" || fail "return spawn missing: $out"
 f="$tmp/test/genome/scene/house.lua"
 grep -q 'door = { to = "intro", spawn = "from_house", w = 6, h = 10, on = "press" }' "$f" || fail "door not written"
-grep -q 'house.music = { soundfont = "music/meadow.sf2", song = "music/meadow.mid", transition = "cut" }' "$f" || fail "music not written"
+grep -q 'house.music = { soundfont = "meadow", song = "meadow", transition = "cut" }' "$f" || fail "music not written"
 # The entities layer (addentity.lua / sceneentities.lua) on the house background.
 cp "$src/test/genome/scene/house.lua" "$f"
 ase="$tmp/test/aseprite/house.aseprite"
@@ -33,9 +33,9 @@ echo "$out" | grep -qx "genome coin" && ! echo "$out" | grep -qx "genome intro" 
 echo "$out" | grep -qx "entity hero#1 hero 20 40" && echo "$out" | grep -qx "entity door#1 door 2 36" || fail "house entities: $out"
 run "$ase" --script-param sync=1 --script "$src/scripts/aseprite/addentity.lua" >/dev/null
 cmp -s "$f" "$src/test/genome/scene/house.lua" || { diff "$f" "$src/test/genome/scene/house.lua"; fail "sync isn't idempotent"; }
-run "$ase" --script-param genome=coin --script-param x=60 --script-param y=40 --script-param motion=spin \
+run "$ase" --script-param genome=coin --script-param x=60 --script-param y=40 --script-param motion=orbital \
   --script "$src/scripts/aseprite/addentity.lua" >/dev/null || fail "addentity failed"
-grep -q '{ genome = "coin", pos = { 60, 40 }, motion = { period = 2, type = "spin" } },' "$f" || fail "entity not written"
+grep -q '{ genome = "coin", pos = { 60, 40 }, motion = { radius = 3, speed = 90, type = "orbital" } },' "$f" || fail "entity not written"
 run "$ase" --script-param to=intro --script-param spawn=from_house --script-param x=140 --script-param y=36 \
   --script-param w=6 --script-param h=10 --script "$src/scripts/aseprite/adddoor.lua" >/dev/null || fail "adddoor (slice) failed"
 grep -q '{ genome = "door", pos = { 140, 36 }, door = { h = 10, spawn = "from_house", to = "intro", w = 6 } },' "$f" || fail "door slice not written"
