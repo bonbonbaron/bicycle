@@ -1,6 +1,7 @@
 #include "c/CollisionDetector.h"
 #include "c/Trigger.h"
 #include "c/Kinematics.h"
+#include "c/ImageOverlaps.h"
 #include "m/World.h"
 #include <cassert>
 #include <cstdint>
@@ -51,6 +52,7 @@ void CollisionDetector::check() {
   cd._pushes.clear();
   cd._moved.reset();
   cd._stepping.reset();
+  imageOverlaps::update();  // 2D and ASCII: which drawn images overlap (depth sorting; ImageOverlaps.h)
 }
 
 void CollisionDetector::refresh( Layer& layer, uint32_t row ) {
@@ -190,6 +192,7 @@ void CollisionDetector::registerEntity( Entity entity, unsigned layer ) {
 
 void CollisionDetector::activate( Entity e ) {
   if ( e >= NUM_SUPPORTED_ENTITIES ) return;
+  imageOverlaps::moving( e, true );
   for ( unsigned l = 0; l < NUM_SUPPORTED_COLL_LAYERS; ++l ) {
     if ( _layersOf[e] >> l & 1u ) _layers[l].activate( e );
   }
@@ -198,6 +201,7 @@ void CollisionDetector::activate( Entity e ) {
 // Its box is final for as long as it's still: record it now.
 void CollisionDetector::deactivate( Entity e ) {
   if ( e >= NUM_SUPPORTED_ENTITIES ) return;
+  imageOverlaps::moving( e, false );
   for ( unsigned l = 0; l < NUM_SUPPORTED_COLL_LAYERS; ++l ) {
     if ( _layersOf[e] >> l & 1u && _layers[l].deactivate( e ) ) refresh( _layers[l], _layers[l].row( e ) );
   }
@@ -213,6 +217,7 @@ auto CollisionDetector::isActive( Entity e ) const -> bool {
 // Whoever was touching the entity hears an uncollision (as if it walked away), so nobody keeps a stale contact.
 void CollisionDetector::removeEntity( Entity entity ) {
   if ( entity >= NUM_SUPPORTED_ENTITIES ) return;
+  imageOverlaps::forget( entity );
   for ( auto& layer : _layers ) layer.remove( entity );
   _layersOf[entity] = 0;
   const auto type = World::get<CollBox>( entity ).type;

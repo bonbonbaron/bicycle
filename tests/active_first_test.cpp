@@ -5,6 +5,8 @@
 #include "c/CollisionDetector.h"
 #include "c/Kinematics.h"
 #include "c/Timer.h"
+#include "c/ImageOverlaps.h"
+#include "v/common/FlatRenderer.h"
 #include "c/Trigger.h"
 #include "m/World.h"
 #include <algorithm>
@@ -201,6 +203,54 @@ static void testBlocking() {
   clearEvents();
 }
 
+// Image overlap groups (ImageOverlaps) and the flat renderers' group-wise depth sort (FlatRenderer.h).
+static void testImageOverlaps() {
+  auto& io = ImageOverlaps::getInstance();
+  auto& kin = Kinematics::getInstance();
+  const Entity layer = 40, other = 41, tree = 42, hero = 43, sign = 44, bush = 45, far = 46, ghost = 47;
+  auto put = [&]( Entity e, int x, int y, int w, int h, Entity l ) {
+    World::set<Box>( e, Box( Position( x, y ), Size( w, h ) ) );
+    io.add( e, l );
+  };
+  put( tree, 10, 0, 4, 10, layer );   // feet at y 10
+  put( hero, 12, 4, 2, 4, layer );    // feet at 8: overlaps the tree, so drawn before (behind) it
+  put( sign, 30, 0, 2, 2, layer );    // alone
+  put( bush, 13, 9, 4, 3, layer );    // feet at 12: overlaps the tree (and so joins its group)
+  put( far, 60, 0, 2, 2, layer );
+  put( ghost, 12, 4, 2, 4, other );   // same place as the hero, another layer: never grouped with it
+  frame();  // CollisionDetector::check updates the groups
+  CHECK( io.overlapping( tree, hero ) && io.overlapping( tree, bush ) && !io.overlapping( hero, bush ), "overlaps" );
+  CHECK( !io.overlapping( hero, ghost ) && io.group( ghost ) == ImageOverlaps::NONE, "grouped across layers" );
+  CHECK( io.group( tree ) != ImageOverlaps::NONE && io.group( tree ) == io.group( hero ) && io.group( hero ) == io.group( bush ),
+         "the tree, hero and bush aren't one group" );
+  CHECK( io.group( sign ) == ImageOverlaps::NONE && io.grouped( layer ) && !io.grouped( other ), "groups" );
+
+  // Sorted by feet within the group's slots (0, 1, 3); the sign and far keep slots 2 and 4.
+  std::vector<Entity> order{ tree, hero, sign, bush, far };
+  std::vector<std::pair<Entity, uint32_t>> slots;
+  std::vector<Entity> members;
+  const auto foot = []( Entity e ) { const Box& b = World::get<Box>( e ); return b.pos.y + static_cast<int>( b.size.h ); };
+  const auto groupOf = [&]( Entity e ) { return io.group( e ); };
+  gfx::flat::sortGroups( order, groupOf, foot, slots, members );
+  CHECK( ( order == std::vector<Entity>{ hero, tree, sign, bush, far } ), "sorted %u %u %u %u %u", order[0], order[1], order[2], order[3], order[4] );
+
+  // The hero walks below the tree (feet past its feet): drawn in front of it. Only the mover is rechecked.
+  kin.teleport( hero, Position( 12, 7 ) );  // feet at 11
+  frame();
+  order = { tree, hero, sign, bush, far };
+  gfx::flat::sortGroups( order, groupOf, foot, slots, members );
+  CHECK( ( order == std::vector<Entity>{ tree, hero, sign, bush, far } ), "the hero in front" );
+  // Walking away breaks the group up: back to the added order.
+  kin.teleport( hero, Position( 40, 20 ) );
+  frame();
+  CHECK( io.group( hero ) == ImageOverlaps::NONE && io.group( tree ) == io.group( bush ), "regrouped" );
+  kin.teleport( bush, Position( 80, 20 ) );
+  frame();
+  CHECK( !io.grouped( layer ), "the layer still has a group" );
+  for ( Entity e : { tree, hero, sign, bush, far, ghost } ) { io.remove( e ); kin.forget( e ); }
+  frame();
+}
+
 static void testTimers() {
   auto& t = Timer::getInstance();
   clearEvents();
@@ -232,6 +282,7 @@ int main() {
   testContainer();
   testCollisions();
   testBlocking();
+  testImageOverlaps();
   testTimers();
   if ( failures == 0 ) std::printf( "active-first: all passed\n" );
   return failures == 0 ? 0 : 1;

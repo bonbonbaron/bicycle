@@ -47,7 +47,6 @@ static auto rgbaToArgb( uint32_t rgba ) -> uint32_t {  // BImg pixels: R in the 
   return ( a << 24 ) | ( r << 16 ) | ( g << 8 ) | b;
 }
 
-static auto wrapIdx( int i, int n ) -> int { return ( ( i % n ) + n ) % n; }
 
 static auto envInt( const char* name, int def ) -> int {
   const char* v = std::getenv( name );
@@ -637,98 +636,4 @@ void PixelRenderer::endFrame() {
 
 // Text images (ASCII art with no pixel version) in pixel modes: no character glyphs (that would be ASCII art in a
 // pixel mode); each non-space cell becomes a solid block of the image's color, i.e. a silhouette at cell resolution.
-void PixelRenderer::drawTextImage( const Win* w, const Image& img, int srcX, int srcY, int srcW, int srcH, int dstX, int dstY ) {
-  const uint32_t fg = colorToArgb( img.color );
-  for ( int r = 0; r < srcH; ++r ) {
-    const int iy = srcY + r;
-    if ( iy < 0 || iy >= static_cast<int>( img.lineLimits.size() ) ) continue;
-    const auto& lims = img.lineLimits[iy];
-    for ( int c = 0; c < srcW; ++c ) {
-      const int ix = srcX + c;
-      if ( ix < 0 || ix >= lims.len ) continue;
-      const unsigned char ch = img.string[lims.start + ix];
-      if ( ch != ' ' ) fillRect( w, ( w->x + dstX + c ) * CELL_W, ( w->y + dstY + r ) * CELL_H, CELL_W, CELL_H, fg );
-    }
-  }
-}
-
-void PixelRenderer::drawLayer( WinHandle win, const Image& img, int offX, int offY, bool wrap, int winW, int winH ) {
-  Win* w = WIN( win );
-  if ( !w ) return;
-  if ( !img.pixels ) {  // text layer: same cell mapping as ASCII, glyph by glyph
-    const int imgH = img.lineLimits.size();
-    const int imgW = img.size.w >> FIXEDPT_DEC_BITS;
-    if ( imgH == 0 || imgW == 0 ) return;
-    for ( int r = 0; r < winH; ++r ) {
-      int iy = r + offY;
-      if ( wrap ) iy = wrapIdx( iy, imgH );
-      for ( int c = 0; c < winW; ++c ) {
-        int ix = c + offX;
-        if ( wrap ) ix = wrapIdx( ix, imgW );
-        drawTextImage( w, img, ix, iy, 1, 1, c, r );
-      }
-    }
-    return;
-  }
-  // Window cell (r, c) shows image cell (r + offY, c + offX); an image pixel is 2 cells wide, 1 tall.
-  // Pixels come from the texture atlas (already ARGB).
-  const BImg& p = *img.pixels;
-  const auto at = _atlas.entry( img.pixels );
-  // Smooth scrolling: the whole layer moves up/left by the camera's sub-cell remainder in screen pixels, so one
-  // more row and pixel column are drawn to fill the edge. Every image pixel is still a whole solid rect of the
-  // framebuffer (nearest, no filtering), so tiles stay crisp and can't open seams.
-  const int ox = w->x * CELL_W - _subX, oy = w->y * CELL_H - _subY;
-  const int px0 = offX >= 0 ? offX / 2 : -( ( -offX + 1 ) / 2 );  // floor( offX / 2 )
-  const int px1 = ( offX + winW + 1 ) / 2 + 2;
-  for ( int r = 0; r < winH + ( _subY ? 1 : 0 ); ++r ) {
-    int iy = r + offY;
-    if ( wrap ) iy = wrapIdx( iy, p.h );
-    else if ( iy < 0 || iy >= p.h ) continue;
-    for ( int px = px0; px < px1; ++px ) {
-      int ix = px;
-      if ( wrap ) ix = wrapIdx( ix, p.w );
-      else if ( ix < 0 || ix >= p.w ) continue;
-      const uint32_t argb = _atlas.at( at.x + ix, at.y + iy );
-      fillRect( w, ox + ( 2 * px - offX ) * CELL_W, oy + r * CELL_H, 2 * CELL_W, CELL_H, argb );
-    }
-  }
-}
-
-void PixelRenderer::drawEntity( WinHandle win, Entity entity, const Box& camBox ) {
-  Win* w = WIN( win );
-  if ( !w ) return;
-  const auto& box = World::get<Box>( entity );
-  const auto& img = World::get<Image>( entity );
-  const auto& src = World::get<Rect>( entity );
-  const bool hasSrc = src.w > 0;
-  // The camera's whole cell and its remainder, the same split the scene's layers get (Scene::render), so
-  // sprites and the ground move together to the screen pixel.
-  constexpr int FRAC = ( 1 << FIXEDPT_DEC_BITS ) - 1;
-  const int camX = camBox.pos.x & ~FRAC, camY = camBox.pos.y & ~FRAC;
-  const int ex = ( box.pos.x - camX ) >> FIXEDPT_DEC_BITS;  // entity's top-left in window cells (text images)
-  const int ey = ( box.pos.y - camY ) >> FIXEDPT_DEC_BITS;
-  const int exPx = ( ( box.pos.x - camX ) * CELL_W >> FIXEDPT_DEC_BITS ) - ( ( camBox.pos.x & FRAC ) * CELL_W >> FIXEDPT_DEC_BITS );
-  const int eyPx = ( ( box.pos.y - camY ) * CELL_H >> FIXEDPT_DEC_BITS ) - ( ( camBox.pos.y & FRAC ) * CELL_H >> FIXEDPT_DEC_BITS );
-  const int sx = hasSrc ? src.x : 0, sy = hasSrc ? src.y : 0;
-  const int sw = hasSrc ? src.w : img.size.w >> FIXEDPT_DEC_BITS;
-  const int sh = hasSrc ? src.h : img.size.h >> FIXEDPT_DEC_BITS;
-  if ( !img.pixels ) {
-    drawTextImage( w, img, sx, sy, sw, sh, ex, ey );
-    return;
-  }
-  // The sprite's src rect is a sub-rect of its image's place in the atlas.
-  const BImg& p = *img.pixels;
-  const auto at = _atlas.entry( img.pixels );
-  const int ox = w->x * CELL_W, oy = w->y * CELL_H;
-  for ( int r = 0; r < sh; ++r ) {
-    const int iy = sy + r;
-    if ( iy < 0 || iy >= p.h ) continue;
-    for ( int c = 0; c < sw / 2; ++c ) {
-      const int ix = sx / 2 + c;
-      if ( ix < 0 || ix >= p.w ) continue;
-      fillRect( w, ox + exPx + 2 * c * CELL_W, oy + eyPx + r * CELL_H, 2 * CELL_W, CELL_H, _atlas.at( at.x + ix, at.y + iy ) );
-    }
-  }
-}
-
 }  // namespace gfx

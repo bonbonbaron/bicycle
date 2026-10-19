@@ -1,6 +1,7 @@
 #include "v/common/Scene.h"
 #include "c/Layer3D.h"
 #include "c/Kinematics.h"
+#include "c/ImageOverlaps.h"
 #include "m/World.h"
 #include "v/common/Renderer.h"
 #include <algorithm>
@@ -52,6 +53,7 @@ void Grid::addEntity( const Entity entity ) {
   assert( _layers.size() > 0 );
   _layers.back().fg.push_back( entity );
   _entityToLayerMap[ entity ] = _layers.size() - 1;  // so it's zero-indexed
+  imageOverlaps::drawnOn( entity, _layers.back().id );
 }
 
 void Grid::addEntityTo( const Entity entity, unsigned layerIdx ) {
@@ -59,6 +61,7 @@ void Grid::addEntityTo( const Entity entity, unsigned layerIdx ) {
   layerIdx = std::min<unsigned>( layerIdx, _layers.size() - 1 );
   _layers[layerIdx].fg.push_back( entity );
   _entityToLayerMap[ entity ] = layerIdx;
+  imageOverlaps::drawnOn( entity, _layers[layerIdx].id );
 }
 
 auto Grid::getLayers() -> std::vector<Layer>& {
@@ -129,7 +132,7 @@ void Scene::updateCameraLimits() {
 }
 
 void Scene::renderFg( const Layer& layer ) {
-  for ( const auto& entity : layer.fg ) {
+  for ( const auto& entity : gfx::renderer().drawOrder( layer.id, layer.fg ) ) {
     if ( const bool* h = _hidden.find( entity ); h && *h ) {
       continue;
     }

@@ -1,10 +1,10 @@
 #pragma once
-#include "v/common/Renderer.h"
+#include "v/common/FlatRenderer.h"
 
 namespace gfx {
 
 // curses: ncurses on Linux and macOS, PDCurses on Windows (include/curses_compat.h).
-class AsciiRenderer : public Renderer {
+class AsciiRenderer : public FlatRenderer<Renderer> {
   public:
     auto mode() const -> Mode override { return Mode::Ascii; }
     void init( const std::string& gameName ) override;
@@ -30,8 +30,10 @@ class AsciiRenderer : public Renderer {
     void setAttr( WinHandle win, int attr, bool on ) override;
     void presentWindow( WinHandle win ) override;
     void endFrame() override;
-    void drawLayer( WinHandle win, const Image& img, int offX, int offY, bool wrap, int winW, int winH ) override;
-    void drawEntity( WinHandle win, Entity entity, const Box& camBox ) override;
+  protected:
+    void drawCells( WinHandle win, int y, int x, std::string_view cells, const Image& ) override {
+      text( win, y, x, std::string( cells ) );
+    }
   private:
     bool _up{};
     bool _tooSmall{};

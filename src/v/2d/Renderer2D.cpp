@@ -1,5 +1,6 @@
 // 2D mode: the pixel framebuffer (see PixelRenderer) shown through an SDL_Renderer streaming texture.
 #include "v/sdl/PixelRenderer.h"
+#include "v/common/FlatRenderer.h"
 #include "data/BImg.h"
 #include <SDL3/SDL.h>
 #include <algorithm>
@@ -9,9 +10,13 @@
 
 namespace gfx {
 
-class Renderer2D final : public PixelRenderer {
+class Renderer2D final : public FlatRenderer<PixelRenderer> {
   public:
     auto mode() const -> Mode override { return Mode::TwoD; }
+    void setLayerSubcell( int fx, int fy ) override {
+      _subX = fx * CELL_W >> FIXEDPT_DEC_BITS;  // screen pixels: the camera's sub-cell position
+      _subY = fy * CELL_H >> FIXEDPT_DEC_BITS;
+    }
 
     // 2D UI: flat, crisp, pixel-art flavored. A health bar is a dark frame with a segmented fill whose color goes
     // green -> yellow -> red with the fraction, a label in front and "curr/max" after it.
@@ -20,7 +25,76 @@ class Renderer2D final : public PixelRenderer {
       else drawLabel( win, y, x, align, w.text );
     }
 
+  protected:
+    // A text image's cells: a solid cell in the image's color for each non-space.
+    void drawCells( WinHandle win, int y, int x, std::string_view cells, const Image& img ) override {
+      const Win* w = static_cast<Win*>( win );
+      if ( !w ) return;
+      const uint32_t fg = colorToArgb( img.color );
+      for ( size_t c = 0; c < cells.size(); ++c ) {
+        if ( cells[c] != ' ' ) fillRect( w, ( w->x + x + static_cast<int>( c ) ) * CELL_W, ( w->y + y ) * CELL_H, CELL_W, CELL_H, fg );
+      }
+    }
+
+    // Window cell (r, c) shows image cell (r + offY, c + offX); an image pixel is 2 cells wide, 1 tall. Pixels come
+    // from the texture atlas (already ARGB).
+    void drawPixelLayer( WinHandle win, const Image& img, int offX, int offY, bool wrap, int winW, int winH ) override {
+      const Win* w = static_cast<Win*>( win );
+      if ( !w ) return;
+      const BImg& p = *img.pixels;
+      const auto at = _atlas.entry( img.pixels );
+      // Smooth scrolling: the whole layer moves up/left by the camera's sub-cell remainder in screen pixels, so one
+      // more row and pixel column are drawn to fill the edge. Every image pixel is still a whole solid rect of the
+      // framebuffer (nearest, no filtering), so tiles stay crisp and can't open seams.
+      const int ox = w->x * CELL_W - _subX, oy = w->y * CELL_H - _subY;
+      const int px0 = offX >= 0 ? offX / 2 : -( ( -offX + 1 ) / 2 );  // floor( offX / 2 )
+      const int px1 = ( offX + winW + 1 ) / 2 + 2;
+      for ( int r = 0; r < winH + ( _subY ? 1 : 0 ); ++r ) {
+        int iy = r + offY;
+        if ( wrap ) iy = flat::wrapIdx( iy, p.h );
+        else if ( iy < 0 || iy >= p.h ) continue;
+        for ( int px = px0; px < px1; ++px ) {
+          int ix = px;
+          if ( wrap ) ix = flat::wrapIdx( ix, p.w );
+          else if ( ix < 0 || ix >= p.w ) continue;
+          fillRect( w, ox + ( 2 * px - offX ) * CELL_W, oy + r * CELL_H, 2 * CELL_W, CELL_H, _atlas.at( at.x + ix, at.y + iy ) );
+        }
+      }
+    }
+
+    // A sprite: its src rect (a sub-rect of its image's place in the atlas) at the camera's whole cell and remainder,
+    // the same split the scene's layers get (Scene::render), so sprites and the ground move together to the pixel.
+    void drawPixelEntity( WinHandle win, Entity entity, const Box& camBox ) override {
+      const Win* w = static_cast<Win*>( win );
+      if ( !w ) return;
+      const auto& box = World::get<Box>( entity );
+      const auto& img = World::get<Image>( entity );
+      const auto& src = World::get<Rect>( entity );
+      const bool hasSrc = src.w > 0;
+      constexpr int FRAC = ( 1 << FIXEDPT_DEC_BITS ) - 1;
+      const int camX = camBox.pos.x & ~FRAC, camY = camBox.pos.y & ~FRAC;
+      const int exPx = ( ( box.pos.x - camX ) * CELL_W >> FIXEDPT_DEC_BITS ) - ( ( camBox.pos.x & FRAC ) * CELL_W >> FIXEDPT_DEC_BITS );
+      const int eyPx = ( ( box.pos.y - camY ) * CELL_H >> FIXEDPT_DEC_BITS ) - ( ( camBox.pos.y & FRAC ) * CELL_H >> FIXEDPT_DEC_BITS );
+      const int sx = hasSrc ? src.x : 0, sy = hasSrc ? src.y : 0;
+      const int sw = hasSrc ? src.w : img.size.w >> FIXEDPT_DEC_BITS;
+      const int sh = hasSrc ? src.h : img.size.h >> FIXEDPT_DEC_BITS;
+      const BImg& p = *img.pixels;
+      const auto at = _atlas.entry( img.pixels );
+      const int ox = w->x * CELL_W, oy = w->y * CELL_H;
+      for ( int r = 0; r < sh; ++r ) {
+        const int iy = sy + r;
+        if ( iy < 0 || iy >= p.h ) continue;
+        for ( int c = 0; c < sw / 2; ++c ) {
+          const int ix = sx / 2 + c;
+          if ( ix < 0 || ix >= p.w ) continue;
+          fillRect( w, ox + exPx + 2 * c * CELL_W, oy + eyPx + r * CELL_H, 2 * CELL_W, CELL_H, _atlas.at( at.x + ix, at.y + iy ) );
+        }
+      }
+    }
+
   private:
+    int _subX{}, _subY{};  // see setLayerSubcell
+
     void drawMeter( WinHandle win, int y, int x, const Widget& bar ) {
       const Win* w = static_cast<Win*>( win );
       if ( !w || ( w->attr & ATTR_INVISIBLE ) ) return;

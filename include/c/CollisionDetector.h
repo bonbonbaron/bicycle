@@ -13,6 +13,9 @@
 // blocker; its velocity loses that component if it pointed into the blocker (so it slides along a wall). The
 // collision is still reported (a hero walking into an enemy gets hurt), and while the two stay flush they count as
 // touching. A step's components into a blocker it already touches are dropped (unblocked); moving away always works.
+//
+// In 2D and ASCII it also keeps the drawn images' overlap groups up to date for depth sorting (ImageOverlaps.h), from
+// the same moving set.
 #include "c/Collision.h"
 #include "data/ActiveFirst.h"
 #include "m/Entity.h"

@@ -51,12 +51,6 @@ class PixelRenderer : public Renderer {
     void endFrame() override;
     void applyTransition();
 
-    void drawLayer( WinHandle win, const Image& img, int offX, int offY, bool wrap, int winW, int winH ) override;
-    void drawEntity( WinHandle win, Entity entity, const Box& camBox ) override;
-    void setLayerSubcell( int fx, int fy ) override {
-      _subX = fx * CELL_W >> FIXEDPT_DEC_BITS;  // screen pixels: the camera's sub-cell position
-      _subY = fy * CELL_H >> FIXEDPT_DEC_BITS;
-    }
     void preloadImage( const std::shared_ptr<const BImg>& img ) override { _atlas.add( img ); }
     void onSceneUnloaded() override { _atlas.prune(); }
 
@@ -87,7 +81,6 @@ class PixelRenderer : public Renderer {
 
     // Pixel helpers, in screen pixels, clipped to win (null = whole screen). ARGB; alpha 0 skips.
     void fillRect( const Win* win, int x, int y, int w, int h, uint32_t argb );
-    int _subX{}, _subY{};  // see setLayerSubcell
     void glyph( const Win* win, int px, int py, unsigned char c, uint32_t fg, uint32_t bg );
     // Alpha-blended drawing (straight alpha, so the 3D overlay composites right).
     void clip( const Win* w, int& x0, int& y0, int& x1, int& y1 ) const;  // to w (null = screen) and the screen
@@ -105,7 +98,6 @@ class PixelRenderer : public Renderer {
     static constexpr int UI_TEXT_PX = 15;  // body text size: fits a 16-pixel cell row
     UiFont _font, _fontBold;
     SpriteAtlas _atlas;  // every sprite/tileset image, packed at load (see SpriteAtlas.h)
-    void drawTextImage( const Win* win, const Image& img, int srcX, int srcY, int srcW, int srcH, int dstX, int dstY );
     void saveScreenshotIfDue();
     auto screenshotDue() const -> bool;  // this frame will be saved (BICYCLE_SCREENSHOT)
     // The finished frame as ARGB, top row first (3D reads it back from GL before swapping).
