@@ -3,70 +3,119 @@
 #include "trigLUT.h"
 #include "Constants.h"
 #include "c/Layer3D.h"
+#include "c/CollisionDetector.h"
 #include <cmath>
 #include <algorithm>
+#include <type_traits>
 
 auto Kinematics::getInstance() -> Kinematics& {
   static Kinematics kin{};
   return kin;
 }
 
-// TODO implement fixed point math here
+namespace {
+// A Box (velocity, acceleration, speed limit) as its six fixed-point lanes x, y, z, w, h, d, so a loop over n of
+// them is one counted loop over 6n ints, which vectorizes (a loop over the structs doesn't). The size lanes are
+// unsigned in Box; as ints the limits work the same (a size limit of 0 keeps it 0; above 0, std::clamp on unsigned
+// had its bounds crossed).
+constexpr uint32_t LANES = 6;
+static_assert( sizeof( Box ) == LANES * sizeof( int ) && std::is_standard_layout_v<Box> );
+template <typename B> auto lanes( B* boxes ) {
+  using Int = std::conditional_t<std::is_const_v<B>, const int, int>;
+  return reinterpret_cast<Int*>( boxes );
+}
+}  // namespace
+
+// Per frame, over the moving entities only (the active rows of _motion): trackers aim, accelerations and the speed
+// limits apply (counted loops over contiguous columns, which vectorize), then the boxes move and scripted motions
+// run. Entities whose settle time ran out stop being active.
 void Kinematics::run() {
   auto& boxes = World::get<Box>();
+  const uint32_t n = _motion.nActive();
   // Trackers need to know where they're going before we move them.
-  for ( Entity follower = 0; follower < _tracks.size(); ++follower ) {
-    auto& target = _tracks.at( follower );
-    if ( target == 0 || target == follower ) {
-      continue;  // not tracking anything
-    }
-    auto& trackerPos = World::get<Box>( follower ).pos;
-    auto& targetPos = boxes.at( target ).pos;
+  for ( uint32_t i = 0; i < n; ++i ) {
+    const Entity follower = _motion.key( i ), target = _motion.col<TRACK>()[i];
+    if ( target == 0 || target == follower ) continue;  // not tracking anything
+    auto& trackerPos = boxes.at( follower ).pos;
+    const auto& targetPos = boxes.at( target ).pos;
     // If motion is acceleration-based, accelerate toward target.
-    auto& trkrAcc = _accs.at( follower ).pos;
-    auto& trkrVel = _vels.at( follower ).pos;
-    // unit vector from tracker to target
-    if ( ( targetPos - trackerPos ).hasZeroMag() ) {
-      continue;  // already there; normalizing would divide by zero
-    }
-    auto direction = ( targetPos - trackerPos ).normalize();  
-    // Acceleration-based tracking
-    if ( ! trkrAcc.hasZeroMag() ) {
-      trkrAcc = direction * trkrAcc.mag();
-    }
-    // Velocity-based tracking
-    else if ( ! trkrVel.hasZeroMag() ) {
-      trkrVel = direction * trkrVel.mag();
-    }
-    // Position-based tracking
-    else {
-      // Since tracker as zero velocity, it just moves with its target.
-      trackerPos += _vels.at( target ).pos;
-    }
+    auto& trkrAcc = _motion.col<ACC>()[i].pos;
+    auto& trkrVel = _motion.col<VEL>()[i].pos;
+    if ( ( targetPos - trackerPos ).hasZeroMag() ) continue;  // already there; normalizing would divide by zero
+    auto direction = ( targetPos - trackerPos ).normalize();  // unit vector from tracker to target
+    if ( ! trkrAcc.hasZeroMag() ) trkrAcc = direction * trkrAcc.mag();       // acceleration-based tracking
+    else if ( ! trkrVel.hasZeroMag() ) trkrVel = direction * trkrVel.mag();  // velocity-based tracking
+    else if ( _motion.contains( target ) ) trackerPos += _motion.at<VEL>( target ).pos;  // moves with its target
   }
-
-  // Add accelerations to velocities.
-  for ( unsigned i = 0; i < NUM_SUPPORTED_ENTITIES; ++i ) {
-    _vels.at(i) += _accs.at(i);
-  }
-  // Limit velocities.
-  for ( unsigned i = 0; i < NUM_SUPPORTED_ENTITIES; ++i ) {
-    auto& vel = _vels.at(i);
-    const auto& term = _terminalVels.at(i);
-    vel.pos.x = std::clamp( vel.pos.x, -term.pos.x, term.pos.x );
-    vel.pos.y = std::clamp( vel.pos.y, -term.pos.y, term.pos.y );
-    vel.pos.z = std::clamp( vel.pos.z, -term.pos.z, term.pos.z );
-    vel.size.w = std::clamp( vel.size.w, -term.size.w, term.size.w );
-    vel.size.h = std::clamp( vel.size.h, -term.size.h, term.size.h );
-    vel.size.d = std::clamp( vel.size.d, -term.size.d, term.size.d );
-  }
-  // Add velocities to positions.
-  for ( unsigned i = 0; i < NUM_SUPPORTED_ENTITIES; ++i ) {
-    boxes.at(i) += _vels.at(i);
-  }
+  // Add accelerations to velocities, then limit them: over the active rows' lanes, one flat loop each.
+  Velocity* vels = _motion.col<VEL>();
+  int* __restrict v = lanes( vels );
+  const int* __restrict a = lanes( _motion.col<ACC>() );
+  const int* __restrict t = lanes( _motion.col<TERM>() );
+  for ( uint32_t i = 0; i < n * LANES; ++i ) v[i] += a[i];
+  for ( uint32_t i = 0; i < n * LANES; ++i ) v[i] = std::clamp( v[i], -t[i], t[i] );
+  // Add velocities to positions (World's boxes are per entity: a scatter, not a contiguous loop).
+  for ( uint32_t i = 0; i < n; ++i ) boxes.at( _motion.key( i ) ) += vels[i];
   runDriven();
   // The 3D layer (3D builds only; it works only for entities with a transform): physics, then the camera follows.
   layer3d::step( static_cast<float>( Constants::MILLISECONDS_PER_FRAME / 1000.0 ) );
+  // Settling entities count down; those that don't move any more go still (backwards: deactivating swaps a row
+  // with the last active one, which was already visited).
+  uint8_t* settle = _motion.col<SETTLE>();
+  for ( uint32_t i = _motion.nActive(); i-- > 0; ) {
+    if ( settle[i] > 0 ) --settle[i];
+    const Entity e = _motion.key( i );
+    if ( !moving( e ) ) {
+      _motion.deactivate( e );
+      CollisionDetector::getInstance().deactivate( e );
+    }
+  }
+}
+
+// --- moving or still -----------------------------------------------------------------------------------------------
+
+auto Kinematics::motionRow( Entity e ) -> uint32_t {
+  _motion.add( e, Velocity{}, Acceleration{}, Velocity{}, Entity{}, uint8_t{} );
+  return _motion.row( e );
+}
+
+auto Kinematics::moving( Entity e ) const -> bool {
+  if ( e < _driven.size() && ( _driven[e].on || _driven[e].spin != 0 ) ) return true;
+  if ( !_motion.contains( e ) ) return false;
+  const auto zero = []( const Box& b ) { return b.pos.hasZeroMag() && b.size.w == 0 && b.size.h == 0 && b.size.d == 0; };
+  return !zero( _motion.at<VEL>( e ) ) || !zero( _motion.at<ACC>( e ) ) || _motion.at<TRACK>( e ) != 0 ||
+         _motion.at<SETTLE>( e ) > 0;
+}
+
+void Kinematics::update( Entity e ) {
+  motionRow( e );
+  if ( moving( e ) ) {
+    _motion.activate( e );
+    CollisionDetector::getInstance().activate( e );  // (also when it was already moving but just got a collider)
+  }
+  else if ( _motion.deactivate( e ) ) CollisionDetector::getInstance().deactivate( e );
+}
+
+void Kinematics::moved( Entity e ) {
+  const uint32_t row = motionRow( e );
+  _motion.col<SETTLE>()[row] = SETTLE_FRAMES;
+  _motion.activate( e );
+  CollisionDetector::getInstance().activate( e );
+}
+
+void Kinematics::teleport( Entity e, Position pos ) {
+  World::get<Box>( e ).pos = pos;
+  moved( e );
+}
+
+auto Kinematics::step( Entity e, Position delta ) -> bool {
+  auto& cd = CollisionDetector::getInstance();
+  if ( cd.blockedToward( e, delta ) ) return false;
+  auto& pos = World::get<Box>( e ).pos;
+  cd.stepped( e, pos );
+  pos += delta;
+  moved( e );
+  return true;
 }
 
 // --- scripted motions -----------------------------------------------------------------------------------------------
@@ -90,8 +139,15 @@ auto Kinematics::driven( Entity e ) -> Driven& {
   return _driven[e];
 }
 
+// The moving entities with a scripted motion, in entity order (a follower placed after its target sees where the
+// target went this frame, as it always has).
 void Kinematics::runDriven() {
-  for ( Entity e = 0; e < _driven.size(); ++e ) {
+  _drivenNow.clear();
+  for ( uint32_t i = 0; i < _motion.nActive(); ++i ) {
+    if ( _motion.key( i ) < _driven.size() ) _drivenNow.push_back( _motion.key( i ) );
+  }
+  std::sort( _drivenNow.begin(), _drivenNow.end() );
+  for ( const Entity e : _drivenNow ) {
     auto& d = _driven[e];
     if ( d.spin != 0 || ( d.on && d.type >= LINEAR3D ) ) runDriven3D( e, d );  // Kinematics3D.cpp
     if ( !d.on || d.type >= LINEAR3D ) continue;
@@ -241,14 +297,11 @@ void Kinematics::forget( Entity e ) {
   for ( auto& d : _driven ) {
     if ( d.on && ( ( d.type == FOLLOW_LERP && d.tgt == e ) || ( d.type == ORBITAL && d.center == e ) ) ) d.on = false;
   }
-  if ( e < _tracks.size() ) _tracks[e] = 0;
-  for ( auto& t : _tracks ) {
-    if ( t == e ) t = 0;
+  for ( uint32_t i = 0; i < _motion.size(); ++i ) {
+    if ( _motion.col<TRACK>()[i] == e ) _motion.col<TRACK>()[i] = 0;
   }
-  if ( e < _vels.size() ) {
-    _vels[e] = {};
-    _accs[e] = {};
-  }
+  _motion.remove( e );
+  CollisionDetector::getInstance().deactivate( e );  // (followers that stopped go still in the next run())
 }
 
 void Kinematics::snap( Entity e ) {
@@ -260,6 +313,7 @@ void Kinematics::stopMotion( Entity e ) {
     _driven[e].path.clear();
     _driven[e].path3.clear();
   }
+  update( e );
 }
 
 auto Kinematics::motionType( Entity e ) const -> int {
@@ -277,14 +331,18 @@ void Kinematics::config( const Entity entity, const MotionConfig& src ) {
 
 void Kinematics::start( const Entity entity ) {
   const auto& cfg = _cfgs.at(entity);
-  _vels.at(entity) = cfg.initVel;
-  _terminalVels.at(entity) = cfg.termVel;
-  _accs.at(entity) = cfg.initAcc;
+  motionRow( entity );
+  _motion.at<VEL>( entity ) = cfg.initVel;
+  _motion.at<TERM>( entity ) = cfg.termVel;
+  _motion.at<ACC>( entity ) = cfg.initAcc;
+  update( entity );
 }
 
 void Kinematics::stop( const Entity entity ) {
-  _vels.at(entity) = Box();
-  _accs.at(entity) = Box();
+  motionRow( entity );
+  _motion.at<VEL>( entity ) = Box();
+  _motion.at<ACC>( entity ) = Box();
+  update( entity );
 }
 
 void Kinematics::pause( const Entity entity ) {
@@ -296,19 +354,21 @@ void Kinematics::unpause( const Entity entity ) {
 }
 
 void Kinematics::setVelocity( const Entity entity, const Position& vel ) {
-  _vels.at( entity ) = Box();
-  _vels.at( entity ).pos = vel;
-  _accs.at( entity ) = Box();
-  auto& term = _terminalVels.at( entity );
+  motionRow( entity );
+  _motion.at<VEL>( entity ) = Box();
+  _motion.at<VEL>( entity ).pos = vel;
+  _motion.at<ACC>( entity ) = Box();
+  auto& term = _motion.at<TERM>( entity );
   term.pos.x = std::max( term.pos.x, std::abs( vel.x ) );
   term.pos.y = std::max( term.pos.y, std::abs( vel.y ) );
+  update( entity );
 }
 
 void Kinematics::track( Entity follower, Entity tgt ) {
-  _tracks.at( follower ) = tgt;
+  motionRow( follower );
+  _motion.at<TRACK>( follower ) = tgt;
+  update( follower );
 }
 
-void Kinematics::untrack( Entity follower ) {
-  _tracks.at( follower ) = 0;
-}
+void Kinematics::untrack( Entity follower ) { track( follower, 0 ); }
 

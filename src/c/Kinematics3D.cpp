@@ -60,6 +60,7 @@ void Kinematics::linear3D( Entity e, float speed, bool pingPong ) {
   d.dir = 1;
   d.t = 0;
   d.pos3 = phys3d::World3D::get().transform( e ).pos;
+  update( e );  // moving now
 }
 
 void Kinematics::addWaypoint3D( Entity e, float x, float y, float z ) {
@@ -78,6 +79,7 @@ void Kinematics::orbit3D( Entity e, Entity center, m3::Vec3 c, float r, float de
   d.bobAmp = bobAmp;
   d.bobHz = bobHz;
   d.t = 0;
+  update( e );  // moving now
 }
 
 void Kinematics::follow3D( Entity e, Entity tgt, m3::Vec3 offset, float rate ) {
@@ -89,6 +91,7 @@ void Kinematics::follow3D( Entity e, Entity tgt, m3::Vec3 offset, float rate ) {
   d.offset3 = offset;
   d.stiffness = rate;
   if ( !retarget ) { d.t = 0; d.started = false; }
+  update( e );  // moving now
 }
 
 void Kinematics::view3D( Entity e, Entity tgt, m3::Vec3 offset ) {
@@ -98,6 +101,7 @@ void Kinematics::view3D( Entity e, Entity tgt, m3::Vec3 offset ) {
   d.tgt = tgt;
   d.offset3 = offset;
   d.t = 0;
+  update( e );  // moving now
 }
 
 void Kinematics::kick3D( Entity e, float back, float pitchDeg, float rate ) {
@@ -126,6 +130,7 @@ void Kinematics::runViews3D( float dt ) {
 
 void Kinematics::spin3D( Entity e, float yawDegPerSec ) {
   driven( e ).spin = yawDegPerSec * m3::PI / 180.f;
+  update( e );
 }
 
 void Kinematics::runCamera3D( float dt ) {

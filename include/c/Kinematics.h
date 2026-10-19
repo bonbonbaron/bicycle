@@ -8,6 +8,7 @@
 #include "c/MotionMath.h"
 #include "data/Mem.h"
 #include "m/Math3D.h"
+#include "data/ActiveFirst.h"
 
 class Kinematics : public Controllable {
   public:
@@ -63,6 +64,15 @@ class Kinematics : public Controllable {
     void runCamera3D( float dt );
     void runViews3D( float dt );  // VIEW3D riders, after the camera rig
     auto motionType( Entity e ) const -> int;  // -1 if not driven
+
+    // Moves outside the motions above (scripts, scene placement, animation frames resizing a box). Each keeps the
+    // entity active for the next two collision checks (see CollisionDetector.h); fixed-point positions.
+    void teleport( Entity e, Position pos );
+    // A step by delta: false (and no move) if it heads into a blocker it touches; a step into a new blocker is
+    // undone by the next CollisionDetector::check().
+    auto step( Entity e, Position delta ) -> bool;
+    void moved( Entity e );           // its box changed some other way
+    auto isMoving( Entity e ) const -> bool { return _motion.isActive( e ); }
   private:
     Kinematics() = default;
     Kinematics(const Kinematics&) = delete;
@@ -75,16 +85,17 @@ class Kinematics : public Controllable {
       Entity tgt;
     };
 
-    // To streamline processing, linear and orbital accelerations are treated synonymously (x -> tangential, y -> radial (positive-outward), z ignored for 2D but axial vel in 3D).
-    // Only the treatment of cartesian positions is distinguished. Orbits must be translated from rotational to cartesian coordinates at that point.
-    // We'll use a sine (doubles as cosine) look-up table to streamline that. Debating between 8- and 16-bit.
-    // TODO if this underperforms per frame, then I'll make these vectors of active motions.
-    std::array<MotionConfig, NUM_SUPPORTED_ENTITIES> _cfgs{};       
-    // Vels & accs combine linear/orbital motion w/ scaling (size-changes).
-    std::array<Velocity, NUM_SUPPORTED_ENTITIES> _terminalVels{};       
-    std::array<Velocity, NUM_SUPPORTED_ENTITIES> _vels{};       
-    std::array<Acceleration, NUM_SUPPORTED_ENTITIES> _accs{};
-    std::array<Entity, NUM_SUPPORTED_ENTITIES> _tracks{};
+    std::array<MotionConfig, NUM_SUPPORTED_ENTITIES> _cfgs{};  // start()/unpause() values
+
+    // Entities' velocities and accelerations (and size changes), the active rows the moving ones: run() loops over
+    // those only. An entity is moving while it has a velocity, an acceleration, a target it tracks or a scripted
+    // motion, and for SETTLE frames after a teleport or step. Its collision checks follow (CollisionDetector).
+    enum { VEL, ACC, TERM, TRACK, SETTLE };
+    static constexpr uint8_t SETTLE_FRAMES = 3;  // a move in frame N's Lua: active for checks N+1 and N+2
+    ActiveFirst<Velocity, Acceleration, Velocity, Entity, uint8_t> _motion;
+    auto motionRow( Entity e ) -> uint32_t;  // its row, added (still) if it had none
+    void update( Entity e );                 // (de)activates e for whether it moves now
+    auto moving( Entity e ) const -> bool;
     struct Driven {
       bool on{};
       MotionType type{};
@@ -114,6 +125,5 @@ class Kinematics : public Controllable {
     auto driven( Entity e ) -> Driven&;
     void runDriven();
     mem::Vector<Driven> _driven{ mem::Allocator<Driven>( mem::GENERAL ) };
-    MotionType type{};
-    Entity tgt{};  // orbiting, tracking (e.g. missiles), or just general destination
+    std::vector<Entity> _drivenNow;  // runDriven(): this frame's
 };

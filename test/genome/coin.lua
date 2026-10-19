@@ -11,10 +11,9 @@ local HERO = 1  -- Genome.COLL.hero
 function coin:onCollision(other, collType)
   if collType == HERO then
     self:sound( "collect" )
-    local pos = ffi.C.World_getBoxes().arr[self.id].pos
-    pos.x = ffi.C.rollDice( 4, 300 ) * 256
-    pos.y = ffi.C.rollDice( 34, 42 ) * 256
-    dbglog( "coin collected; respawned at %d,%d", pos.x / 256, pos.y / 256 )
+    local x, y = ffi.C.rollDice( 4, 300 ), ffi.C.rollDice( 34, 42 )
+    ffi.C.teleport( self.id, x * 256, y * 256 )
+    dbglog( "coin collected; respawned at %d,%d", x, y )
   end
 end
 

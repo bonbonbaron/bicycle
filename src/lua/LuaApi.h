@@ -25,5 +25,7 @@ inline auto velocity( int vx, int vy ) -> Position {
   v.y = vy;
   return v;
 }
+// A position already in fixed point (no shift, unlike Position( x, y )).
+inline auto fixedPos( int x, int y ) -> Position { return velocity( x, y ); }
 
 }  // namespace lua

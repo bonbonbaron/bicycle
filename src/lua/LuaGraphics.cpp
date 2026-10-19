@@ -2,12 +2,14 @@
 #include "LuaApi.h"
 #include "v/common/PixelImages.h"
 #include "v/common/Renderer.h"
+#include "c/Kinematics.h"
 
 namespace {
 // The entity's image, and its box sized to it.
 void setImage( Entity entity, Image img ) {
   World::set<Image>( entity, std::move( img ) );
   World::get<Box>( entity ).size = World::get<Image>( entity ).size;
+  Kinematics::getInstance().moved( entity );  // a new size: collision checks
 }
 }  // namespace
 

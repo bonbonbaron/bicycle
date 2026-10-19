@@ -31,7 +31,23 @@ EXPORT_API unsigned getAnimFrameIdx( Entity entity ) { return animator().getFram
 EXPORT_API void addCollider( Entity entity, unsigned layer, unsigned type, int x, int y, int w, int h ) {
   World::set<CollBox>( entity, CollBox( Box( Position( x, y ), Size( w, h ) ), type ) );
   CollisionDetector::registerEntity( entity, layer );
+  kinematics().moved( entity );  // checked against everyone on the next frames, wherever it was put
 }
+// Collision types (a bit each, 1 << type) that stop the entity's steps (stepEntity): coll = { blockedBy = {...} }.
+EXPORT_API void setCollBlockers( Entity entity, unsigned typeMask ) {
+  CollisionDetector::getInstance().setBlockers( entity, typeMask );
+}
+
+// --- moving by hand (fixed point: 256 = one cell) -------------------------------------------------------------------
+// One step by dx, dy, unless the entity's blockers (setCollBlockers) are in the way: false if it touches one that
+// way, and a step into a new one is undone in the next collision check (the collision is still reported, and
+// stepBlocked() is then true until the next step).
+EXPORT_API bool stepEntity( Entity entity, int dx, int dy ) {
+  return kinematics().step( entity, lua::fixedPos( dx, dy ) );
+}
+EXPORT_API bool stepBlocked( Entity entity ) { return CollisionDetector::getInstance().stepBlocked( entity ); }
+// Puts the entity at x, y (its box's top-left), no blocking (respawns, knockbacks).
+EXPORT_API void teleport( Entity entity, int x, int y ) { kinematics().teleport( entity, lua::fixedPos( x, y ) ); }
 
 // --- motion (cells, seconds, degrees; see Kinematics.h and the motion gene in scripts/Genome.lua) -------------------
 // Constant velocity in fixed-point cells per frame (256 = one cell per frame).

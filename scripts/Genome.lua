@@ -534,8 +534,9 @@ Gene["GeneLoader"] = {
       end
     end
   end,
-  -- coll = { type = "solid", layer = 0, box = { x, y, w, h } }: collide with entities on the same layer.
-  -- type is a name from Genome.COLL (or a number); box is relative to the entity, in cells (default: whole entity).
+  -- coll = { type = "solid", layer = 0, box = { x, y, w, h }, blockedBy = { "solid", ... } }: collide with entities
+  -- on the same layer. type is a name from Genome.COLL (or a number); box is relative to the entity, in cells
+  -- (default: whole entity). blockedBy: the types its steps (ffi.C.stepEntity) can't go into (the engine undoes them).
   coll = function(entity, gene, tbl)
     local c = gene.val
     checkType( c, "table" )
@@ -545,6 +546,14 @@ Gene["GeneLoader"] = {
     if not collType then error( "Unknown collision type '"..tostring( c.type ).."'." ) end
     local box = c.box or { 0, 0, 0, 0 }
     ffi.C.addCollider( entity, c.layer or 0, collType, box[1], box[2], box[3], box[4] )
+    if c.blockedBy then
+      local mask = 0
+      for _, t in ipairs( c.blockedBy ) do
+        local bt = type( t ) == "number" and t or COLL[t] or error( "Unknown collision type '"..tostring( t ).."' in blockedBy." )
+        mask = bit.bor( mask, bit.lshift( 1, bt ) )
+      end
+      ffi.C.setCollBlockers( entity, mask )
+    end
   end,
   initAnim = 0,  -- do nothing; read by the sprite loader
   palette = 0,   -- color palette variant: read by the sprite loader (Sprite.paletteSpec)

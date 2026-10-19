@@ -2,6 +2,7 @@
 #include "c/Animator.h"
 #include "m/World.h"
 #include "c/Timeout.h"
+#include "c/Kinematics.h"
 
 auto Animator::getInstance() -> Animator& {
   static Animator kin{};
@@ -36,11 +37,17 @@ void Animator::showFrame( const Entity entity, AnimState& state ) {
   World::set<Rect>( entity, currFrame.srcRect );
   // Box is in fixed point; assume we don't want to change its depth.
   auto& box = World::get<Box>( entity );
+  const Size before = box.size;
   box.size.w = currFrame.srcRect.w << FIXEDPT_DEC_BITS;
   box.size.h = currFrame.srcRect.h << FIXEDPT_DEC_BITS;
+  bool changed = box.size.w != before.w || box.size.h != before.h;
   if ( currFrame.collisionBox.size.w > 0 ) {
+    const auto& old = World::get<CollBox>( entity );
+    const auto& nu = currFrame.collisionBox;
+    changed |= old.pos.x != nu.pos.x || old.pos.y != nu.pos.y || old.size.w != nu.size.w || old.size.h != nu.size.h;
     World::set<CollBox>( entity, currFrame.collisionBox );
   }
+  if ( changed ) Kinematics::getInstance().moved( entity );  // a new collision shape: checked again
 }
 
 void Animator::startTimer( const Entity entity, AnimState& state ) {

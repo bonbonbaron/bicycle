@@ -66,7 +66,7 @@ EXPORT_API void attachEntity( Entity entity, unsigned layerIdx ) {
 }
 
 EXPORT_API void setPos( Entity entity, Position pos ) {
-  World::get<Box>( entity ).pos = pos << FIXEDPT_DEC_BITS;
+  Kinematics::getInstance().teleport( entity, pos << FIXEDPT_DEC_BITS );
 }
 
 // Not drawn while hidden (e.g. to flash a character).
