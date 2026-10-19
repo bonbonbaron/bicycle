@@ -33,10 +33,10 @@ class ActiveFirst {
     auto keys() const -> const Key* { return _keys.data(); }
 
     // Column I: its rows in order (the active ones first), or one key's cell.
-    template <size_t I> auto col() { return std::get<I>( _cols ).data(); }
-    template <size_t I> auto col() const { return std::get<I>( _cols ).data(); }
-    template <size_t I> auto& at( Key k ) { return std::get<I>( _cols )[_rowOf[k]]; }
-    template <size_t I> const auto& at( Key k ) const { return std::get<I>( _cols )[_rowOf[k]]; }
+    template <std::size_t I> auto col() { return std::get<I>( _cols ).data(); }
+    template <std::size_t I> auto col() const { return std::get<I>( _cols ).data(); }
+    template <std::size_t I> auto& at( Key k ) { return std::get<I>( _cols )[_rowOf[k]]; }
+    template <std::size_t I> const auto& at( Key k ) const { return std::get<I>( _cols )[_rowOf[k]]; }
 
     // A new, inactive row. False (and nothing changes) if the key is already in.
     auto add( Key k, Columns... cells ) -> bool {
@@ -77,7 +77,7 @@ class ActiveFirst {
     }
 
   private:
-    template <size_t... I> void push( std::index_sequence<I...>, Columns&&... cells ) {
+    template <std::size_t... I> void push( std::index_sequence<I...>, Columns&&... cells ) {
       ( std::get<I>( _cols ).push_back( std::move( cells ) ), ... );
     }
     void swapRows( uint32_t a, uint32_t b ) {

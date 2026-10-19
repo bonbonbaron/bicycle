@@ -52,10 +52,10 @@ namespace {
   int sfRead( void* buf, fluid_long_long_t count, void* handle ) {
     auto* h = static_cast<SfHandle*>( handle );
     if ( h->fp ) {
-      return std::fread( buf, static_cast<size_t>( count ), 1, h->fp ) == 1 ? FLUID_OK : FLUID_FAILED;
+      return std::fread( buf, static_cast<std::size_t>( count ), 1, h->fp ) == 1 ? FLUID_OK : FLUID_FAILED;
     }
     if ( count < 0 || h->pos + count > static_cast<long long>( h->mem->size() ) ) return FLUID_FAILED;
-    std::memcpy( buf, h->mem->data() + h->pos, static_cast<size_t>( count ) );
+    std::memcpy( buf, h->mem->data() + h->pos, static_cast<std::size_t>( count ) );
     h->pos += count;
     return FLUID_OK;
   }
@@ -249,9 +249,9 @@ auto MidiPlayer::hasPreset( int bank, int program ) const -> bool {
 
 // The (bank, program) pairs a Standard MIDI File plays notes with: program changes, bank selects (CC0), channel
 // 10 as drums (bank 128), and channels that play without a program change (program 0).
-static void midiPresets( const uint8_t* d, size_t n, std::vector<std::pair<int, int>>& out ) {
-  auto be = [&]( size_t i, int k ) { uint32_t v = 0; for ( int j = 0; j < k; ++j ) v = v << 8 | d[i + j]; return v; };
-  size_t i = 0;
+static void midiPresets( const uint8_t* d, std::size_t n, std::vector<std::pair<int, int>>& out ) {
+  auto be = [&]( std::size_t i, int k ) { uint32_t v = 0; for ( int j = 0; j < k; ++j ) v = v << 8 | d[i + j]; return v; };
+  std::size_t i = 0;
   if ( n < 14 || std::memcmp( d, "MThd", 4 ) != 0 ) return;
   i = 8 + be( 4, 4 );
   int bank[16]{}, prog[16]{};
@@ -262,7 +262,7 @@ static void midiPresets( const uint8_t* d, size_t n, std::vector<std::pair<int, 
     out.push_back( bp );
   };
   while ( i + 8 <= n ) {
-    const size_t len = be( i + 4, 4 ), start = i + 8, end = std::min( n, start + len );
+    const std::size_t len = be( i + 4, 4 ), start = i + 8, end = std::min( n, start + len );
     const bool track = std::memcmp( d + i, "MTrk", 4 ) == 0;
     i = start;
     uint8_t status = 0;

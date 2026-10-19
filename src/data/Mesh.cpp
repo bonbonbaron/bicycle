@@ -83,7 +83,7 @@ auto decode( std::string_view s ) -> std::optional<MeshData> {
   eb::Decoded d;
   if ( !eb::decode( conn, d ) ) return std::nullopt;
   // Positions in decoded order (dummies have none).
-  std::vector<int32_t> q( 3 * static_cast<size_t>( d.nVerts ), 0 );
+  std::vector<int32_t> q( 3 * static_cast<std::size_t>( d.nVerts ), 0 );
   std::vector<uint8_t> known( d.nVerts, 0 );
   std::vector<int32_t> compact( d.nVerts, -1 );
   bytes::Reader pr( streams[3] );
@@ -99,7 +99,7 @@ auto decode( std::string_view s ) -> std::optional<MeshData> {
     compact[i] = static_cast<int32_t>( nReal++ );
   }
   if ( !pr.ok || nReal != nVerts ) return std::nullopt;
-  m.pos.resize( 3 * static_cast<size_t>( nVerts ) );
+  m.pos.resize( 3 * static_cast<std::size_t>( nVerts ) );
   const float steps = static_cast<float>( ( 1 << qbits ) - 1 );
   for ( uint32_t i = 0; i < d.nVerts; ++i ) {
     if ( compact[i] < 0 ) continue;
@@ -108,18 +108,18 @@ auto decode( std::string_view s ) -> std::optional<MeshData> {
     }
   }
   // Real triangles in decoded order.
-  for ( size_t t = 0; t < d.tris.size() / 3; ++t ) {
+  for ( std::size_t t = 0; t < d.tris.size() / 3; ++t ) {
     const int32_t a = compact[d.tris[3 * t]], b = compact[d.tris[3 * t + 1]], c = compact[d.tris[3 * t + 2]];
     if ( a < 0 || b < 0 || c < 0 ) continue;
     m.tris.insert( m.tris.end(), { static_cast<uint32_t>( a ), static_cast<uint32_t>( b ), static_cast<uint32_t>( c ) } );
   }
-  if ( m.tris.size() != 3 * static_cast<size_t>( nTris ) ) return std::nullopt;
-  const size_t nCorners = m.tris.size();
+  if ( m.tris.size() != 3 * static_cast<std::size_t>( nTris ) ) return std::nullopt;
+  const std::size_t nCorners = m.tris.size();
   if ( flags & 2 ) {
     bytes::Reader nr( streams[4] );
     int32_t pa = 0, pb = 0;
     m.normals.resize( 3 * nCorners );
-    for ( size_t c = 0; c < nCorners; ++c ) {
+    for ( std::size_t c = 0; c < nCorners; ++c ) {
       pa += nr.svarint();
       pb += nr.svarint();
       octDecode( pa, pb, &m.normals[3 * c] );
@@ -130,7 +130,7 @@ auto decode( std::string_view s ) -> std::optional<MeshData> {
     bytes::Reader ur( streams[5] );
     int32_t pu = 0, pv = 0;
     m.uvs.resize( 2 * nCorners );
-    for ( size_t c = 0; c < nCorners; ++c ) {
+    for ( std::size_t c = 0; c < nCorners; ++c ) {
       pu += ur.svarint();
       pv += ur.svarint();
       m.uvs[2 * c] = uvmin[0] + ( uvmax[0] - uvmin[0] ) * pu / 65535.f;
@@ -139,10 +139,10 @@ auto decode( std::string_view s ) -> std::optional<MeshData> {
     if ( !ur.ok ) return std::nullopt;
   }
   if ( flags & 8 ) {
-    if ( streams[7].size() != 8 * static_cast<size_t>( nVerts ) ) return std::nullopt;
-    m.joints.resize( 4 * static_cast<size_t>( nVerts ) );
-    m.weights.resize( 4 * static_cast<size_t>( nVerts ) );
-    for ( size_t v = 0; v < nVerts; ++v ) {
+    if ( streams[7].size() != 8 * static_cast<std::size_t>( nVerts ) ) return std::nullopt;
+    m.joints.resize( 4 * static_cast<std::size_t>( nVerts ) );
+    m.weights.resize( 4 * static_cast<std::size_t>( nVerts ) );
+    for ( std::size_t v = 0; v < nVerts; ++v ) {
       for ( int k = 0; k < 4; ++k ) m.joints[4 * v + k] = static_cast<uint8_t>( streams[7][8 * v + k] );
       for ( int k = 0; k < 4; ++k ) m.weights[4 * v + k] = static_cast<uint8_t>( streams[7][8 * v + 4 + k] );
     }

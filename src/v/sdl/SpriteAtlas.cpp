@@ -31,14 +31,14 @@ void SpriteAtlas::rebuildIfDirty() {
   const auto rects = atlas::atlasPlacements( a, PAD );
   _w = static_cast<int>( a.width() );
   _h = static_cast<int>( a.height() );
-  _px.assign( static_cast<size_t>( _w ) * _h, 0u );
+  _px.assign( static_cast<std::size_t>( _w ) * _h, 0u );
   _entries.resize( _imgs.size() );
-  for ( size_t i = 0; i < _imgs.size(); ++i ) {
+  for ( std::size_t i = 0; i < _imgs.size(); ++i ) {
     const BImg& img = *_imgs[i];
     const auto& r = rects[i];
     _entries[i] = Entry{ r.x, r.y, r.w, r.h };
     for ( int y = 0; y < img.h; ++y ) {
-      uint32_t* dst = _px.data() + static_cast<size_t>( r.y + y ) * _w + r.x;
+      uint32_t* dst = _px.data() + static_cast<std::size_t>( r.y + y ) * _w + r.x;
       for ( int x = 0; x < img.w; ++x ) {
         const uint32_t rgba = img.pixel( x, y );  // R in the low byte
         dst[x] = ( rgba & 0xFF000000u ) | ( ( rgba & 0xFF ) << 16 ) | ( rgba & 0xFF00 ) | ( ( rgba >> 16 ) & 0xFF );
@@ -54,7 +54,7 @@ void SpriteAtlas::rebuildIfDirty() {
 void SpriteAtlas::prune() {
   // Until nothing changes: a palette variant holds its graybody (BImg::gray), so dropping the variant can leave
   // the graybody with only the atlas's reference.
-  const size_t before = _imgs.size();
+  const std::size_t before = _imgs.size();
   for ( bool dropped = true; dropped; ) {
     std::vector<std::shared_ptr<const BImg>> keep;
     for ( auto& img : _imgs ) {
@@ -65,7 +65,7 @@ void SpriteAtlas::prune() {
   }
   if ( _imgs.size() == before ) return;
   _idx.clear();
-  for ( size_t i = 0; i < _imgs.size(); ++i ) _idx[_imgs[i].get()] = i;
+  for ( std::size_t i = 0; i < _imgs.size(); ++i ) _idx[_imgs[i].get()] = i;
   _entries.clear();
   _dirty = true;
 }

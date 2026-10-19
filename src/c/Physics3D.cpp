@@ -43,7 +43,7 @@ void World3D::removeEntity( Entity e ) {
   for ( Entity o = 1; o < NUM_SUPPORTED_ENTITIES; ++o ) {
     if ( o == e ) continue;
     const Entity i = std::min( e, o ), j = std::max( e, o );
-    const size_t bit = static_cast<size_t>( i ) * NUM_SUPPORTED_ENTITIES + j;
+    const std::size_t bit = static_cast<std::size_t>( i ) * NUM_SUPPORTED_ENTITIES + j;
     if ( !_touching.test( bit ) ) continue;
     _touching.reset( bit );
     if ( _contact && _body[o].collType ) _contact( o, e, _body[e].collType, false );
@@ -54,8 +54,8 @@ void World3D::removeEntity( Entity e ) {
   _boxPrev[e] = {};
 }
 
-void World3D::addLevelTriangles( const float* pos, const uint32_t* tris, size_t nTris ) {
-  for ( size_t i = 0; i < nTris; ++i ) {
+void World3D::addLevelTriangles( const float* pos, const uint32_t* tris, std::size_t nTris ) {
+  for ( std::size_t i = 0; i < nTris; ++i ) {
     auto v = [&]( int k ) { const uint32_t j = tris[3 * i + k]; return Vec3{ pos[3 * j], pos[3 * j + 1], pos[3 * j + 2] }; };
     Tri t{ v( 0 ), v( 1 ), v( 2 ), {} };
     t.n = normalize( cross( t.b - t.a, t.c - t.a ) );
@@ -109,21 +109,21 @@ void World3D::buildGrid( float cell ) {
     z1 = std::clamp( static_cast<int>( ( mxz - _lo.z ) / cell ), 0, _nz - 1 );
   };
   // Counting sort into a CSR layout: cellStart[c]..cellStart[c+1] index cellTris.
-  _cellStart.assign( static_cast<size_t>( _nx ) * _nz + 1, 0 );
+  _cellStart.assign( static_cast<std::size_t>( _nx ) * _nz + 1, 0 );
   for ( const auto& t : _tris ) {
     int x0, x1, z0, z1;
     range( t, x0, x1, z0, z1 );
     for ( int z = z0; z <= z1; ++z )
-      for ( int x = x0; x <= x1; ++x ) ++_cellStart[static_cast<size_t>( z ) * _nx + x + 1];
+      for ( int x = x0; x <= x1; ++x ) ++_cellStart[static_cast<std::size_t>( z ) * _nx + x + 1];
   }
-  for ( size_t i = 1; i < _cellStart.size(); ++i ) _cellStart[i] += _cellStart[i - 1];
+  for ( std::size_t i = 1; i < _cellStart.size(); ++i ) _cellStart[i] += _cellStart[i - 1];
   _cellTris.assign( _cellStart.back(), 0 );
   mem::Vector<uint32_t> fill( _cellStart.begin(), _cellStart.end() - 1, mem::Allocator<uint32_t>( mem::TEMPORARY ) );
   for ( uint32_t i = 0; i < _tris.size(); ++i ) {
     int x0, x1, z0, z1;
     range( _tris[i], x0, x1, z0, z1 );
     for ( int z = z0; z <= z1; ++z )
-      for ( int x = x0; x <= x1; ++x ) _cellTris[fill[static_cast<size_t>( z ) * _nx + x]++] = i;
+      for ( int x = x0; x <= x1; ++x ) _cellTris[fill[static_cast<std::size_t>( z ) * _nx + x]++] = i;
   }
   _stamp.assign( _tris.size(), 0 );
   _stampId = 0;
@@ -140,7 +140,7 @@ void World3D::forTrisInBox( Vec3 lo, Vec3 hi, F&& f ) {
   const int z1 = std::clamp( static_cast<int>( ( hi.z - _lo.z ) / _cell ), 0, _nz - 1 );
   for ( int z = z0; z <= z1; ++z ) {
     for ( int x = x0; x <= x1; ++x ) {
-      const size_t c = static_cast<size_t>( z ) * _nx + x;
+      const std::size_t c = static_cast<std::size_t>( z ) * _nx + x;
       for ( uint32_t k = _cellStart[c]; k < _cellStart[c + 1]; ++k ) {
         const uint32_t i = _cellTris[k];
         if ( _stamp[i] == _stampId ) continue;
@@ -420,7 +420,7 @@ void World3D::overlaps() {
         const float rr = a.radius + b.radius + 0.02f;
         now = segmentSegment( p1, q1, p2, q2, c1, c2 ) < rr * rr;
       }
-      const size_t bit = static_cast<size_t>( i ) * NUM_SUPPORTED_ENTITIES + j;
+      const std::size_t bit = static_cast<std::size_t>( i ) * NUM_SUPPORTED_ENTITIES + j;
       if ( now == _touching.test( bit ) ) continue;
       _touching.set( bit, now );
       if ( a.collType ) _contact( i, j, b.collType, now );
@@ -466,7 +466,7 @@ auto World3D::raycast( Vec3 o, Vec3 dir, float maxDist, Entity ignore, bool enti
       float tmx = std::fabs( d.x ) > 1e-9f ? t0 + ( ( _lo.x + ( cx + ( sx > 0 ) ) * _cell ) - s.x ) / d.x : inf;
       float tmz = std::fabs( d.z ) > 1e-9f ? t0 + ( ( _lo.z + ( cz + ( sz > 0 ) ) * _cell ) - s.z ) / d.z : inf;
       for ( int guard = 0; guard < 4096; ++guard ) {
-        const size_t c = static_cast<size_t>( cz ) * _nx + cx;
+        const std::size_t c = static_cast<std::size_t>( cz ) * _nx + cx;
         for ( uint32_t k = _cellStart[c]; k < _cellStart[c + 1]; ++k ) testTri( _cellTris[k] );
         const float next = std::min( tmx, tmz );
         if ( best.hit && best.t <= next ) break;  // nothing in later cells can be closer

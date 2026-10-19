@@ -4,7 +4,7 @@
 #include <cstdint>
 
 namespace {
-auto alignedAdd( size_t n, size_t align ) -> void* {
+auto alignedAdd( std::size_t n, std::size_t align ) -> void* {
   if ( align <= 16 ) return mem::memAdd( n, mem::GENERAL );
   // Over-allocate, align, and remember the real block just before the aligned pointer.
   auto* raw = static_cast<uint8_t*>( mem::memAdd( n + align + sizeof( void* ), mem::GENERAL ) );
@@ -12,25 +12,25 @@ auto alignedAdd( size_t n, size_t align ) -> void* {
   reinterpret_cast<void**>( addr )[-1] = raw;
   return reinterpret_cast<void*>( addr );
 }
-void alignedDel( void* p, size_t align ) {
+void alignedDel( void* p, std::size_t align ) {
   if ( !p ) return;
   mem::memDel( align <= 16 ? p : reinterpret_cast<void**>( p )[-1] );
 }
 }  // namespace
 
-void* operator new( size_t n ) { return mem::memAdd( n, mem::GENERAL ); }
-void* operator new[]( size_t n ) { return mem::memAdd( n, mem::GENERAL ); }
-void* operator new( size_t n, const std::nothrow_t& ) noexcept { return mem::memAdd( n, mem::GENERAL ); }
-void* operator new[]( size_t n, const std::nothrow_t& ) noexcept { return mem::memAdd( n, mem::GENERAL ); }
+void* operator new( std::size_t n ) { return mem::memAdd( n, mem::GENERAL ); }
+void* operator new[]( std::size_t n ) { return mem::memAdd( n, mem::GENERAL ); }
+void* operator new( std::size_t n, const std::nothrow_t& ) noexcept { return mem::memAdd( n, mem::GENERAL ); }
+void* operator new[]( std::size_t n, const std::nothrow_t& ) noexcept { return mem::memAdd( n, mem::GENERAL ); }
 void operator delete( void* p ) noexcept { mem::memDel( p ); }
 void operator delete[]( void* p ) noexcept { mem::memDel( p ); }
-void operator delete( void* p, size_t ) noexcept { mem::memDel( p ); }
-void operator delete[]( void* p, size_t ) noexcept { mem::memDel( p ); }
+void operator delete( void* p, std::size_t ) noexcept { mem::memDel( p ); }
+void operator delete[]( void* p, std::size_t ) noexcept { mem::memDel( p ); }
 void operator delete( void* p, const std::nothrow_t& ) noexcept { mem::memDel( p ); }
 void operator delete[]( void* p, const std::nothrow_t& ) noexcept { mem::memDel( p ); }
-void* operator new( size_t n, std::align_val_t a ) { return alignedAdd( n, static_cast<size_t>( a ) ); }
-void* operator new[]( size_t n, std::align_val_t a ) { return alignedAdd( n, static_cast<size_t>( a ) ); }
-void operator delete( void* p, std::align_val_t a ) noexcept { alignedDel( p, static_cast<size_t>( a ) ); }
-void operator delete[]( void* p, std::align_val_t a ) noexcept { alignedDel( p, static_cast<size_t>( a ) ); }
-void operator delete( void* p, size_t, std::align_val_t a ) noexcept { alignedDel( p, static_cast<size_t>( a ) ); }
-void operator delete[]( void* p, size_t, std::align_val_t a ) noexcept { alignedDel( p, static_cast<size_t>( a ) ); }
+void* operator new( std::size_t n, std::align_val_t a ) { return alignedAdd( n, static_cast<std::size_t>( a ) ); }
+void* operator new[]( std::size_t n, std::align_val_t a ) { return alignedAdd( n, static_cast<std::size_t>( a ) ); }
+void operator delete( void* p, std::align_val_t a ) noexcept { alignedDel( p, static_cast<std::size_t>( a ) ); }
+void operator delete[]( void* p, std::align_val_t a ) noexcept { alignedDel( p, static_cast<std::size_t>( a ) ); }
+void operator delete( void* p, std::size_t, std::align_val_t a ) noexcept { alignedDel( p, static_cast<std::size_t>( a ) ); }
+void operator delete[]( void* p, std::size_t, std::align_val_t a ) noexcept { alignedDel( p, static_cast<std::size_t>( a ) ); }

@@ -47,7 +47,7 @@ void ImageOverlaps::setMoving( Entity e, bool on ) {
 }
 
 void ImageOverlaps::setOverlap( Entity a, Entity b, bool on, Entity layer ) {
-  const size_t ab = a * NUM_SUPPORTED_ENTITIES + b;
+  const std::size_t ab = a * NUM_SUPPORTED_ENTITIES + b;
   if ( _overlap.test( ab ) == on ) return;
   _overlap.set( ab, on );
   _overlap.set( b * NUM_SUPPORTED_ENTITIES + a, on );
@@ -103,8 +103,8 @@ void ImageOverlaps::regroup( Entity layer ) {
     while ( parent[e] != e ) e = parent[e] = parent[parent[e]];
     return e;
   };
-  for ( size_t i = 0; i < members.size(); ++i ) {
-    for ( size_t j = i + 1; j < members.size(); ++j ) {
+  for ( std::size_t i = 0; i < members.size(); ++i ) {
+    for ( std::size_t j = i + 1; j < members.size(); ++j ) {
       if ( overlapping( members[i], members[j] ) ) parent[root( members[i] )] = root( members[j] );
     }
   }

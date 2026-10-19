@@ -9,7 +9,7 @@ auto BImg::parse( std::string_view bytes ) -> std::optional<BImg> {
   img.h = r.u16();
   const int n = r.u16();
   r.u16();
-  const size_t count = static_cast<size_t>( img.w ) * img.h;
+  const std::size_t count = static_cast<std::size_t>( img.w ) * img.h;
   if ( n > 0 ) {
     img.palette.resize( n );
     for ( auto& c : img.palette ) c = r.u32();

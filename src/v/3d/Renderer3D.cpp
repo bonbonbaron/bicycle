@@ -855,7 +855,7 @@ class Renderer3D final : public PixelRenderer {
             const float r = std::sqrt( dx * dx + dy * dy );
             const float a = std::clamp( ( 1.0f - r ) / 0.5f, 0.0f, 1.0f );
             const float soft = a * a * ( 3 - 2 * a );  // an even dark middle, a soft rim over the outer half, 0 at the edge
-            px[static_cast<size_t>( y ) * N + x] = static_cast<uint32_t>( std::lround( soft * 255 ) ) << 24;  // ARGB
+            px[static_cast<std::size_t>( y ) * N + x] = static_cast<uint32_t>( std::lround( soft * 255 ) ) << 24;  // ARGB
           }
         gl.GenTextures( 1, &_blobTex );
         texParams( _blobTex, GL_CLAMP_TO_EDGE );
@@ -942,7 +942,7 @@ class Renderer3D final : public PixelRenderer {
 
     void presentFramebuffer() override {
       fpsBegin();
-      const size_t draws0 = _frameDraws;
+      const std::size_t draws0 = _frameDraws;
       gl.Viewport( 0, 0, _fbW, _fbH );
       auto& w3 = phys3d::World3D::get();
       const m3::Vec3 sky = w3.active() ? w3.view().sky : m3::Vec3{ 0.45f, 0.65f, 0.90f };
@@ -1017,8 +1017,8 @@ class Renderer3D final : public PixelRenderer {
         return;
       }
       static std::vector<uint32_t> tmp;
-      tmp.resize( static_cast<size_t>( w ) * h );
-      for ( size_t i = 0; i < tmp.size(); ++i ) {
+      tmp.resize( static_cast<std::size_t>( w ) * h );
+      for ( std::size_t i = 0; i < tmp.size(); ++i ) {
         const uint32_t c = px[i];
         tmp[i] = ( c & 0xFF00FF00u ) | ( ( c >> 16 ) & 0xFFu ) | ( ( c & 0xFFu ) << 16 );
       }
@@ -1047,7 +1047,7 @@ class Renderer3D final : public PixelRenderer {
     // GLSL 330 -> GLSL ES 1.00 (GLES2): attribute/varying, texture2D, gl_FragColor, no shadow sampler.
     static auto toEs2( std::string src, bool vertex ) -> std::string {
       auto replaceAll = [&]( const std::string& a, const std::string& b ) {
-        for ( size_t p = 0; ( p = src.find( a, p ) ) != std::string::npos; p += b.size() ) src.replace( p, a.size(), b );
+        for ( std::size_t p = 0; ( p = src.find( a, p ) ) != std::string::npos; p += b.size() ) src.replace( p, a.size(), b );
       };
       replaceAll( "#version 330 core\n", vertex ? "#version 100\nprecision highp float;\n" : "#version 100\nprecision mediump float;\n" );
       for ( int l = 0; l < 5; ++l ) replaceAll( "layout(location = " + std::to_string( l ) + ") ", "" );
@@ -1138,9 +1138,9 @@ class Renderer3D final : public PixelRenderer {
         std::fprintf( stderr, "bicycle 3D: textures at the first frame: %d ok, %d loaded again, %d missing\n", ok, fixed, failed );
     }
     auto texture( const BImg& img ) -> GLuint {
-      gfx::Pixels rgba( static_cast<size_t>( img.w ) * img.h );
+      gfx::Pixels rgba( static_cast<std::size_t>( img.w ) * img.h );
       for ( int y = 0; y < img.h; ++y )
-        for ( int x = 0; x < img.w; ++x ) rgba[static_cast<size_t>( y ) * img.w + x] = img.pixel( x, y );
+        for ( int x = 0; x < img.w; ++x ) rgba[static_cast<std::size_t>( y ) * img.w + x] = img.pixel( x, y );
       GLuint t{};
       gl.GenTextures( 1, &t );
       texParams( t, GL_REPEAT );
@@ -1202,14 +1202,14 @@ class Renderer3D final : public PixelRenderer {
       if ( !skinned ) g->skin = nullptr;
       // Expand to one vertex per corner (normals and uvs are per corner), grouped by material.
       mem::Vector<float, mem::GRAPHIC> verts;
-      const size_t nMat = std::max<size_t>( 1, m->materials.size() );
-      for ( size_t mat = 0; mat < nMat; ++mat ) {
+      const std::size_t nMat = std::max<std::size_t>( 1, m->materials.size() );
+      for ( std::size_t mat = 0; mat < nMat; ++mat ) {
         GpuMesh::Range r;
         r.first = static_cast<int>( verts.size() / 16 );
-        for ( size_t t = 0; t < m->nTris(); ++t ) {
+        for ( std::size_t t = 0; t < m->nTris(); ++t ) {
           if ( ( m->triMat.empty() ? 0 : m->triMat[t] ) != mat ) continue;
           for ( int c = 0; c < 3; ++c ) {
-            const size_t corner = 3 * t + c, v = m->tris[corner];
+            const std::size_t corner = 3 * t + c, v = m->tris[corner];
             verts.insert( verts.end(), { m->pos[3 * v], m->pos[3 * v + 1], m->pos[3 * v + 2] } );
             if ( m->normals.empty() ) verts.insert( verts.end(), { 0, 1, 0 } );
             else verts.insert( verts.end(), { m->normals[3 * corner], m->normals[3 * corner + 1], m->normals[3 * corner + 2] } );
@@ -1224,7 +1224,7 @@ class Renderer3D final : public PixelRenderer {
             }
           }
         }
-        if ( !skinned ) tessellate( verts, static_cast<size_t>( r.first ) * 16 );
+        if ( !skinned ) tessellate( verts, static_cast<std::size_t>( r.first ) * 16 );
         r.count = static_cast<int>( verts.size() / 16 ) - r.first;
         if ( mat < m->materials.size() ) {
           const auto& mm = m->materials[mat];
@@ -1243,7 +1243,7 @@ class Renderer3D final : public PixelRenderer {
       }
       {
         m3::Vec3 lo{ 1e30f, 1e30f, 1e30f }, hi{ -1e30f, -1e30f, -1e30f };
-        for ( size_t v = 0; v < m->nVerts(); ++v ) {
+        for ( std::size_t v = 0; v < m->nVerts(); ++v ) {
           const m3::Vec3 p{ m->pos[3 * v], m->pos[3 * v + 1], m->pos[3 * v + 2] };
           lo = { std::min( lo.x, p.x ), std::min( lo.y, p.y ), std::min( lo.z, p.z ) };
           hi = { std::max( hi.x, p.x ), std::max( hi.y, p.y ), std::max( hi.z, p.z ) };
@@ -1268,12 +1268,12 @@ class Renderer3D final : public PixelRenderer {
     // interpolate badly; small ones also give per-vertex lighting and fog more samples. verts from `from` on are
     // triangles of 16 floats per vertex (pos3 nrm3 uv2 joints4 weights4).
     template <class V>
-    static void tessellate( V& verts, size_t from ) {
+    static void tessellate( V& verts, std::size_t from ) {
       constexpr float MAX_EDGE = 6.f;
       constexpr int VF = 16, TF = 3 * VF;
       std::vector<float> out, stack;
       out.reserve( verts.size() - from );
-      for ( size_t t = from; t + TF <= verts.size(); t += TF ) {
+      for ( std::size_t t = from; t + TF <= verts.size(); t += TF ) {
         stack.assign( verts.begin() + t, verts.begin() + t + TF );
         while ( !stack.empty() ) {
           float tri[TF];
@@ -1325,7 +1325,7 @@ class Renderer3D final : public PixelRenderer {
       const auto& src = m.bindVerts;
       m.skinVerts.resize( src.size() );
       const int nj = static_cast<int>( m.skin->joints.size() );
-      for ( size_t v = 0; v + 16 <= src.size(); v += 16 ) {
+      for ( std::size_t v = 0; v + 16 <= src.size(); v += 16 ) {
         const float* in = &src[v];
         float* out = &m.skinVerts[v];
         float s[16]{};
@@ -1350,10 +1350,10 @@ class Renderer3D final : public PixelRenderer {
     void drawMesh( const GpuMesh& m, const Mat4& viewProj, const Mat4& model, const float* bones = nullptr, GLuint prog = 0 ) {
       if ( !prog ) prog = _prog;
       if ( s_es2 && bones && m.skin ) {  // GLES2: skinned on the CPU, or with the small skinned shader
-        if ( prog == _prog && _skinProg && m.skin->joints.size() <= static_cast<size_t>( ES2_BONES ) ) {
+        if ( prog == _prog && _skinProg && m.skin->joints.size() <= static_cast<std::size_t>( ES2_BONES ) ) {
           float rows[4 * 3 * ES2_BONES];
-          const size_t nj = m.skin->joints.size();
-          for ( size_t j = 0; j < nj; ++j )
+          const std::size_t nj = m.skin->joints.size();
+          for ( std::size_t j = 0; j < nj; ++j )
             for ( int r = 0; r < 3; ++r )
               for ( int c = 0; c < 4; ++c ) rows[12 * j + 4 * r + c] = bones[16 * j + 4 * c + r];
           gl.UseProgram( _skinProg );
@@ -1625,7 +1625,7 @@ class Renderer3D final : public PixelRenderer {
       // What to draw: the level's static meshes, then every visible 3D entity's model (posed if rigged).
       _items.clear();
       for ( const auto& st : _statics ) _items.push_back( { st.get(), m3::identity(), false, nullptr } );
-      size_t nPosed = 0;
+      std::size_t nPosed = 0;
       _blobCasters.clear();
       _models.forEach( [&]( Entity entity, std::shared_ptr<GpuMesh>& mesh ) {
         const auto& t = w3.transform( entity );
@@ -1703,15 +1703,15 @@ class Renderer3D final : public PixelRenderer {
         lightVP = m3::mul( lightProj, lv0 );
         const m3::Planes lp = m3::frustumPlanes( lightVP );
         // What changed since the map was drawn: the light view (statics), the moving casters (pose included).
-        auto fnv = []( uint64_t h, const void* p, size_t n ) {
-          for ( size_t i = 0; i < n; ++i ) h = ( h ^ static_cast<const unsigned char*>( p )[i] ) * 1099511628211ull;
+        auto fnv = []( uint64_t h, const void* p, std::size_t n ) {
+          for ( std::size_t i = 0; i < n; ++i ) h = ( h ^ static_cast<const unsigned char*>( p )[i] ) * 1099511628211ull;
           return h;
         };
         const uint64_t viewHash = fnv( 1469598103934665603ull ^ static_cast<uint64_t>( Q.size ), lightVP.data(), 16 * sizeof( float ) );
         uint64_t dynHash = viewHash;
         _casters.clear();
-        const size_t nStatic = _statics.size();
-        for ( size_t i = 0; i < _items.size(); ++i ) {
+        const std::size_t nStatic = _statics.size();
+        for ( std::size_t i = 0; i < _items.size(); ++i ) {
           const auto& it = _items[i];
           m3::Vec3 c;
           float r;
@@ -1738,7 +1738,7 @@ class Renderer3D final : public PixelRenderer {
           gl.Uniform1i( gl.GetUniformLocation( _depthProg, "tex" ), 0 );
           gl.Viewport( 0, 0, Q.size, Q.size );
           auto drawCasters = [&]( bool statics, bool dynamics ) {
-            for ( size_t i : _casters ) {
+            for ( std::size_t i : _casters ) {
               const bool st = i < nStatic;
               if ( ( st && !statics ) || ( !st && !dynamics ) ) continue;
               const auto& it = _items[i];
@@ -1878,7 +1878,7 @@ class Renderer3D final : public PixelRenderer {
         auto pot = []( int v ) { int p = 1; while ( p < v ) p <<= 1; return p; };
         const int tw = pot( _fbW ), th = pot( _fbH );
         if ( !same ) {  // allocate the power-of-two texture (contents come from the sub-upload)
-          std::vector<uint32_t> zero( static_cast<size_t>( tw ) * th, 0 );
+          std::vector<uint32_t> zero( static_cast<std::size_t>( tw ) * th, 0 );
           uploadBGRA( tw, th, zero.data() );
         }
         uploadSubBGRA( _fbW, _fbH, reinterpret_cast<const uint32_t*>( _fb.data() ) );
@@ -1894,13 +1894,13 @@ class Renderer3D final : public PixelRenderer {
     }
 
     void readBack() {
-      gfx::Pixels px( static_cast<size_t>( _fbW ) * _fbH );
+      gfx::Pixels px( static_cast<std::size_t>( _fbW ) * _fbH );
       gl.PixelStorei( GL_PACK_ALIGNMENT, 4 );
       gl.ReadPixels( 0, 0, _fbW, _fbH, s_tier != CORE ? GL_RGBA : GL_BGRA, GL_UNSIGNED_BYTE, px.data() );
       if ( s_tier != CORE ) for ( auto& c : px ) c = ( c & 0xFF00FF00u ) | ( ( c >> 16 ) & 0xFFu ) | ( ( c & 0xFFu ) << 16 );
       _capture.resize( px.size() );
       for ( int y = 0; y < _fbH; ++y )  // GL rows are bottom first
-        for ( int x = 0; x < _fbW; ++x ) _capture[static_cast<size_t>( y ) * _fbW + x] = px[static_cast<size_t>( _fbH - 1 - y ) * _fbW + x] | 0xFF000000u;
+        for ( int x = 0; x < _fbW; ++x ) _capture[static_cast<std::size_t>( y ) * _fbW + x] = px[static_cast<std::size_t>( _fbH - 1 - y ) * _fbW + x] | 0xFF000000u;
     }
 
     static GL gl;
@@ -2009,12 +2009,12 @@ class Renderer3D final : public PixelRenderer {
     uint64_t _fpsStart{}, _fpsLast{};
     double _fpsMs[P_COUNT]{};
     int _fpsFrames{}, _fpsShadowRenders{}, _fpsStaticRenders{};
-    size_t _fpsDraws{}, _frameDraws{};
+    std::size_t _fpsDraws{}, _frameDraws{};
     int _quality{ Q_HIGH }, _autoQuality{ Q_HIGH }, _envQuality{ -1 }, _shadowSize{};
     bool _shadowValid{};
     uint64_t _shadowViewHash{}, _shadowDynHash{};
     GLuint _staticTex{}, _staticFbo{};
-    std::vector<size_t> _casters;
+    std::vector<std::size_t> _casters;
     std::unordered_map<GLuint, MeshLocs> _meshLocs;
     int _overlayW{}, _overlayH{};
     static constexpr float SHADOW_EXTENT = 22.f;  // meters each side of the shadow focus
@@ -2036,7 +2036,7 @@ class Renderer3D final : public PixelRenderer {
       return 0;
     }();
     bool _shadowOk{};
-    struct Stats3D { size_t meshes{}, culled{}, billboards{}; } _stats3d;
+    struct Stats3D { std::size_t meshes{}, culled{}, billboards{}; } _stats3d;
     GLuint _skinProg{};
     int _dbgFrame{};
     m3::Vec3 _dbgEye{};  // GLES2: the skinned shader (BICYCLE_GLES2_GPU_SKIN=1), else 0 (CPU skinning)
@@ -2051,7 +2051,7 @@ class Renderer3D final : public PixelRenderer {
     mem::Vector<float, mem::GRAPHIC> _bbVerts;  // this frame's billboard quads (GL upload staging)
     GLuint _atlasTex{};
     uint32_t _atlasTexVersion{};
-    struct { size_t billboardDraws{}, billboards{}, skinnedDraws{}; } _stats;
+    struct { std::size_t billboardDraws{}, billboards{}, skinnedDraws{}; } _stats;
     static auto now() -> double {
       return std::chrono::duration<double>( std::chrono::steady_clock::now().time_since_epoch() ).count();
     }
