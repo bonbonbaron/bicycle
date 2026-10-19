@@ -242,11 +242,22 @@ everything through it (`include/data/Pack.h`): Lua modules (a `package.loaders` 
 SoundFonts, images and meshes. Files missing from the pack are read from disk, and `BICYCLE_LOOSE_ASSETS=1`
 ignores the pack.
 
-| entry | stored as | decoded with |
-|---|---|---|
-| `.lua`, `.txt`, `.mid`, `.sf2`, ... | zlib (miniz at level 10 when packing) | jollybean's `tinfl` (`src/data/tinfl.c`) |
-| `.bimg` (indexed) | jollybean's strip codec (deduplicated runs of N pixels, bit-packed indices, deflated), or deflate if smaller | `src/data/Strip.cpp` |
-| `.obj` (Blender) | `.bmesh`: Edgebreaker connectivity, quantized + parallelogram-predicted positions, octahedral normals, delta UVs, all deflated | `src/data/Mesh.cpp`, `src/data/Edgebreaker.cpp` |
+| entry | stored as | encoded with (offline) | decoded with (engine) |
+|---|---|---|---|
+| `.lua`, `.txt`, `.mid`, `.sf2`, ... | zlib (miniz at level 10 when packing) | `tools/codec/Deflate.cpp` | jollybean's `tinfl` (`src/data/tinfl.c`) |
+| `.bimg` (indexed) | jollybean's strip codec (deduplicated runs of N pixels, bit-packed indices, deflated), or deflate if smaller | `tools/codec/StripEncode.cpp` | `src/data/Strip.cpp` |
+| `.obj` (Blender) | `.bmesh`: Edgebreaker connectivity, quantized + parallelogram-predicted positions, octahedral normals, delta UVs, all deflated | `tools/codec/MeshEncode.cpp`, `tools/codec/EdgebreakerEncode.cpp` | `src/data/Mesh.cpp`, `src/data/EdgebreakerDecode.cpp` |
+| `.bskin` (Blender) | quantized joints/actions (smallest-three quaternions, delta varints) | `tools/codec/SkinEncode.cpp` | `src/data/Skin.cpp` |
+
+Encoders and deflate are offline only. `tools/codec` (the `bicycle_codecs_encode` library, defined in
+`tools/pack/CMakeLists.txt`) is linked by `bicycle-pack` and `bicycle-tests`, never by the engine, which links
+`bicycle_data` (decoders and `tinfl` only). `cmake/BicycleDataSources.cmake` holds both source lists. The tools
+compile their own copy of the decoders, so the host packer for a cross build is built with the host compilers.
+Code shared by an encoder and its decoder stays in the engine (`src/data/EdgebreakerLoops.h`,
+`mesh::predict`, `mesh::octDecode`). SDL is built with `SDL_DISABLE_STB`, so its PNG loader/saver (stb_image
+plus a miniz deflater) isn't linked either. Dev builds still parse loose `.obj`/`.mtl` at run time
+(`src/data/Obj.cpp`). That's a parser, not an encoder: it draws meshes straight from the OBJ without encoding
+them.
 
 Game SoundFonts are handed to fluidsynth from memory (a custom SoundFont loader whose file callbacks read a
 buffer; names start with `bicycle-mem://`), and MIDI files with `fluid_player_add_mem`, so neither touches the

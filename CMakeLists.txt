@@ -99,9 +99,10 @@ bicycle_miniz()
 find_package( Threads REQUIRED )
 
 # --- assets: codecs (inflate, strips, Edgebreaker meshes) and the packer -------------------------------------------
-add_library( bicycle_data STATIC
-  src/data/tinfl.c src/data/Mem.cpp src/data/Pack.cpp src/data/Obj.cpp src/data/Atlas.cpp src/data/Skin.cpp src/data/Strip.cpp src/data/BImg.cpp src/data/Mesh.cpp
-  src/data/Edgebreaker.cpp )
+# The engine links decoders only; deflate and the encoders are offline (tools/codec, linked by bicycle-pack and
+# bicycle-tests). See cmake/BicycleDataSources.cmake.
+include( cmake/BicycleDataSources.cmake )
+add_library( bicycle_data STATIC ${BICYCLE_DATA_SOURCES} )
 target_include_directories( bicycle_data PUBLIC include )
 # Memory pool sizes in MB (include/data/Mem.h); the same names as environment variables override them at run time.
 foreach( pool_default PERMANENT=16 GENERAL=128 TEXT=64 GRAPHIC=96 AUDIO=96 TEMPORARY=64 SCENE=64 )
@@ -212,7 +213,7 @@ if ( NOT CMAKE_CROSSCOMPILING )
   add_executable( bicycle-motion-tests tests/motion_test.cpp )
   target_include_directories( bicycle-motion-tests PRIVATE include )
   add_executable( bicycle-tests tests/codec_test.cpp )
-  target_link_libraries( bicycle-tests PRIVATE bicycle_pack_codecs )
+  target_link_libraries( bicycle-tests PRIVATE bicycle_codecs_encode )
   enable_testing()
   # The pack round-trip packs the test game afresh into this build directory and checks that pack. Not
   # test/assets.bpak: it's shared by every build directory and only rebuilt by builds whose BICYCLE_GAMES has

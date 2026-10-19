@@ -14,9 +14,10 @@
 #include "data/Skin.h"
 #include "data/Obj.h"
 #include <optional>
-#include "Deflate.h"
-#include "StripEncode.h"
-#include "MeshEncode.h"
+#include "codec/Deflate.h"
+#include "codec/StripEncode.h"
+#include "codec/MeshEncode.h"
+#include "codec/SkinEncode.h"
 #include "../../src/data/Bytes.h"
 #include <algorithm>
 #include <cstdio>

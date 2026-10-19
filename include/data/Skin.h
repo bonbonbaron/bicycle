@@ -46,7 +46,7 @@ struct Skin {
 namespace skin {
 constexpr int MAX_JOINTS = 32;  // the skinning shader's uniform array
 auto decode( std::string_view bytes ) -> std::optional<Skin>;
-auto encode( const Skin& s, bool quantized, bool withVertices ) -> std::string;
+// Encoding is offline only: skin::encode in tools/codec/SkinEncode.h.
 // Skinning matrices (joint global transform x inverse bind), 16 floats each, for an action at time seconds
 // (looping, linear interpolation between frames; nlerp for rotations).
 void pose( const Skin& s, const SkinAction& a, float seconds, float* out );

@@ -1,4 +1,4 @@
-#include "Deflate.h"
+#include "codec/Deflate.h"
 #include "miniz.h"
 #include <stdexcept>
 

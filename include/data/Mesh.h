@@ -48,9 +48,8 @@ struct MeshData {
 namespace mesh {
 constexpr int DEFAULT_QBITS = 14;
 auto decode( std::string_view bmesh ) -> std::optional<MeshData>;
-// Octahedral normal coding shared by the encoder and decoder (bits per component).
+// Octahedral normals, NORMAL_BITS per component (the encoder, mesh::octEncode, is offline: tools/codec/MeshEncode.h).
 constexpr int NORMAL_BITS = 10;
-auto octEncode( const float n[3] ) -> std::array<int32_t, 2>;
 void octDecode( int32_t a, int32_t b, float n[3] );
 // Position prediction (see above) over quantized positions q (3 per vertex); dummy[] marks hole vertices.
 auto predict( const std::vector<int32_t>& q, const std::vector<uint8_t>& known, std::array<int32_t, 3> ctx,

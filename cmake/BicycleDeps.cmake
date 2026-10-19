@@ -111,6 +111,11 @@ function( bicycle_build_cmake_dep name src )
   endif()
   if ( CMAKE_TOOLCHAIN_FILE )
     list( APPEND args "-DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}" )
+    # The zig toolchains (cmake/*-zig.cmake) find their compiler wrappers through ZIG_WRAP, which may have come
+    # from -DZIG_WRAP=... instead of the environment: hand it on, or the dep's ar/ranlib resolve to "/a64-ar".
+    if ( ZIG_WRAP )
+      list( APPEND args "-DZIG_WRAP=${ZIG_WRAP}" )
+    endif()
   endif()
   if ( NOT CMAKE_GENERATOR MATCHES "Visual Studio" )
     list( APPEND args "-DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}" "-DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}" )
@@ -409,7 +414,10 @@ function( bicycle_sdl3 )
     -DSDL_JOYSTICK=OFF -DSDL_HIDAPI=OFF -DSDL_POWER=OFF -DSDL_AUDIO=OFF -DSDL_GPU=OFF -DSDL_VULKAN=OFF
     -DSDL_DIALOG=OFF -DSDL_TRAY=OFF -DSDL_PIPEWIRE=OFF -DSDL_PULSEAUDIO=OFF -DSDL_ALSA=OFF -DSDL_JACK=OFF
     -DSDL_SNDIO=OFF -DSDL_IBUS=OFF -DSDL_LIBURING=OFF -DSDL_DBUS=OFF -DSDL_LIBUDEV=ON
-    -DSDL_X11_XTEST=OFF -DSDL_X11_XSCRNSAVER=OFF )
+    -DSDL_X11_XTEST=OFF -DSDL_X11_XSCRNSAVER=OFF
+    # No stb_image/miniz PNG load/save (SDL_LoadPNG/SDL_SavePNG): the engine reads .bimg and screenshots to
+    # .bmp, and SDL's dynamic API table would otherwise link the PNG deflate encoder into every executable.
+    -DCMAKE_C_FLAGS_INIT=-DSDL_DISABLE_STB )
   find_package( SDL3 CONFIG REQUIRED PATHS "${BICYCLE_DEPS_PREFIX}" NO_DEFAULT_PATH )
   add_library( bicycle_sdl3 INTERFACE )
   target_link_libraries( bicycle_sdl3 INTERFACE SDL3::SDL3-static )
