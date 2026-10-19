@@ -4,12 +4,9 @@
 
 #include "c/WindowManager.h"
 
-#define EXPORT_API \
-  __attribute__((used))\
-  __attribute__((visibility("default")))
+#include "export.h"
 
 namespace bicycle {
-  auto isInit() -> bool;
   void init( const std::string& gameName );
   void die( const std::string& s );
 
@@ -21,10 +18,9 @@ namespace bicycle {
 
   template<typename T, typename... Args>
     Entity push( Args&&... args ) {
-      // Ensure the developer remembered to initialize ncurses before adding anything to the window manager.
-      // Any windows created before initialization disappear.
+      // A new window of type T on top of the stack; returns its entity id.
       auto& wm = WindowManager::getInstance();
       auto shared = std::make_shared<T>( args... );
-      return wm.push( shared );  // returns new window's entity ID
+      return wm.push( shared );
     }
 }  // namespace bicycle

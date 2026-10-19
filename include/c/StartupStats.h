@@ -7,10 +7,11 @@
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include "Env.h"
 
 namespace startup {
 inline auto on() -> bool {
-  static const bool v = [] { const char* e = std::getenv( "BICYCLE_STARTUP_STATS" ); return e && *e && *e != '0'; }();
+  static const bool v = env::flag( "BICYCLE_STARTUP_STATS" );
   return v;
 }
 inline auto origin() -> std::chrono::steady_clock::time_point {

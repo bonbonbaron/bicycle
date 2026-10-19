@@ -444,7 +444,7 @@ end
 function move( entity, vel )
   checkType( entity, "number" )
   checkType( vel, "table" )
-  -- TODO write a motion config wrapper in bicycle.cpp.
+  -- TODO write a motion config wrapper in src/lua/LuaMotion.cpp.
   -- TODO write a Motion table that defaults values and allows you to easily define a motion in Lua. Then you can handle all the nasty configuration stuff here.
   if vel.x and vel.y then
     sys( START, SYS_MOTION, entity )
