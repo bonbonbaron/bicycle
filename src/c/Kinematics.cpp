@@ -55,7 +55,13 @@ void Kinematics::run() {
   for ( uint32_t i = 0; i < n * LANES; ++i ) v[i] += a[i];
   for ( uint32_t i = 0; i < n * LANES; ++i ) v[i] = std::clamp( v[i], -t[i], t[i] );
   // Add velocities to positions (World's boxes are per entity: a scatter, not a contiguous loop).
-  for ( uint32_t i = 0; i < n; ++i ) boxes.at( _motion.key( i ) ) += vels[i];
+  // Entities that can be blocked tell CollisionDetector where they came from, so it can push them back out.
+  auto& cd = CollisionDetector::getInstance();
+  for ( uint32_t i = 0; i < n; ++i ) {
+    Box& box = boxes.at( _motion.key( i ) );
+    if ( cd.blocks( _motion.key( i ) ) && !vels[i].pos.hasZeroMag() ) cd.movedFrom( _motion.key( i ), box.pos, false );
+    box += vels[i];
+  }
   runDriven();
   // The 3D layer (3D builds only; it works only for entities with a transform): physics, then the camera follows.
   layer3d::step( static_cast<float>( Constants::MILLISECONDS_PER_FRAME / 1000.0 ) );
@@ -110,12 +116,20 @@ void Kinematics::teleport( Entity e, Position pos ) {
 
 auto Kinematics::step( Entity e, Position delta ) -> bool {
   auto& cd = CollisionDetector::getInstance();
-  if ( cd.blockedToward( e, delta ) ) return false;
+  const Position d = cd.unblocked( e, delta );
+  if ( d.hasZeroMag() && !delta.hasZeroMag() ) return false;
   auto& pos = World::get<Box>( e ).pos;
-  cd.stepped( e, pos );
-  pos += delta;
+  cd.movedFrom( e, pos, true );
+  pos += d;
   moved( e );
   return true;
+}
+
+void Kinematics::stopToward( Entity e, Position dir ) {
+  if ( !_motion.contains( e ) ) return;
+  auto& v = _motion.at<VEL>( e ).pos;
+  if ( v.x * dir.x > 0 ) v.x = 0;
+  if ( v.y * dir.y > 0 ) v.y = 0;
 }
 
 // --- scripted motions -----------------------------------------------------------------------------------------------

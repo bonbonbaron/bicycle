@@ -39,9 +39,9 @@ EXPORT_API void setCollBlockers( Entity entity, unsigned typeMask ) {
 }
 
 // --- moving by hand (fixed point: 256 = one cell) -------------------------------------------------------------------
-// One step by dx, dy, unless the entity's blockers (setCollBlockers) are in the way: false if it touches one that
-// way, and a step into a new one is undone in the next collision check (the collision is still reported, and
-// stepBlocked() is then true until the next step).
+// One step by dx, dy, minus the parts that go further into a blocker (setCollBlockers) it touches: false (no move) if
+// nothing is left. A step into a new one is pushed back out flush in the next collision check (the collision is
+// still reported, and stepBlocked() is then true until the next step).
 EXPORT_API bool stepEntity( Entity entity, int dx, int dy ) {
   return kinematics().step( entity, lua::fixedPos( dx, dy ) );
 }

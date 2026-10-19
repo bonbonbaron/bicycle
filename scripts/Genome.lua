@@ -536,7 +536,7 @@ Gene["GeneLoader"] = {
   end,
   -- coll = { type = "solid", layer = 0, box = { x, y, w, h }, blockedBy = { "solid", ... } }: collide with entities
   -- on the same layer. type is a name from Genome.COLL (or a number); box is relative to the entity, in cells
-  -- (default: whole entity). blockedBy: the types its steps (ffi.C.stepEntity) can't go into (the engine undoes them).
+  -- (default: whole entity). blockedBy: the types its steps (ffi.C.stepEntity) and velocity can't go into (stopped flush).
   coll = function(entity, gene, tbl)
     local c = gene.val
     checkType( c, "table" )

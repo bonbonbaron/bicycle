@@ -13,7 +13,7 @@ local WALK_DELAY_MS = 200       -- ...after this long held, so a quick tap is ex
 local WALK_TIMER, WALK_DELAY_TIMER = 7, 8  -- their timer types (the timer gene's is 0)
 local hero = {
   sprite = "pilgrim", model = "pilgrim3d", initAnim = "walk_down", persist = true,
-  coll = { type = "hero", blockedBy = { "solid", "enemy", "npc" } },  -- steps into these are undone by the engine
+  coll = { type = "hero", blockedBy = { "solid", "enemy", "npc" } },  -- the engine stops its steps flush against these
   timer = { ms = TICK_MS },
   sfx = { soundfont = "meadow", program = 120, sounds = { bump = 60, hurt = 55, blip = 76 } },
 }
@@ -101,9 +101,11 @@ function hero:step( dir )
   if ffi.C.stepEntity( self.id, dir.dx, dir.dy ) then
     local pos = box( self.id ).pos
     dbglog( "hero move to %d,%d", pos.x / STEP, pos.y / STEP )
-  else  -- up against something solid that way
+    self.blocked = false
+  elseif not self.blocked then  -- up against something solid that way: bump once, not every frame it pushes
     self:sound( "bump" )
     dbglog( "hero blocked" )
+    self.blocked = true
   end
 end
 
@@ -168,10 +170,11 @@ end
 function hero:onCollision(other, collType)
   if collType == ENEMY then
     self:hurt( other )
-  elseif ( collType == SOLID or collType == NPC ) and ffi.C.stepBlocked( self.id ) then  -- walked into it: put back
+  elseif ( collType == SOLID or collType == NPC ) and ffi.C.stepBlocked( self.id ) then  -- walked into it: stopped flush
     self:sound( "bump" )
+    self.blocked = true
     local pos = box( self.id ).pos
-    dbglog( "hero bumped; back to %d,%d", pos.x / STEP, pos.y / STEP )
+    dbglog( "hero bumped; flush at %d,%d", pos.x / STEP, pos.y / STEP )
   end
 end
 

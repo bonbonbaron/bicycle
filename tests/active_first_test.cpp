@@ -89,23 +89,24 @@ static void testCollisions() {
   frame();
   CHECK( colls.empty(), "still entities collided: %zu events", colls.size() );
 
-  // Into the wall: the collision is reported, then the step is undone.
+  // Into the wall (it starts flush with it): the collision is reported, and the hero is pushed back out, flush.
   CHECK( kin.step( hero, Position( -1, 0 ) ), "step refused before touching anything" );
   CHECK( kin.isMoving( hero ) && cd.isActive( hero ), "a stepped entity isn't active" );
   frame();
   CHECK( heard( colls, hero, wall ) && heard( colls, wall, hero ), "hero/wall collision not sent" );
-  CHECK( World::get<Box>( hero ).pos.x == 10 * CELL, "step into the wall not undone (x=%d)", World::get<Box>( hero ).pos.x / CELL );
+  CHECK( World::get<Box>( hero ).pos.x == 10 * CELL, "not pushed out flush (x=%d)", World::get<Box>( hero ).pos.x );
   CHECK( cd.stepBlocked( hero ), "stepBlocked not set" );
   clearEvents();
   frame();
-  CHECK( heard( uncolls, hero, wall ), "no uncollision after being put back" );
-  CHECK( !cd.touching( hero, wall ), "still touching the wall" );
+  CHECK( uncolls.empty() && cd.touching( hero, wall ), "flush against the wall, but not touching it any more" );
+  CHECK( !kin.step( hero, Position( -1, 0 ) ), "stepped further into the wall it's flush with" );
 
-  // Onto the coin: not a blocker, so the step stands.
+  // Onto the coin: not a blocker, so the step stands (and leaving the wall ends that contact).
   clearEvents();
   CHECK( kin.step( hero, Position( 2, 0 ) ), "step to the coin refused" );
   frame();
   CHECK( heard( colls, hero, coin ) && World::get<Box>( hero ).pos.x == 12 * CELL && !cd.stepBlocked( hero ), "coin" );
+  CHECK( heard( uncolls, hero, wall ), "stepping away from the wall didn't end the contact" );
   kin.teleport( coin, Position( 100, 100 ) );  // collected: it moves away
   clearEvents();
   frame();
@@ -129,6 +130,9 @@ static void testCollisions() {
   CHECK( kin.step( hero, Position( 0, -1 ) ), "stepping away refused" );
   clearEvents();
   frame();
+  CHECK( uncolls.empty(), "flush with the horse (it blocks the hero), so still touching" );
+  CHECK( kin.step( hero, Position( 0, -1 ) ), "stepping further away refused" );
+  frame();
   frame();
   CHECK( heard( uncolls, hero, horse ), "no uncollision after stepping away" );
 
@@ -142,6 +146,61 @@ static void testCollisions() {
 }
 
 // --- timers ----------------------------------------------------------------------------------------------------------
+// Blocking (setBlockers): gaps close flush, only the component into the blocker stops, backing away always works.
+static void testBlocking() {
+  auto& cd = CollisionDetector::getInstance();
+  auto& kin = Kinematics::getInstance();
+  const Entity box = 30, wallR = 31, floor = 32, slider = 33;
+  auto pos = []( Entity e ) { return World::get<Box>( e ).pos; };
+  place( box, 100, 100, 2, 2, HERO );
+  place( wallR, 105, 90, 2, 20, SOLID );  // its left edge at x = 105: a 3-cell gap to the box's right edge
+  place( floor, 90, 106, 30, 2, SOLID );  // its top at y = 106: 4 cells below the box
+  cd.setBlockers( box, 1u << SOLID );
+  frame();
+  clearEvents();
+
+  // A step bigger than the gap ends flush against the wall, not back where it started.
+  CHECK( kin.step( box, Position( 5, 0 ) ), "step refused" );
+  frame();
+  CHECK( pos( box ).x == 103 * CELL && pos( box ).y == 100 * CELL, "not flush: x=%d (want %d)", pos( box ).x, 103 * CELL );
+  CHECK( heard( colls, box, wallR ) && cd.stepBlocked( box ), "the collision or stepBlocked is missing" );
+  // Flush: a step into the wall and down slides (only x is dropped); back away while touching is fine.
+  CHECK( kin.step( box, Position( 1, 1 ) ), "a diagonal step along the wall refused" );
+  frame();
+  CHECK( pos( box ).x == 103 * CELL && pos( box ).y == 101 * CELL, "no slide: %d,%d", pos( box ).x, pos( box ).y );
+  CHECK( kin.step( box, Position( -1, 0 ) ), "backing away from the wall refused" );
+  frame();
+  CHECK( pos( box ).x == 102 * CELL && !cd.touching( box, wallR ), "didn't back away" );
+
+  // Velocity: moving right and down into the wall keeps sliding down (only vx stops), then lands flush on the floor.
+  kin.teleport( box, Position( 100, 100 ) );
+  frame();
+  kin.setVelocity( box, Position( 2, 1 ) );
+  frame();  // x 102, y 101
+  frame();  // x 104 -> pushed to 103, vx stopped
+  CHECK( pos( box ).x == 103 * CELL && pos( box ).y == 102 * CELL, "velocity into the wall: %d,%d", pos( box ).x, pos( box ).y );
+  for ( int i = 0; i < 4; ++i ) frame();
+  CHECK( pos( box ).x == 103 * CELL && pos( box ).y == 104 * CELL, "not resting in the corner: %d,%d", pos( box ).x, pos( box ).y );
+  CHECK( cd.touching( box, wallR ) && cd.touching( box, floor ), "the corner's walls don't both touch it" );
+  CHECK( !kin.isMoving( box ) || pos( box ).x == 103 * CELL, "still drifting" );
+  // Backing out of the corner works at once, both ways.
+  kin.setVelocity( box, Position( -1, -1 ) );
+  frame();
+  CHECK( pos( box ).x == 102 * CELL && pos( box ).y == 103 * CELL, "couldn't back out of the corner" );
+  kin.setVelocity( box, Position() );
+
+  // Corner, diagonally from the open side: a step that would cross both edges stops on the one it reaches last.
+  place( slider, 120, 100, 2, 2, HERO );
+  cd.setBlockers( slider, 1u << SOLID );
+  kin.teleport( slider, Position( 121, 103 ) );  // right of the floor's end (x 120), 1 row above its top
+  frame();
+  CHECK( kin.step( slider, Position( -3, 2 ) ), "corner step refused" );
+  frame();  // the floor's right edge x=120 is reached after 1/3 of dx, its top y=106 after 1/2 of dy: lands on top
+  CHECK( pos( slider ).y == 104 * CELL && pos( slider ).x == 118 * CELL, "corner: %d,%d", pos( slider ).x, pos( slider ).y );
+  for ( Entity e : { box, wallR, floor, slider } ) { cd.removeEntity( e ); kin.forget( e ); }
+  clearEvents();
+}
+
 static void testTimers() {
   auto& t = Timer::getInstance();
   clearEvents();
@@ -172,6 +231,7 @@ static void testTimers() {
 int main() {
   testContainer();
   testCollisions();
+  testBlocking();
   testTimers();
   if ( failures == 0 ) std::printf( "active-first: all passed\n" );
   return failures == 0 ? 0 : 1;

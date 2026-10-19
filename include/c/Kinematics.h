@@ -68,9 +68,10 @@ class Kinematics : public Controllable {
     // Moves outside the motions above (scripts, scene placement, animation frames resizing a box). Each keeps the
     // entity active for the next two collision checks (see CollisionDetector.h); fixed-point positions.
     void teleport( Entity e, Position pos );
-    // A step by delta: false (and no move) if it heads into a blocker it touches; a step into a new blocker is
-    // undone by the next CollisionDetector::check().
+    // A step by delta, minus any component into a blocker it's flush against: false (no move) if nothing is left.
+    // A step into a new blocker is pushed back flush by the next CollisionDetector::check().
     auto step( Entity e, Position delta ) -> bool;
+    void stopToward( Entity e, Position dir );  // zeroes each velocity component pointing dir's way (blocked)
     void moved( Entity e );           // its box changed some other way
     auto isMoving( Entity e ) const -> bool { return _motion.isActive( e ); }
   private:
