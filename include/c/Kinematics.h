@@ -61,6 +61,7 @@ class Kinematics : public Controllable {
     // The 3D camera: a kinematic body driven by the rig in World3D (Physics3D.h) toward its target, like any
     // follower; Lua sets the mode and feeds yaw/pitch, the camera never positions itself.
     void runCamera3D( float dt );
+    void runViews3D( float dt );  // VIEW3D riders, after the camera rig
     auto motionType( Entity e ) const -> int;  // -1 if not driven
   private:
     Kinematics() = default;
@@ -109,7 +110,7 @@ class Kinematics : public Controllable {
       float radius3{}, bobAmp{}, spin{};
       float kickBack{}, kickPitch{}, kickRate{}, kick{};  // VIEW3D recoil: kick 1 -> 0
     };
-    void runViews3D( float dt );  // VIEW3D riders, after the camera rig
+    void runDriven3D( Entity e, Driven& d );  // a 3D motion or spin (Kinematics3D.cpp; nothing in 2D builds)
     auto driven( Entity e ) -> Driven&;
     void runDriven();
     mem::Vector<Driven> _driven{ mem::Allocator<Driven>( mem::GENERAL ) };

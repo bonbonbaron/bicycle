@@ -260,14 +260,17 @@ set( BICYCLE_SOURCES
   src/v/common/Menu.cpp src/v/common/TextMenu.cpp src/v/common/Scene.cpp
   src/c/Trigger.cpp src/c/Timer.cpp src/c/WindowManager.cpp src/c/CollisionDetector.cpp
   src/c/Kinematics.cpp src/c/Animator.cpp src/c/MidiPlayer.cpp src/c/Dice.cpp
-  src/c/Physics3D.cpp src/c/World3DApi.cpp src/c/InputState.cpp )
+  src/c/InputState.cpp )
+# Each mode adds only its own code: the true-3D layer (physics, 3D motions and camera rig, their Lua API) is in 3D
+# builds alone; ASCII and 2D link its no-op stand-in, src/c/Layer3DOff.cpp (include/c/Layer3D.h).
 # Not built (unfinished or replaced): src/c/Input.cpp (Linux evdev keyboard), src/c/RenderSystem.cpp, src/v/common/Graph.cpp
 if ( BICYCLE_RENDER STREQUAL "ASCII" )
-  list( APPEND BICYCLE_SOURCES src/v/ascii/AsciiRenderer.cpp src/c/SshInputListener.cpp )
+  list( APPEND BICYCLE_SOURCES src/v/ascii/AsciiRenderer.cpp src/c/SshInputListener.cpp src/c/Layer3DOff.cpp )
 elseif ( BICYCLE_RENDER STREQUAL "2D" )
-  list( APPEND BICYCLE_SOURCES src/v/sdl/PixelRenderer.cpp src/v/sdl/UiFont.cpp src/v/sdl/SpriteAtlas.cpp src/v/2d/Renderer2D.cpp )
+  list( APPEND BICYCLE_SOURCES src/v/sdl/PixelRenderer.cpp src/v/sdl/UiFont.cpp src/v/sdl/SpriteAtlas.cpp src/v/2d/Renderer2D.cpp src/c/Layer3DOff.cpp )
 elseif ( BICYCLE_RENDER STREQUAL "3D" )
-  list( APPEND BICYCLE_SOURCES src/v/sdl/PixelRenderer.cpp src/v/sdl/UiFont.cpp src/v/sdl/SpriteAtlas.cpp src/v/3d/Renderer3D.cpp )
+  list( APPEND BICYCLE_SOURCES src/v/sdl/PixelRenderer.cpp src/v/sdl/UiFont.cpp src/v/sdl/SpriteAtlas.cpp src/v/3d/Renderer3D.cpp
+    src/c/Layer3D.cpp src/c/Physics3D.cpp src/c/World3DApi.cpp src/c/Kinematics3D.cpp )
 endif()
 
 if ( BICYCLE_RELEASE )
