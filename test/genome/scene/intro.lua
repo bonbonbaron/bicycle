@@ -14,7 +14,7 @@ intro.fg = {
   [4] = { 
     -- BEGIN entities (generated from the entities layer of meadow.aseprite: place them there)
     { genome = "cottage", pos = { 52, 26 } },
-    { genome = "door", pos = { 64, 40 }, door = { h = 4, spawn = "entry", to = "house", w = 6 } },
+    { genome = "door", pos = { 64, 30 }, door = { h = 4, spawn = "entry", to = "house", w = 6 } },
     { genome = "horse", pos = { 110, 40 } },
     { genome = "coin", pos = { 20, 42 } },
     { genome = "coin", pos = { 64, 43 } },
@@ -25,7 +25,7 @@ intro.fg = {
     { genome = "butterfly", pos = { 10, 34 } },
     { genome = "moth", pos = { 100, 30 } },
     { genome = "beetle", pos = { 150, 45 } },
-    { genome = "redbeetle", pos = { 50, 45 } },
+    { genome = "redbeetle", pos = { 50, 55 } },
     -- END entities
   }
 }

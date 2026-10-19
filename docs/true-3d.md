@@ -104,8 +104,8 @@ or an old `build = function( scene ) ... end`.
 
 - Start with `Scene.start( "courtyard" )` (it pushes the scene window: create bodies after it, entity 0 is reserved).
 - `persist = true, player = true` (a genome's fields or `W.Body.new` options): carried to the next scene, the player
-  onto the spawn point (velocity zeroed, yaw from the spawn), other persistent bodies at the same offset;
-  `onSceneEnter( name, spawn )`. A persistent genome that's already alive isn't placed again when its level comes
+  onto the spawn point (velocity zeroed, yaw from the spawn), other persistent bodies at the same offset. 
+  A persistent genome that's already alive isn't placed again when its level comes
   back up, and `Scene.removeForever( body )` (a collected coin) keeps it out of that scene for good.
 - Everything else made while the scene loaded is despawned on the way out (transform, body, overlaps with an
   uncollision to the other side, motions, model), the level collision is freed (`levelClear`), and the scene's

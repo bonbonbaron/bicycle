@@ -561,7 +561,6 @@ Gene["GeneLoader"] = {
   motion = 0,  -- started by Scene once every entity is placed (Genome.startMotion), so targets can be named
   -- persist = true: the entity survives scene changes (the hero, a companion); see Scene.goto in Scene.lua.
   persist = 0,
-  onSceneEnter = 0,  -- persistent entities: called as ( sceneName, spawnName ) after arriving in a new scene
   onDespawn = 0,     -- called just before a scene change (or Scene.removeForever) despawns the entity
   -- door = { to = "house", spawn = "entry", w = 4, h = 6, on = "touch" | "press", transition = "fade",
   --          duration = 0.6, music = "crossfade" | "cut" | "keep" }
@@ -739,7 +738,7 @@ Genome.PLACEMENT = PLACEMENT
 --   killY = -15                                   below it: onFallOut( self ); landing: onLand( self )
 --   listen = true                                 gets every onInput( self, key, pressed, dx, dy ), focused or not
 --   onLevelReady( self )                          after the whole level is placed (find another placed genome)
---   sfx, timer, persist, onSpawn, onCollision, onUncollision, onTimer, onInput, onSceneEnter, onDespawn as in 2D.
+--   sfx, timer, persist, onSpawn, onCollision, onUncollision, onTimer, onInput, onDespawn as in 2D.
 -- entry = { genome = "coin", pos = { x, y, z }, yaw = <deg>, key = "<saved-state key>", focus = true (the player),
 --           persist = true, <any genome field, e.g. door = { to = "bonus" } or motion = { path = {...} }> }.
 -- Returns the body (its table is the instance: genome fields + World3D.Body methods + self:sound).

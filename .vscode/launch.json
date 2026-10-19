@@ -1,0 +1,11 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "lua",
+      "request": "launch",
+      "name": "Debug Lua Script",
+      "program": "${workspaceFolder}/test/main.lua"
+    }
+  ]
+}

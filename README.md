@@ -186,7 +186,7 @@ return coin
   once (`Sound.soundfonts`, outside the scene's memory scope). Scenes have no sound-effect lists any more (an old
   `scene.sfx` still loads, with a warning). Samples go into a SoundFont (`tools/audio/make_sf2.py`).
 * **Behavior** is events only: `onSpawn`, `onInput( key, pressed, dx, dy )` (see "Input" below),
-  `onCollision( other, type )`, `onUncollision`, `onTimer( timerId, type )`, `onSceneEnter( scene, spawn )`,
+  `onCollision( other, type )`, `onUncollision`, `onTimer( timerId, type )`, 
   `onDespawn`; in 3D also `onLand( self )`, `onFallOut( self )` (below the genome's `killY`, default -15) and
   `onLevelReady( self )` (everything the level places exists). `listen = true` (3D genomes; `listenInput( id )` for
   anything) makes it get every input event without having the focus (a camera genome). `timer = <ms> | { ms, rep, type }`
@@ -504,8 +504,7 @@ arriving waits until the player steps off it, so spawning on a door doesn't boun
 
 Genomes with `persist = true` (the hero, the fairy) are carried over: same entity, same Lua table, same timers. The
 player lands on the spawn point, companions keep their offset from it (followers snap there instead of flying
-across the map), the camera keeps tracking with the same options, the HUD is rebuilt, and each gets
-`onSceneEnter( sceneName, spawnName )`. Everything else is despawned (`onDespawn` first).
+across the map), the camera keeps tracking with the same options, and the HUD is rebuilt. Everything else is despawned (`onDespawn` first).
 
 The order is fixed and runs between frames: 1. the transition covers the screen (input is frozen); 2. windows over
 the scene, then the scene's entities, are despawned; 3. the scene window pops and the SCENE memory pool is reset;

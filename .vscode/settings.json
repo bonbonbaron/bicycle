@@ -1,0 +1,6 @@
+{
+  "cmake.cmakePath": "C:/msys64/clang64/bin/cmake.exe",
+  "cmake.generator": "Ninja",
+  "cmake.useCMakePresets": "always"
+}
+

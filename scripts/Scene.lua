@@ -542,12 +542,12 @@ local function swap( name, opts )
   end
   if W and type( W ) == "table" and not tbl.world3d and W.Camera.last then W.Camera.off() end  -- back to 2.5D
   require( "Hud" ).rebuild()
-  for _, b in pairs( W and type( W ) == "table" and W.persistent or {} ) do
-    if b.onSceneEnter then b:onSceneEnter( name, opts.spawn ) end
-  end
-  for _, g in pairs( Scene.persistent ) do
-    if g.tbl.onSceneEnter then g.tbl:onSceneEnter( name, opts.spawn ) end
-  end
+  -- for _, b in pairs( W and type( W ) == "table" and W.persistent or {} ) do
+  --   if b.onSceneEnter then b:onSceneEnter( name, opts.spawn ) end
+  -- end
+  -- for _, g in pairs( Scene.persistent ) do
+  --   if g.tbl.onSceneEnter then g.tbl:onSceneEnter( name, opts.spawn ) end
+  -- end
   ffi.C.sceneStats( "enter", name, 0 )
 end
 

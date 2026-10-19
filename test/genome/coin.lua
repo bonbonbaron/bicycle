@@ -3,8 +3,14 @@ require('bicycle')
 -- Everything about it is here: its sprite, animation, collision and its own sound, so it can be dropped into any
 -- scene (scripts/aseprite/addentity.lua) as is.
 local coin = {
-  sprite = "goldcoin", initAnim = "spin", coll = { type = "coin" },
-  sfx = { soundfont = "meadow", program = 120, sounds = { collect = 72 } },
+  sprite = "goldcoin",
+  initAnim = "spin", 
+  coll = { type = "coin" },
+  sfx = { 
+    soundfont = "meadow",
+    program = 120, 
+    sounds = { collect = 72 }
+  },
 }
 local HERO = 1  -- Genome.COLL.hero
 

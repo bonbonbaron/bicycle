@@ -153,13 +153,13 @@ function hero:respawn()
 end
 
 -- After walking through a door: we're at the new scene's spawn point; forget what we touched in the old one.
-function hero:onSceneEnter( sceneName, spawnName )
-  local pos = box( self.id ).pos
-  self.spawn = { x = pos.x, y = pos.y }
-  self.touching = {}
-  self.prevPos = nil
-  dbglog( "hero entered %s (spawn %s)", sceneName, tostring( spawnName ) )
-end
+-- function hero:onSceneEnter( sceneName, spawnName )
+--   local pos = box( self.id ).pos
+--   self.spawn = { x = pos.x, y = pos.y }
+--   self.touching = {}
+--   self.prevPos = nil
+--   dbglog( "hero entered %s (spawn %s)", sceneName, tostring( spawnName ) )
+-- end
 
 -- The walk timer steps in the newest held direction; the timer gene's tick flashes while invulnerable.
 function hero:onTimer(timerId, timeoutType)

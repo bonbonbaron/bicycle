@@ -86,8 +86,4 @@ function hero:onTimer( id, kind )
   end
 end
 
-function hero:onSceneEnter( sceneName )
-  if os.getenv( "BICYCLE_DEMO_LOG" ) then io.stderr:write( "plat3d entered "..sceneName.."\n" ) end
-end
-
 return hero
