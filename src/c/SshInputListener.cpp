@@ -82,7 +82,8 @@ void SshInput::send( LogicalKey k, bool pressed ) {
   _inputState.currKeysPressed.reset();
   if ( pressed ) _inputState.currKeysPressed.set( static_cast<unsigned>( k ) );
   _inputState.lastPressed = k;
-  Trigger::sendInput( _inputState, pressed );
+  _inputState.pressed = pressed;
+  Trigger::sendInput( _inputState );
   if ( pressed ) inputState().pressed.set( static_cast<unsigned>( k ) );
 }
 

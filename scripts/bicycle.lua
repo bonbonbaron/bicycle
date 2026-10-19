@@ -532,10 +532,6 @@ function getUpdates()
     entity = entities[focus]
     if not entity then error("We're focused on nonexistent entity "..tostring(focus)..".") end
     local function deliver( key, pressed, dx, dy )
-      if inputLog then
-        inputLog:write( string.format( "input %d %s\n", key, pressed and "down" or "up" ) )
-        inputLog:flush()
-      end
       if entity.onInput then entity:onInput( key, pressed, dx, dy ) end
       for id in pairs( listeners ) do
         local l = entities[id]

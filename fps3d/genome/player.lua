@@ -24,7 +24,9 @@ function player:onSpawn()
   ffi.C.setHudBar( self.hud, 0 )
   self.walkKeys, self.triggers = {}, {}
   focusOn( self.id )
-  if os.getenv( "BICYCLE_DEMO_LOG" ) then self:every( 500, LOG_TIMER ) end
+  if os.getenv( "BICYCLE_DEMO_LOG" ) then
+    self:every( 500, LOG_TIMER )
+  end
 end
 
 function player:walk()

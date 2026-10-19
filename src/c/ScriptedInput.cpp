@@ -22,8 +22,9 @@ auto items( const char* var, char sep ) -> std::vector<std::string> {
 void send( LogicalKey key, bool down ) {
   Input in{};
   if ( down ) in.currKeysPressed.set( static_cast<unsigned>( key ) );
+  in.pressed = down;
   in.lastPressed = key;
-  Trigger::sendInput( in, down );
+  Trigger::sendInput( in );
 }
 }  // namespace
 
@@ -81,7 +82,8 @@ void ScriptedInput::play( long frame ) {
     if ( now == before ) continue;
     Input in{};
     in.lastPressed = static_cast<LogicalKey>( static_cast<int>( LogicalKey::MouseLeft ) + static_cast<int>( b ) );
-    Trigger::sendInput( in, now );
+    in.pressed = now;
+    Trigger::sendInput( in );
   }
   held.mouseButtons = ( held.mouseButtons & ~_buttons ) | buttons;
   held.mousePressed |= buttons & ~_buttons;

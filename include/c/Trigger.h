@@ -34,7 +34,7 @@ class Trigger {
     // Le trifecta
     // A key or mouse button going down (pressed) or up: windows (dialogues, menus) see presses; Lua's onInput( self,
     // input, pressed ) sees both, in order. Callers that only know presses keep calling sendInput( input ).
-    static void sendInput( Input& input, bool pressed = true );
+    static void sendInput( Input& input );
     // Mouse look: motion since the last frame (pixels), delivered to Lua once per frame as onInput( self, Look, true,
     // dx, dy ) when nonzero.
     static void sendLook( float dx, float dy );

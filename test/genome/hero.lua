@@ -12,17 +12,48 @@ local WALK_MS = 90              -- while a direction key is held: one step this 
 local WALK_DELAY_MS = 200       -- ...after this long held, so a quick tap is exactly one step
 local WALK_TIMER, WALK_DELAY_TIMER = 7, 8  -- their timer types (the timer gene's is 0)
 local hero = {
-  sprite = "pilgrim", model = "pilgrim3d", initAnim = "walk_down", coll = { type = "hero" }, persist = true,
+  sprite = "pilgrim",
+  initAnim = "walk_down",
+  coll = { type = "hero" },
+  vel = { x = 0, y = 0 },
+  persist = true,
   timer = { ms = TICK_MS },
-  sfx = { soundfont = "meadow", program = 120, sounds = { bump = 60, hurt = 55, blip = 76 } },
+  sfx = {
+	  soundfont = "meadow",
+	  program = 120,
+	  sounds = {
+		  bump = 60,
+		  hurt = 55,
+		  blip = 76
+	  }
+  },
 }
 
 local STEP = 256  -- one cell in fixed-point (FIXEDPT_DEC_BITS = 8)
-local DIRS = {
-  [ffi.C.A] = { strip="walk_left",  dx=-2 * STEP, dy=0 },  -- 2 columns ~ 1 row, since cells are tall
-  [ffi.C.D] = { strip="walk_right", dx= 2 * STEP, dy=0 },
-  [ffi.C.W] = { strip="walk_up",    dx=0, dy=-STEP },
-  [ffi.C.S] = { strip="walk_down",  dx=0, dy= STEP },
+local stepSize = 3
+local ACTIONS = {
+  [ffi.C.A] = function()
+     strip="walk_left"
+     dx=-stepSize * STEP
+     dy=0
+  end,
+  [ffi.C.D] = function()
+     strip="walk_right"
+     dx= stepSize * STEP
+     dy=0
+  end,
+  [ffi.C.W] = function()
+     strip="walk_up"
+     dx=0
+     dy=-STEP
+  end,
+  [ffi.C.S] = function()
+     strip="walk_down"
+     dy= 
+  end,
+  [ffi.C.LeftShift] = function()
+    stepSize = 6
+  end
 }
 local SOLID, ENEMY, NPC = 2, 4, 5  -- Genome.COLL
 local BLOCKERS = { [SOLID]=true, [ENEMY]=true, [NPC]=true }
@@ -42,11 +73,7 @@ function hero:onSpawn()
   self.invulnerable = 0
   -- The camera is a kinematic body tracking us (Camera.track in scripts/bicycle.lua). It glides after us with a
   -- dead zone; BICYCLE_CAMERA=hard makes it hard-track instead (snap, no dead zone).
-  if os.getenv( "BICYCLE_CAMERA" ) == "hard" then
-    Camera.track( self.id, { mode = "hard" } )
-  else
     Camera.track( self.id, { mode = "lerp", rate = 5, deadzone = { 10, 3 } } )
-  end
 end
 
 -- While touching something solid (e.g. it walked into us), refuse moves toward its center.
@@ -79,7 +106,11 @@ function hero:onInput(input, pressed)
   input = tonumber( input )
   if DIRS[input] then
     self.held = self.held or {}
-    for i = #self.held, 1, -1 do if self.held[i] == input then table.remove( self.held, i ) end end
+    for i = #self.held, 1, -1 do
+      if self.held[i] == input then
+        table.remove( self.held, i )
+      end
+    end
     if pressed then table.insert( self.held, input ) end
     if #self.held == 0 and self.walkTimer then
       self:stopTimer( self.walkTimer )
@@ -87,7 +118,9 @@ function hero:onInput(input, pressed)
     elseif #self.held > 0 and not self.walkTimer then
       self.walkTimer = self:after( WALK_DELAY_MS, WALK_DELAY_TIMER )
     end
-    if pressed then self:step( DIRS[input] ) end
+    if pressed then 
+      self:step( DIRS[input] )
+    end
     return
   end
   if not pressed then return end
