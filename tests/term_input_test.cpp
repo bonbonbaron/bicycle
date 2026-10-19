@@ -67,19 +67,26 @@ static void holdKey( Sim& s, char c, double t0, double t1, double delay, double 
 }
 
 int main() {
-  {  // a tap: one byte, released after the initial timeout (no repeat came)
+  {  // a tap: one byte, released right away (no repeat came), so a game steps once
     Sim s;
     double p = -1, r = -1;
     holdKey( s, 'd', 0, 0, 1e9, 30, 800, &p, &r );
     CHECK( s.str() == "+D -D" );
     CHECK( p == 0 );
-    CHECK( r > 500 && r < 560 );
+    CHECK( r > 50 && r < 110 );
   }
-  {  // held for 2 s at a 500 ms delay and 30 Hz repeat: one press, one release shortly after the repeats stop
+  {  // two quick taps: two presses, each released right away
+    Sim s;
+    for ( double t = 0; t < 600; t += 33.3 ) s.frame( t, ( t == 0 || ( t > 140 && t < 170 ) ) ? "d" : "" );
+    CHECK( s.str() == "+D -D +D -D" );
+  }
+  {  // held for 2 s at a 500 ms delay and 30 Hz repeat: a tap, then pressed again by the first repeat and held
+     // until shortly after the repeats stop
     Sim s;
     double p = -1, r = -1;
     holdKey( s, 'w', 0, 2000, 500, 33, 2600, &p, &r );
-    CHECK( s.str() == "+W -W" );
+    CHECK( s.str() == "+W -W +W -W" );
+    CHECK( p >= 500 && p < 540 );
     CHECK( r > 2000 && r <= 2000 + 150 + 34 );
     CHECK( s.det.repeatMs > 25 && s.det.repeatMs < 45 );
     CHECK( s.det.timeout( K::W ) == 150 || s.det.repeatMs * 2.5 <= 150 );
@@ -88,23 +95,23 @@ int main() {
     Sim s;
     double r = -1;
     holdKey( s, 'a', 0, 1500, 300, 20, 2000, nullptr, &r );
-    CHECK( s.str() == "+A -A" );
+    CHECK( s.str() == "+A -A +A -A" );
     CHECK( r > 1500 && r < 1500 + 33 + 67 + 34 + 34 );  // read latency + timeout (~2.5 x 27 ms) + frame steps
   }
-  {  // a slow typematic delay (700 ms) beats the 500 ms initial timeout once; then the delay is learned
+  {  // a slow typematic delay (700 ms) is learned; a slow (10 Hz, Linux console) repeat still holds
     Sim s;
-    holdKey( s, 's', 0, 1500, 700, 33, 2000 );
-    CHECK( s.str() == "+S -S +S -S" );  // the one spurious release and re-press
+    holdKey( s, 's', 0, 1500, 700, 100, 2000 );
+    CHECK( s.str() == "+S -S +S -S" );
     CHECK( s.det.delayMs > 650 );
     s.log.clear();
     holdKey( s, 's', 3000, 4500, 700, 33, 5000 );
-    CHECK( s.str() == "+S -S" );  // learned: no gap the second time
+    CHECK( s.str() == "+S -S +S -S" );
   }
-  {  // two keys: terminals repeat only the newest, so the first is released by its own timeout
+  {  // two keys: terminals repeat only the newest; the first, a tap here, is released before the second's press
     Sim s;
     s.frame( 0, "w" );
     for ( double t = 33; t < 600; t += 33 ) s.frame( t, t >= 100 ? "d" : "" );
-    CHECK( s.str() == "+W +D -W" );
+    CHECK( s.str() == "+W -W +D" );
   }
   {  // configuration from BICYCLE_TTY_KEYUP
     term::KeyReleaseDetector d;
@@ -119,9 +126,9 @@ int main() {
     s.frame( 33, "\x1b" );
     CHECK( s.str() == "+D" );
     s.frame( 66 );
-    CHECK( s.str() == "+D +Esc" );
+    CHECK( s.str() == "+D +Esc -D" );  // the arrow was a tap
     s.frame( 99, "7" );
-    CHECK( s.str() == "+D +Esc +7" );
+    CHECK( s.str() == "+D +Esc -D +7" );
   }
   {  // SGR mouse: presses and real releases; wheel and motion ignored
     Sim s;

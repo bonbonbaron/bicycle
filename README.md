@@ -138,7 +138,7 @@ engine and the Aseprite exporters get these paths from):
   body/palette/collision/      *_collset.lua      collision index -> collision type (normal, fire, ...)
   body/graybody/               *_pixels.bimg      palette-agnostic gray (indexed) pixels: sprites and tilesets
   body/graybody/animation/     *_anim_src_rects.lua, *_globalAnim.lua   frames, tags, durations
-  body/graybody/collision/     *_collmap.lua, *_collRects.lua           collision regions / masks
+  body/graybody/collision/     *_collmap.lua, *_collRects.lua           collision regions / masks  (only for layers with collision tiles)
   body/graybody/colormap/      *_colormap.lua, *.txt                    ASCII art (and img gene text images)
   tilemap/                     *_tilemap.lua, *_tileset.lua             background tile layouts and tilesets
   scene/                       scene tables (scene/bg/<name>/: text backgrounds)
@@ -618,11 +618,12 @@ Input is events, in every render mode: `onInput( self, key, pressed, dx, dy )` o
 * asks for the kitty keyboard protocol (`CSI > 11 u`: kitty, foot, WezTerm, Ghostty, recent Alacritty and
   iTerm2...) and, if the terminal answers the `CSI ? u` query, uses its real press/repeat/release events;
 * turns on SGR mouse (`?1000` + `?1006`): button presses and releases (`MouseLeft`/`MouseRight`/`MouseMiddle`);
-* otherwise infers releases from auto-repeat: a key's first byte is a press, and while its repeat bytes keep coming
-  it stays held; it's released when none arrives within the timeout: `initial` ms before the first repeat (the
-  typematic delay; it adapts to the measured delay, within 0.5x..2x of `initial`), then `factor` times the measured
-  repeat interval, clamped to [`min`, `max`]. Tune with `BICYCLE_TTY_KEYUP="initial,min,max,factor"` (default
-  `500,60,150,2.5`). A key let go before its first repeat is released `initial` ms after it was pressed. xterm's
+* otherwise infers releases from auto-repeat: a key's first byte is a press, released `initial` ms later unless
+  repeats follow, so a quick tap is exactly one press and a prompt release (one step). Holding a key, the terminal
+  sends its first repeat after its typematic delay: that presses the key again, and it stays held while repeat
+  bytes keep coming, released when none arrives within `factor` times the measured repeat interval, clamped to
+  [`min`, `max`]. A hold therefore reads as press, release, (the delay), press ... release, like typing. Tune with
+  `BICYCLE_TTY_KEYUP="initial,min,max,factor"` (default `50,60,150,2.5`). xterm's
   modifyOtherKeys reports no releases, so xterm uses the heuristic. Terminals repeat only the newest key, so a key
   held under another one is released by its timeout. `BICYCLE_TTY_KITTY=0` / `BICYCLE_TTY_MOUSE=0` turn the
   protocols off; both are undone at exit.

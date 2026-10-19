@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Terminal key events end to end: the ASCII build in a pty gets synthetic bytes (a key's auto-repeat, an arrow's
 # escape sequence, SGR mouse, kitty keyboard protocol events) and every onInput event Lua sees is logged
-# (BICYCLE_INPUT_LOG) in order: one press and one release per hold, through Trigger::sendInput.
+# (BICYCLE_INPUT_LOG) in order, through Trigger::sendInput.
 #   tests/tty_input_test.py <ascii executable>   (ctest: tty-input)
 import os, pty, select, sys, tempfile, time
 
@@ -49,7 +49,8 @@ for line in open(log):
     if int(k) in (X, D, MOUSE_L):
         events.append("%s%s" % ("+" if s == "down" else "-", {X: "X", D: "D", MOUSE_L: "MouseL"}[int(k)]))
 os.unlink(log)
-want = ["+X", "-X", "+D", "-D", "+MouseL", "-MouseL", "+X", "-X"]
+# A hold is a tap (released right away) and, from its first auto-repeat, a press held until the repeats stop.
+want = ["+X", "-X", "+X", "-X", "+D", "-D", "+MouseL", "-MouseL", "+X", "-X"]
 if i < len(schedule):
     print("tty-input: the game quit before all input was sent (%.1fs)" % (time.time() - start))
     print(out[-2000:].decode(errors="replace"))

@@ -7,10 +7,12 @@
 //      CSI > 11 u (disambiguate | report event types | report all keys as escape codes), it reports real presses,
 //      repeats and releases (CSI code ; mods : event u). SGR mouse (?1006) reports button releases the same way.
 //   2. Everywhere else (plain xterm, xterm's modifyOtherKeys, which has no release reports, tmux, Windows consoles)
-//      a held key is its auto-repeat bytes, so KeyReleaseDetector presses on the first byte and releases when the
-//      repeats stop: after `initial` ms before the first repeat (the typematic delay), then after factor x the
-//      measured repeat interval clamped to [min, max]. BICYCLE_TTY_KEYUP="initial,min,max,factor" tunes it
-//      (defaults "500,60,150,2.5").
+//      a held key is its auto-repeat bytes, so KeyReleaseDetector presses on the first byte and releases it
+//      `initial` ms later unless repeats follow: a tap is a tap (one step), whatever the typematic delay. When the
+//      first repeat of a key just released that way arrives (a hold, after the typematic delay), the key is pressed
+//      again and held while the repeats keep coming, until none comes within factor x the measured repeat interval
+//      clamped to [min, max]. So a hold reads as press, release, (the terminal's delay), press ... release.
+//      BICYCLE_TTY_KEYUP="initial,min,max,factor" tunes it (defaults "50,60,150,2.5").
 #include "c/Input.h"
 #include <algorithm>
 #include <array>
@@ -132,7 +134,7 @@ class Decoder {
 // Press on a key's first byte, hold while auto-repeat bytes arrive, release when they stop. Times are in ms.
 class KeyReleaseDetector {
   public:
-    double initialMs{ 500 }, minMs{ 60 }, maxMs{ 150 }, factor{ 2.5 };
+    double initialMs{ 50 }, minMs{ 60 }, maxMs{ 150 }, factor{ 2.5 };
     double repeatMs{};  // measured auto-repeat interval (moving average), 0 = not measured yet
     double delayMs{};   // measured typematic delay (first byte to first repeat), 0 = not measured yet
 
@@ -146,7 +148,7 @@ class KeyReleaseDetector {
     // How long a held key may go without a byte before it counts as released.
     auto timeout( LogicalKey k ) const -> double {
       const auto& s = _k[idx( k )];
-      if ( s.repeats == 0 ) return delayMs > 0 ? std::clamp( delayMs * 1.3 + 40, initialMs * 0.5, initialMs * 2 ) : initialMs;
+      if ( s.repeats == 0 ) return initialMs;  // a tap ends right away
       return repeatMs > 0 ? std::clamp( factor * repeatMs, minMs, maxMs ) : maxMs;
     }
     auto down( LogicalKey k ) const -> bool { return _k[idx( k )].down; }
@@ -167,10 +169,13 @@ class KeyReleaseDetector {
         s.last = t;
         return false;
       }
-      // Released by the initial timeout, then the first repeat came: the typematic delay is longer than we thought.
-      // (That once costs a release and a re-press; afterwards the learned delay covers it.)
-      const bool lateRepeat = _timedOut == k && t - _timedOutPressT < initialMs * 2.5;
-      if ( lateRepeat ) delayMs = avg( delayMs, t - _timedOutPressT );
+      // Released as a tap, then its first auto-repeat came (the terminal's typematic delay later): a hold. It's
+      // pressed again and held like a repeating key. Another byte soon after the tap (a quick double tap) is a
+      // fresh tap; once the delay is measured, only a byte near it counts as the repeat.
+      const double since = t - _timedOutPressT;
+      const bool lateRepeat = _timedOut == k && ( delayMs > 0 ? since > delayMs * 0.6 && since < delayMs * 1.6
+                                                              : since >= 200 && since < 1200 );
+      if ( lateRepeat ) delayMs = avg( delayMs, since );
       _timedOut = LogicalKey::COUNT;
       // (Terminals repeat only the newest key: a key held before it stops repeating and is released by its timeout.)
       s = Key{ true, false, t, t, lateRepeat ? 1 : 0 };

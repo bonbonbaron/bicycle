@@ -33,13 +33,17 @@ void Timer::_run() {
   for ( unsigned timerId = 0; timerId < MAX_NUM_TIMERS; ++timerId ) {
     _times.at(timerId) -= _decrementers.at(timerId);
     if ( _decrementers.at(timerId) > 0 && _times.at(timerId) == 0 ) {
-      Trigger::sendTimeout( _msgs.at(timerId) );
+      // Reset or free the slot BEFORE delivering: an animation timeout is handled right here (Animator::tick) and
+      // makes the next frame's timer, which can take this very slot; freeing it afterwards killed that timer, so
+      // animations stopped after a frame or a cycle.
+      const Timeout msg = _msgs.at(timerId);
       const auto& cfg = _cfgs.at(timerId);
       if ( cfg.repeat ) {
         _times.at(timerId) = cfg.fullTimer;
       } else {
         stop( timerId );  // a one-shot timer's slot is free again (it used to stay taken for good)
       }
+      Trigger::sendTimeout( msg );
     }
   }
 }

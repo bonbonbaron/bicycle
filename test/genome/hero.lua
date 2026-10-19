@@ -9,7 +9,8 @@ require('Dialogue')
 -- timer: the flash/invulnerability tick (onTimer); sfx: the hero's own sounds.
 local TICK_MS = 100             -- flash/invulnerability timer period
 local WALK_MS = 90              -- while a direction key is held: one step this often (the first on the press)
-local WALK_TIMER = 7            -- its timer type (the timer gene's is 0)
+local WALK_DELAY_MS = 200       -- ...after this long held, so a quick tap is exactly one step
+local WALK_TIMER, WALK_DELAY_TIMER = 7, 8  -- their timer types (the timer gene's is 0)
 local hero = {
   sprite = "pilgrim", model = "pilgrim3d", initAnim = "walk_down", coll = { type = "hero" }, persist = true,
   timer = { ms = TICK_MS },
@@ -72,8 +73,8 @@ function hero:speakerInReach()
   end
 end
 
--- Input: a direction key steps once when pressed and keeps stepping (a walk timer) until it's released; the newest
--- held direction wins. Releases of other keys mean nothing here.
+-- Input: a direction key steps once when pressed and, held past WALK_DELAY_MS, keeps stepping (a walk timer) until
+-- it's released; the newest held direction wins. Releases of other keys mean nothing here.
 function hero:onInput(input, pressed)
   input = tonumber( input )
   if DIRS[input] then
@@ -84,7 +85,7 @@ function hero:onInput(input, pressed)
       self:stopTimer( self.walkTimer )
       self.walkTimer = nil
     elseif #self.held > 0 and not self.walkTimer then
-      self.walkTimer = self:every( WALK_MS, WALK_TIMER )
+      self.walkTimer = self:after( WALK_DELAY_MS, WALK_DELAY_TIMER )
     end
     if pressed then self:step( DIRS[input] ) end
     return
@@ -162,6 +163,11 @@ end
 
 -- The walk timer steps in the newest held direction; the timer gene's tick flashes while invulnerable.
 function hero:onTimer(timerId, timeoutType)
+  if timeoutType == WALK_DELAY_TIMER then  -- held past a tap: walk on
+    if tonumber( self.walkTimer ) ~= tonumber( timerId ) then return end  -- (released and pressed again meanwhile: a newer timer counts)
+    self.walkTimer = self:every( WALK_MS, WALK_TIMER )
+    timerId, timeoutType = self.walkTimer, WALK_TIMER
+  end
   if timeoutType == WALK_TIMER then
     local held = self.held or {}
     if getFocus() ~= self.id then  -- a dialogue took the input (and will get the key's release): stop walking

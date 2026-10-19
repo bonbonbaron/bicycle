@@ -223,8 +223,9 @@ function Sprite.loadTilemapLayer( layer )
     numTilesHigh = map.numTilesHigh,
     tiles = {},
     tileset = layer.tileset and Sprite.getAsset( layer.tileset ) or {},
-    collmap = layer.collmap and Sprite.getAsset( layer.collmap ) or {},
-    collset = layer.collset and Sprite.getAsset( layer.collset ) or {},
+    -- No collision files (a layer without collision tiles, or an older export whose empty ones were deleted): none.
+    collmap = layer.collmap and Sprite.exists( layer.collmap ) and Sprite.getAsset( layer.collmap ) or {},
+    collset = layer.collset and Sprite.exists( layer.collset ) and Sprite.getAsset( layer.collset ) or {},
     bg = Sprite.bgSettings( layer.bg ),
   }
   for i = 1, tm.numTilesWide * tm.numTilesHigh do

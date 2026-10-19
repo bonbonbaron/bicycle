@@ -323,11 +323,14 @@ local function makeSprite(ctr, globAnim)
 				local layerCollsetName = layerName.."_collset"
 				outputLayer.tilemap = layerTilemapName
 				outputLayer.tileset = layerTilesetName
-				outputLayer.collmap = layerCollmapName
-				outputLayer.collset = layerCollsetName
 				g.serialize_table( layerTilemapName, outputTilemap, DEBUG )
-				g.serialize_table( layerCollmapName, outputCollmap, DEBUG )
-				g.serialize_table( layerCollsetName, outputCollset, DEBUG )
+				-- Collision files only for a layer whose tiles have collision types (none: no collision, no files).
+				if next(outputCollmap) ~= nil then
+					outputLayer.collmap = layerCollmapName
+					outputLayer.collset = layerCollsetName
+					g.serialize_table( layerCollmapName, outputCollmap, DEBUG )
+					g.serialize_table( layerCollsetName, outputCollset, DEBUG )
+				end
 				if cfg.pixels then
 					outputTileset.pixels = layerName.."_tileset_pixels"
 					outputTileset.colormap = outputTileset.pixels

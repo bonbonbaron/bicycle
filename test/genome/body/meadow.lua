@@ -13,10 +13,8 @@ local meadow = {
         x = 0,
         parallax = 100
       },
-      collset = "meadow_sky_collset",
       tilemap = "meadow_sky_tilemap",
-      colorpal = "meadow_sky_palette",
-      collmap = "meadow_sky_collmap"
+      colorpal = "meadow_sky_palette"
     },
     {
       tileset = "meadow_clouds_tileset",
@@ -29,10 +27,8 @@ local meadow = {
         x = 0,
         parallax = 100
       },
-      collset = "meadow_clouds_collset",
       tilemap = "meadow_clouds_tilemap",
-      colorpal = "meadow_clouds_palette",
-      collmap = "meadow_clouds_collmap"
+      colorpal = "meadow_clouds_palette"
     },
     {
       tileset = "meadow_hills_tileset",
@@ -45,10 +41,8 @@ local meadow = {
         x = 0,
         parallax = 50
       },
-      collset = "meadow_hills_collset",
       tilemap = "meadow_hills_tilemap",
-      colorpal = "meadow_hills_palette",
-      collmap = "meadow_hills_collmap"
+      colorpal = "meadow_hills_palette"
     },
     {
       tileset = "meadow_ground_tileset",
@@ -61,10 +55,8 @@ local meadow = {
         x = 0,
         parallax = 100
       },
-      collset = "meadow_ground_collset",
       tilemap = "meadow_ground_tilemap",
-      colorpal = "meadow_ground_palette",
-      collmap = "meadow_ground_collmap"
+      colorpal = "meadow_ground_palette"
     },
     {
       tileset = "meadow_fence_tileset",
@@ -77,10 +69,8 @@ local meadow = {
         x = 0,
         parallax = 150
       },
-      collset = "meadow_fence_collset",
       tilemap = "meadow_fence_tilemap",
-      colorpal = "meadow_fence_palette",
-      collmap = "meadow_fence_collmap"
+      colorpal = "meadow_fence_palette"
     }
   }
 }

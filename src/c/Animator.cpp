@@ -15,8 +15,7 @@ void Animator::tick( const Entity entity ) {
   if ( !state.running || state.currStrip == nullptr ) {
     return;
   }
-  auto& timer = Timer::getInstance();
-  timer.stop( state.timerId );  // one-shot timer: free it before making the next one
+  // (The one-shot timer that called this is already free: Timer::_run frees a slot before delivering its timeout.)
   if ( state.frameIdx + 1 < state.currStrip->frames.size() ) {
     ++state.frameIdx;
   }
