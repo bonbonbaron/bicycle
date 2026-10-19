@@ -9,9 +9,12 @@
 #include "data/Atlas.h"
 #include "data/Skin.h"
 #include "data/Obj.h"
-#include "../tools/pack/Deflate.h"
-#include "../tools/pack/StripEncode.h"
-#include "../tools/pack/MeshEncode.h"
+#include "codec/Deflate.h"
+#include "codec/StripEncode.h"
+#include "codec/MeshEncode.h"
+#include "codec/EdgebreakerEncode.h"
+#include "codec/SkinEncode.h"
+#include "codec/BImgEncode.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -39,7 +42,7 @@ static void testDeflate() {
 static auto stripRoundTrip( const BImg& img, int n ) -> bool {
   const auto enc = stripEncode( img, n );
   const auto dec = strip::decode( enc );
-  return dec && std::string_view( *dec ) == img.serialize();
+  return dec && std::string_view( *dec ) == bimg::serialize( img );
 }
 
 static void testStrip() {

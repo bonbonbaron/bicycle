@@ -33,5 +33,5 @@ struct BImg {
     return k < palette.size() ? palette[k] : 0u;
   }
   static auto parse( std::string_view bytes ) -> std::optional<BImg>;
-  auto serialize() const -> std::string;
+  // Writing .bimg is offline only: bimg::serialize in tools/codec/BImgEncode.h.
 };

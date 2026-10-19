@@ -1,11 +1,29 @@
-#include "MeshEncode.h"
-#include "Deflate.h"
+#include "codec/MeshEncode.h"
+#include "codec/Deflate.h"
 #include "../../src/data/Bytes.h"
 #include <algorithm>
 #include <cmath>
 #include <fstream>
 #include <map>
 #include <sstream>
+
+namespace mesh {
+
+auto octEncode( const float in[3] ) -> std::array<int32_t, 2> {
+  float n[3] = { in[0], in[1], in[2] };
+  const float l1 = std::fabs( n[0] ) + std::fabs( n[1] ) + std::fabs( n[2] );
+  if ( l1 <= 0 ) return { 0, 0 };
+  for ( auto& c : n ) c /= l1;
+  float x = n[0], y = n[1];
+  if ( n[2] < 0 ) {
+    x = ( 1 - std::fabs( n[1] ) ) * ( n[0] >= 0 ? 1.f : -1.f );
+    y = ( 1 - std::fabs( n[0] ) ) * ( n[1] >= 0 ? 1.f : -1.f );
+  }
+  const float maxv = static_cast<float>( ( 1 << ( NORMAL_BITS - 1 ) ) - 1 );
+  return { static_cast<int32_t>( std::lround( x * maxv ) ), static_cast<int32_t>( std::lround( y * maxv ) ) };
+}
+
+}  // namespace mesh
 
 
 static auto stream( std::string& o, const std::string& raw ) -> size_t {

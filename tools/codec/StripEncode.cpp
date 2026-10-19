@@ -1,5 +1,5 @@
-#include "StripEncode.h"
-#include "Deflate.h"
+#include "codec/StripEncode.h"
+#include "codec/Deflate.h"
 #include "../../src/data/Bytes.h"
 #include <map>
 #include <stdexcept>
