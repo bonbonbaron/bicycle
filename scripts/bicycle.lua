@@ -276,6 +276,7 @@ ffi.cdef([[
   void setHudBar( int id, int val );
   int addHudText( const char* text, int x, int y );
   void setHudText( int id, const char* text );
+  void removeHudItem( int id );
   float frameRate();
   bool setHudBarSprites( int id, const char* framePath, const char* fillPath );
   void setHidden( Entity entity, bool hidden );
@@ -444,7 +445,7 @@ end
 function move( entity, vel )
   checkType( entity, "number" )
   checkType( vel, "table" )
-  -- TODO write a motion config wrapper in bicycle.cpp.
+  -- TODO write a motion config wrapper in src/lua/LuaMotion.cpp.
   -- TODO write a Motion table that defaults values and allows you to easily define a motion in Lua. Then you can handle all the nasty configuration stuff here.
   if vel.x and vel.y then
     sys( START, SYS_MOTION, entity )

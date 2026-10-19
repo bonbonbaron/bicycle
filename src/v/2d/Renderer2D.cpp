@@ -15,15 +15,21 @@ class Renderer2D final : public PixelRenderer {
 
     // 2D UI: flat, crisp, pixel-art flavored. A health bar is a dark frame with a segmented fill whose color goes
     // green -> yellow -> red with the fraction, a label in front and "curr/max" after it.
-    void drawBar( WinHandle win, int y, int x, const BarSpec& bar ) override {
+    void drawWidget( WinHandle win, int y, int x, Align align, const Widget& w ) override {
+      if ( w.kind == Widget::BAR ) drawMeter( win, y, x, w );
+      else drawLabel( win, y, x, align, w.text );
+    }
+
+  private:
+    void drawMeter( WinHandle win, int y, int x, const Widget& bar ) {
       const Win* w = static_cast<Win*>( win );
       if ( !w || ( w->attr & ATTR_INVISIBLE ) ) return;
       int px = ( w->x + x ) * CELL_W + 4;
       const int top = ( w->y + y ) * CELL_H;
       const float frac = static_cast<float>( bar.curr ) / std::max( 1, bar.max );
-      if ( !bar.label.empty() ) {
-        px += drawString( w, px + 1, top + 1, bar.label, 0xC0000000u, UI_TEXT_PX, true );  // drop shadow
-        drawString( w, px - measureString( bar.label, UI_TEXT_PX, true ), top, bar.label, 0xFFFFF4D8u, UI_TEXT_PX, true );
+      if ( !bar.text.empty() ) {
+        px += drawString( w, px + 1, top + 1, bar.text, 0xC0000000u, UI_TEXT_PX, true );  // drop shadow
+        drawString( w, px - measureString( bar.text, UI_TEXT_PX, true ), top, bar.text, 0xFFFFF4D8u, UI_TEXT_PX, true );
         px += 6;
       }
       const int bw = std::max( 16, bar.len * CELL_W * 2 ), bh = 14, by = top + 1;
@@ -51,18 +57,19 @@ class Renderer2D final : public PixelRenderer {
     }
 
     // A HUD label: crisp text with a drop shadow on a dark translucent plate.
-    void drawHudText( WinHandle win, int y, int x, int align, const std::string& s ) override {
+    void drawLabel( WinHandle win, int y, int x, Align align, const std::string& s ) {
       const Win* w = static_cast<Win*>( win );
       if ( !w || ( w->attr & ATTR_INVISIBLE ) || s.empty() ) return;
       const int tw = measureString( s, UI_TEXT_PX );
       const int anchor = ( w->x + x ) * CELL_W;
-      const int px = align == 1 ? anchor - 8 - tw : align == 2 ? anchor - tw / 2 : anchor + 4;
+      const int px = align == Align::End ? anchor - 8 - tw : align == Align::Center ? anchor - tw / 2 : anchor + 4;
       const int top = ( w->y + y ) * CELL_H;
       blendRect( w, px - 4, top - 1, tw + 8, CELL_H + 2, 0x90000000u );
       drawString( w, px + 1, top + 1, s, 0xC0000000u, UI_TEXT_PX );
       drawString( w, px, top, s, 0xFFFFF4D8u, UI_TEXT_PX );
     }
 
+  public:
     // A right-pointing gold arrow, pixel-art style.
     void drawMenuCursor( WinHandle win, int y, int x, const std::string& ) override {
       const Win* w = static_cast<Win*>( win );

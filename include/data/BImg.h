@@ -20,7 +20,7 @@ struct BImg {
   mem::Vector<uint8_t, mem::GRAPHIC> indices;   // w*h, indexed images
   mem::Vector<uint32_t, mem::GRAPHIC> rgba;     // w*h, true color images
   // A palette variant (genome palette = "..."): its own palette over another image's indices, which it shares
-  // instead of copying (the graybody, loaded once; see newPixelImagePal in src/bicycle.cpp).
+  // instead of copying (the graybody, loaded once; see pixels::sprite in src/v/common/PixelImages.cpp).
   std::shared_ptr<const BImg> gray;
 
   auto idx() const -> const mem::Vector<uint8_t, mem::GRAPHIC>& { return gray ? gray->indices : indices; }

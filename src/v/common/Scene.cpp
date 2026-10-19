@@ -96,6 +96,12 @@ Scene::~Scene() {
     World::set<Box>( layer.id, Box{} );
     delEntityId( layer.id );
   }
+  for ( const Entity e : _hud.fg ) {
+    World::set<Box>( e, Box{} );
+    delEntityId( e );
+  }
+  World::set<Image>( _hud.id, Image{} );
+  delEntityId( _hud.id );
   const Entity cam = _camera.getId();
   Kinematics::getInstance().forget( cam );
   phys3d::World3D::get().removeEntity( cam );
@@ -176,40 +182,46 @@ void Scene::render() {
   renderHud();
 }
 
-auto Scene::addHudBar( const std::string& label, const int max, const int len, const int x, const int y ) -> int {
-  _hud.emplace_back( label, max, len, x, y );
-  return static_cast<int>( _hud.size() ) - 1;
+auto Scene::addWidget( const gfx::Widget& w ) -> Entity {
+  const Entity e = newEntityId();
+  _widgets.emplace_back( e, w );
+  _hud.fg.push_back( e );
+  return e;
 }
 
-auto Scene::getHudBar( const int id ) -> Bar* {
-  return ( id >= 0 && id < static_cast<int>( _hud.size() ) ) ? &_hud.at( id ) : nullptr;
+auto Scene::widget( Entity e ) -> gfx::Widget* {
+  for ( auto& [id, w] : _widgets ) {
+    if ( id == e ) return &w;
+  }
+  return nullptr;
 }
 
-auto Scene::addHudText( const std::string& text, const int x, const int y ) -> int {
-  _hudText.push_back( { text, x, y } );
-  return static_cast<int>( _hudText.size() ) - 1;
-}
-
-void Scene::setHudText( const int id, const std::string& text ) {
-  if ( id >= 0 && id < static_cast<int>( _hudText.size() ) ) _hudText[id].text = text;
+void Scene::removeWidget( Entity e ) {
+  auto it = std::find( _hud.fg.begin(), _hud.fg.end(), e );
+  if ( it == _hud.fg.end() ) return;
+  _hud.fg.erase( it );
+  std::erase_if( _widgets, [e]( const auto& iw ) { return iw.first == e; } );
+  World::set<Box>( e, Box{} );
+  delEntityId( e );
 }
 
 void Scene::setHidden( const Entity entity, const bool hidden ) {
   _hidden[entity] = hidden;
 }
 
+// The HUD layer: glued, so a widget's screen cell is its position (an edge resolves against the window's size).
 void Scene::renderHud() {
-  for ( const auto& bar : _hud ) {
-    bar.draw( *this );
-  }
+  using gfx::Widget;
   const int w = static_cast<int>( getWidth() ), h = static_cast<int>( getHeight() );
-  for ( const auto& t : _hudText ) {
-    if ( t.text.empty() ) continue;
-    // The named edges sit inside the scene's border, on the bars' first row and column.
-    const int x = t.x >= 0 ? t.x : t.x == -2 ? w : t.x == -3 ? w / 2 : 2;
-    const int align = t.x == -2 ? 1 : t.x == -3 ? 2 : 0;
-    const int y = t.y >= 0 ? t.y : t.y == -2 ? std::max( 0, h - 2 ) : 1;
-    gfx::renderer().drawHudText( getHandle(), y, x, align, t.text );
+  for ( const Entity e : _hud.fg ) {
+    const Widget* wd = widget( e );
+    if ( !wd || ( wd->kind == Widget::TEXT && wd->text.empty() ) ) continue;
+    if ( const bool* hidden = _hidden.find( e ); hidden && *hidden ) continue;
+    const int x = wd->x >= 0 ? wd->x : wd->x == Widget::RIGHT ? w : wd->x == Widget::CENTER ? w / 2 : 2;
+    const int y = wd->y >= 0 ? wd->y : wd->y == Widget::BOTTOM ? std::max( 0, h - 2 ) : 1;
+    const auto align = wd->x == Widget::RIGHT ? gfx::Align::End : wd->x == Widget::CENTER ? gfx::Align::Center : gfx::Align::Start;
+    World::get<Box>( e ).pos = Position( x, y ) << FIXEDPT_DEC_BITS;
+    gfx::renderer().drawWidget( getHandle(), y, x, align, *wd );
   }
 }
 

@@ -173,12 +173,17 @@ void AsciiRenderer::drawBorder( WinHandle win ) {
   ::box( W( win ), 0, 0 );
 }
 
-// ASCII's bar is text: HP [#######---] 7/10 (any value above 0 shows at least one segment).
-void AsciiRenderer::drawBar( WinHandle win, int y, int x, const BarSpec& bar ) {
-  const int filled = ( bar.curr * bar.len + bar.max - 1 ) / bar.max;
-  std::string s = bar.label.empty() ? "[" : bar.label + " [";
-  s += std::string( filled, '#' ) + std::string( bar.len - filled, '-' ) + "] ";
-  s += std::to_string( bar.curr ) + "/" + std::to_string( bar.max );
+// ASCII's HUD is text. A bar: HP [#######---] 7/10 (any value above 0 shows at least one segment).
+void AsciiRenderer::drawWidget( WinHandle win, int y, int x, Align align, const Widget& w ) {
+  std::string s = w.text;
+  if ( w.kind == Widget::BAR ) {
+    const int filled = ( w.curr * w.len + w.max - 1 ) / w.max;
+    s = ( w.text.empty() ? "[" : w.text + " [" ) + std::string( filled, '#' ) + std::string( w.len - filled, '-' ) + "] ";
+    s += std::to_string( w.curr ) + "/" + std::to_string( w.max );
+  }
+  const int n = static_cast<int>( s.size() );
+  if ( align == Align::End ) x = std::max( 0, x - n - 1 );
+  else if ( align == Align::Center ) x = std::max( 0, x - n / 2 );
   text( win, y, x, s );
 }
 
