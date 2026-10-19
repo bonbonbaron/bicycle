@@ -193,6 +193,13 @@ return coin
   starts a timer at spawn; `self:after( ms, type )`, `self:every( ms, type )` and `self:stopTimer( id )` add more.
   Continuous motion is data (`motion`: linear paths, orbits, spin and bob, follow; or an animation), moved by the
   engine's Kinematics, not per-frame Lua.
+* **Moving by hand** (2D, fixed point, 256 = one cell): `ffi.C.stepEntity( id, dx, dy )` steps, and
+  `coll = { type = "hero", blockedBy = { "solid", "enemy" } }` stops its steps and velocity flush against
+  those types, dropping only the part of the motion that heads into them (it slides along walls and can always back
+  away; the collision is still reported, and `ffi.C.stepBlocked( id )` tells `onCollision` a step was cut short);
+  `ffi.C.teleport( id, x, y )` places it. Go through these rather than writing `World_getBoxes()` positions: only
+  entities the engine knows moved are collision-checked (moving entities against everyone, still ones not at all
+  against each other; `CollisionDetector.h`).
 * **Per-instance parameters**: whatever a placement adds (a door's `door = { to = "bonus" }`, a mover's
   `motion = { path = ... }`) is merged over the genome's own fields (nested tables merge, lists replace).
   `params = { ["door.to"] = "scene", ["door.spawn"] = "spawn:door.to", ["motion.path"] = "path", ... }` tells the

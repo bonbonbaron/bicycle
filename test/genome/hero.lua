@@ -3,7 +3,7 @@ local Scene = require('Scene')
 local Hud = require('Hud')
 require('Dialogue')
 -- The player: an animated Aseprite character (see scripts/aseprite/sprite.lua) who walks with WASD,
--- is blocked by solid things, gets hurt by enemies (health bar up top), and talks to NPCs with E or Space.
+-- is blocked by solid things (coll.blockedBy), gets hurt by enemies (health bar up top), and talks to NPCs with E or Space.
 -- model: in 3D mode the hero is the Blender character test/genome/model/pilgrim3d (scripts/blender/make_scene.py).
 -- persist: the hero survives scene changes (Scene.go in scripts/Scene.lua): carried through doors, HUD and camera kept.
 -- timer: the flash/invulnerability tick (onTimer); sfx: the hero's own sounds.
@@ -12,11 +12,8 @@ local WALK_MS = 90              -- while a direction key is held: one step this 
 local WALK_DELAY_MS = 200       -- ...after this long held, so a quick tap is exactly one step
 local WALK_TIMER, WALK_DELAY_TIMER = 7, 8  -- their timer types (the timer gene's is 0)
 local hero = {
-  sprite = "pilgrim",
-  initAnim = "walk_down",
-  coll = { type = "hero" },
-  vel = { x = 0, y = 0 },
-  persist = true,
+  sprite = "pilgrim", model = "pilgrim3d", initAnim = "walk_down", persist = true,
+  coll = { type = "hero", blockedBy = { "solid", "enemy", "npc" } },  -- the engine stops its steps flush against these
   timer = { ms = TICK_MS },
   sfx = {
 	  soundfont = "meadow",
@@ -56,7 +53,6 @@ local ACTIONS = {
   end
 }
 local SOLID, ENEMY, NPC = 2, 4, 5  -- Genome.COLL
-local BLOCKERS = { [SOLID]=true, [ENEMY]=true, [NPC]=true }
 local MAX_HEALTH = 10
 local DAMAGE = 2
 local KNOCKBACK = 6 * STEP      -- columns pushed away from whatever hurt us
@@ -74,18 +70,6 @@ function hero:onSpawn()
   -- The camera is a kinematic body tracking us (Camera.track in scripts/bicycle.lua). It glides after us with a
   -- dead zone; BICYCLE_CAMERA=hard makes it hard-track instead (snap, no dead zone).
     Camera.track( self.id, { mode = "lerp", rate = 5, deadzone = { 10, 3 } } )
-end
-
--- While touching something solid (e.g. it walked into us), refuse moves toward its center.
-function hero:blockedBy(dir)
-  local me = box( self.id )
-  for other, _ in pairs( self.touching or {} ) do
-    local b = box( other )
-    local dx = ( b.pos.x + b.size.w / 2 ) - ( me.pos.x + me.size.w / 2 )
-    local dy = ( b.pos.y + b.size.h / 2 ) - ( me.pos.y + me.size.h / 2 )
-    if dir.dx * dx + dir.dy * dy * 4 > 0 then return true end  -- rows are ~2x as tall as columns are wide
-  end
-  return false
 end
 
 -- The speaker whose box is within TALK_REACH cells of ours (touching counts), if any.
@@ -142,17 +126,15 @@ function hero:onInput(input, pressed)
 end
 
 function hero:step( dir )
-  if self:blockedBy( dir ) then
-    self.anim:set( dir.strip )
+  self.anim:set( dir.strip )  -- no-op if already walking this way
+  if ffi.C.stepEntity( self.id, dir.dx, dir.dy ) then
+    local pos = box( self.id ).pos
+    dbglog( "hero move to %d,%d", pos.x / STEP, pos.y / STEP )
+    self.blocked = false
+  elseif not self.blocked then  -- up against something solid that way: bump once, not every frame it pushes
     self:sound( "bump" )
     dbglog( "hero blocked" )
-  else
-    self.anim:set( dir.strip )  -- no-op if already walking this way
-    local pos = box( self.id ).pos
-    self.prevPos = { x = pos.x, y = pos.y }  -- where to step back to if this move bumps into something solid
-    pos.x = pos.x + dir.dx
-    pos.y = pos.y + dir.dy
-    dbglog( "hero move to %d,%d", pos.x / STEP, pos.y / STEP )
+    self.blocked = true
   end
 end
 
@@ -167,7 +149,7 @@ function hero:hurt( by )
   -- Knock back, away from whatever hit us.
   local me, b = box( self.id ), box( by )
   local away = ( me.pos.x + me.size.w / 2 ) < ( b.pos.x + b.size.w / 2 ) and -1 or 1
-  me.pos.x = me.pos.x + away * KNOCKBACK
+  ffi.C.teleport( self.id, me.pos.x + away * KNOCKBACK, me.pos.y )
   dbglog( "hero hurt: health %d", self.health )
   if self.health <= 0 then
     dbglog( "game over" )
@@ -177,22 +159,18 @@ function hero:hurt( by )
 end
 
 function hero:respawn()
-  local pos = box( self.id ).pos
-  pos.x, pos.y = self.spawn.x, self.spawn.y
+  ffi.C.teleport( self.id, self.spawn.x, self.spawn.y )
   self.health = self.hp:set( MAX_HEALTH )
   self.invulnerable = INVULNERABLE_TICKS
-  self.touching = {}
   dbglog( "respawn: health %d", self.health )
 end
 
--- After walking through a door: we're at the new scene's spawn point; forget what we touched in the old one.
--- function hero:onSceneEnter( sceneName, spawnName )
---   local pos = box( self.id ).pos
---   self.spawn = { x = pos.x, y = pos.y }
---   self.touching = {}
---   self.prevPos = nil
---   dbglog( "hero entered %s (spawn %s)", sceneName, tostring( spawnName ) )
--- end
+-- After walking through a door: we're at the new scene's spawn point.
+function hero:onSceneEnter( sceneName, spawnName )
+  local pos = box( self.id ).pos
+  self.spawn = { x = pos.x, y = pos.y }
+  dbglog( "hero entered %s (spawn %s)", sceneName, tostring( spawnName ) )
+end
 
 -- The walk timer steps in the newest held direction; the timer gene's tick flashes while invulnerable.
 function hero:onTimer(timerId, timeoutType)
@@ -219,24 +197,14 @@ function hero:onTimer(timerId, timeoutType)
 end
 
 function hero:onCollision(other, collType)
-  if BLOCKERS[collType] then
-    self.touching = self.touching or {}
-    self.touching[other] = true
-    if self.prevPos then  -- we walked into it: step back
-      local pos = box( self.id ).pos
-      pos.x, pos.y = self.prevPos.x, self.prevPos.y
-      self.prevPos = nil
-      if collType ~= ENEMY then self:sound( "bump" ) end
-      dbglog( "hero bumped; back to %d,%d", pos.x / STEP, pos.y / STEP )
-    end
-  end
   if collType == ENEMY then
     self:hurt( other )
+  elseif ( collType == SOLID or collType == NPC ) and ffi.C.stepBlocked( self.id ) then  -- walked into it: stopped flush
+    self:sound( "bump" )
+    self.blocked = true
+    local pos = box( self.id ).pos
+    dbglog( "hero bumped; flush at %d,%d", pos.x / STEP, pos.y / STEP )
   end
-end
-
-function hero:onUncollision(other, collType)
-  if self.touching then self.touching[other] = nil end
 end
 
 return hero

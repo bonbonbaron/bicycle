@@ -1,5 +1,5 @@
 #include "v/common/Scene.h"
-#include "c/Physics3D.h"
+#include "c/Layer3D.h"
 #include "c/Kinematics.h"
 #include "m/World.h"
 #include "v/common/Renderer.h"
@@ -104,7 +104,7 @@ Scene::~Scene() {
   delEntityId( _hud.id );
   const Entity cam = _camera.getId();
   Kinematics::getInstance().forget( cam );
-  phys3d::World3D::get().removeEntity( cam );
+  layer3d::removeEntity( cam );
   World::set<Box>( cam, Box{} );
   delEntityId( cam );
 }

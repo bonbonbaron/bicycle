@@ -239,6 +239,18 @@ if ( NOT CMAKE_CROSSCOMPILING )
   target_include_directories( bicycle-map-lut-tests PRIVATE include )
   target_compile_definitions( bicycle-map-lut-tests PRIVATE BICYCLE_MAP_POPCNT_LUT )
   add_test( NAME map-lut COMMAND bicycle-map-lut-tests )
+  # ActiveFirst (include/data/ActiveFirst.h), the active-first collision check and its step blocking, Kinematics'
+  # and Timer's active sets (Trigger stubbed in the test). bicycle-collision-bench: the old all-pairs check vs this.
+  set( activeFirstSources src/c/CollisionDetector.cpp src/c/Kinematics.cpp src/c/Timer.cpp src/c/Layer3DOff.cpp
+       src/m/World.cpp src/m/Box.cpp src/v/common/Image.cpp src/v/common/ColorPalette.cpp src/data/Mem.cpp )
+  add_executable( bicycle-active-first-tests tests/active_first_test.cpp ${activeFirstSources} )
+  add_executable( bicycle-collision-bench tests/collision_bench.cpp ${activeFirstSources} )
+  foreach( t bicycle-active-first-tests bicycle-collision-bench )
+    target_include_directories( ${t} PRIVATE include "${CMAKE_SOURCE_DIR}" )
+    target_link_libraries( ${t} PRIVATE bicycle_luajit )  # Trigger.h includes lua.hpp
+    add_dependencies( ${t} ids )
+  endforeach()
+  add_test( NAME active-first COMMAND bicycle-active-first-tests )
   # True 3D: math (include/m/Math3D.h), level collision, character physics and raycasts (src/c/Physics3D.cpp).
   add_executable( bicycle-3d-tests tests/math3d_test.cpp src/c/Physics3D.cpp )
   target_link_libraries( bicycle-3d-tests PRIVATE bicycle_data )
@@ -260,14 +272,17 @@ set( BICYCLE_SOURCES
   src/v/common/Menu.cpp src/v/common/TextMenu.cpp src/v/common/Scene.cpp
   src/c/Trigger.cpp src/c/Timer.cpp src/c/WindowManager.cpp src/c/CollisionDetector.cpp
   src/c/Kinematics.cpp src/c/Animator.cpp src/c/MidiPlayer.cpp src/c/Dice.cpp
-  src/c/Physics3D.cpp src/c/World3DApi.cpp src/c/InputState.cpp )
+  src/c/InputState.cpp )
+# Each mode adds only its own code: the true-3D layer (physics, 3D motions and camera rig, their Lua API) is in 3D
+# builds alone; ASCII and 2D link its no-op stand-in, src/c/Layer3DOff.cpp (include/c/Layer3D.h).
 # Not built (unfinished or replaced): src/c/Input.cpp (Linux evdev keyboard), src/c/RenderSystem.cpp, src/v/common/Graph.cpp
 if ( BICYCLE_RENDER STREQUAL "ASCII" )
-  list( APPEND BICYCLE_SOURCES src/v/ascii/AsciiRenderer.cpp src/c/SshInputListener.cpp )
+  list( APPEND BICYCLE_SOURCES src/v/ascii/AsciiRenderer.cpp src/c/SshInputListener.cpp src/c/Layer3DOff.cpp )
 elseif ( BICYCLE_RENDER STREQUAL "2D" )
-  list( APPEND BICYCLE_SOURCES src/v/sdl/PixelRenderer.cpp src/v/sdl/UiFont.cpp src/v/sdl/SpriteAtlas.cpp src/v/2d/Renderer2D.cpp )
+  list( APPEND BICYCLE_SOURCES src/v/sdl/PixelRenderer.cpp src/v/sdl/UiFont.cpp src/v/sdl/SpriteAtlas.cpp src/v/2d/Renderer2D.cpp src/c/Layer3DOff.cpp )
 elseif ( BICYCLE_RENDER STREQUAL "3D" )
-  list( APPEND BICYCLE_SOURCES src/v/sdl/PixelRenderer.cpp src/v/sdl/UiFont.cpp src/v/sdl/SpriteAtlas.cpp src/v/3d/Renderer3D.cpp )
+  list( APPEND BICYCLE_SOURCES src/v/sdl/PixelRenderer.cpp src/v/sdl/UiFont.cpp src/v/sdl/SpriteAtlas.cpp src/v/3d/Renderer3D.cpp
+    src/c/Layer3D.cpp src/c/Physics3D.cpp src/c/World3DApi.cpp src/c/Kinematics3D.cpp )
 endif()
 
 if ( BICYCLE_RELEASE )
@@ -341,6 +356,10 @@ if ( NOT MSVC )
     target_link_options( o PRIVATE -s )
   endif()
 endif()
+# The systems' per-frame loops over their active rows (ActiveFirst) are written to vectorize; GCC's -O2 cost model
+# ("very cheap") refuses any loop of unknown length, so these files use the "cheap" one (clang vectorizes at -O2).
+set_source_files_properties( src/c/CollisionDetector.cpp src/c/Kinematics.cpp src/c/Timer.cpp
+  PROPERTIES COMPILE_OPTIONS "$<$<CXX_COMPILER_ID:GNU>:-fvect-cost-model=cheap>" )
 if ( BICYCLE_LTO )
   set_property( TARGET o PROPERTY INTERPROCEDURAL_OPTIMIZATION ON )
 endif()

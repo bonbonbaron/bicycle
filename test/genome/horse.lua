@@ -36,7 +36,7 @@ function horse:onCollision(other, collType)
     ffi.C.setVelocity( self.id, 0, 0 )
     if self.vx and self.vx ~= 0 then
       local pos = ffi.C.World_getBoxes().arr[self.id].pos
-      pos.x = pos.x - ( self.vx > 0 and 3 or -3 ) * 256
+      ffi.C.teleport( self.id, pos.x - ( self.vx > 0 and 3 or -3 ) * 256, pos.y )
     end
     self.vx = 0
     self:sound( "neigh" )

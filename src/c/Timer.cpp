@@ -3,6 +3,7 @@
 #include "Constants.h"
 #include "c/Trigger.h"
 
+#include <algorithm>
 #include <thread>
 
 Timer::Timer() : frameStartTime( std::chrono::steady_clock::now() ) {}
@@ -29,71 +30,66 @@ void Timer::sleepFrame() {
   t.frameStartTime = std::chrono::steady_clock::now();
 }
 
+// Counts the running timers down (one pass over a contiguous column, which vectorizes), then delivers the ones due,
+// in id order.
 void Timer::_run() {
-  for ( unsigned timerId = 0; timerId < MAX_NUM_TIMERS; ++timerId ) {
-    _times.at(timerId) -= _decrementers.at(timerId);
-    if ( _decrementers.at(timerId) > 0 && _times.at(timerId) == 0 ) {
-      // Reset or free the slot BEFORE delivering: an animation timeout is handled right here (Animator::tick) and
-      // makes the next frame's timer, which can take this very slot; freeing it afterwards killed that timer, so
-      // animations stopped after a frame or a cycle.
-      const Timeout msg = _msgs.at(timerId);
-      const auto& cfg = _cfgs.at(timerId);
-      if ( cfg.repeat ) {
-        _times.at(timerId) = cfg.fullTimer;
-      } else {
-        stop( timerId );  // a one-shot timer's slot is free again (it used to stay taken for good)
-      }
-      Trigger::sendTimeout( msg );
+  const uint32_t n = _timers.nActive();
+  unsigned* __restrict left = _timers.col<LEFT>();
+  for ( uint32_t i = 0; i < n; ++i ) left[i] -= 1;
+  _due.clear();
+  for ( uint32_t i = 0; i < n; ++i ) {
+    if ( left[i] == 0 ) _due.push_back( _timers.key( i ) );
+  }
+  std::sort( _due.begin(), _due.end() );
+  for ( const TimerId id : _due ) {
+    // A timeout delivered before this one may have stopped this timer, or reused its id for a new one.
+    if ( !_timers.isActive( id ) || _timers.at<LEFT>( id ) != 0 ) continue;
+    // Reset or free the slot BEFORE delivering: an animation timeout is handled right here (Animator::tick) and
+    // makes the next frame's timer, which can take this very slot; freeing it afterwards killed that timer, so
+    // animations stopped after a frame or a cycle.
+    const Timeout msg = _timers.at<MSG>( id );
+    if ( _timers.at<REPEAT>( id ) ) {
+      _timers.at<LEFT>( id ) = _timers.at<FULL>( id );
+    } else {
+      stop( id );  // a one-shot timer's slot is free again
     }
+    Trigger::sendTimeout( msg );
   }
 }
 
 void Timer::start( const TimerId timerId ) {
-  if ( timerId < MAX_NUM_TIMERS && _times.at( timerId ) > 0 )  {
-    _decrementers.at( timerId ) = 1;
-  }
+  if ( _timers.contains( timerId ) && _timers.at<LEFT>( timerId ) > 0 ) _timers.activate( timerId );
 }
 
 void Timer::stop( unsigned timerId ) {
-  _decrementers.at(timerId) = 0;
+  if ( timerId >= MAX_NUM_TIMERS ) return;
+  _timers.remove( timerId );
   _availableTimers.set( timerId, true );
 }
 
 void Timer::stopEntity( const Entity entity ) {
-  for ( unsigned id = 0; id < MAX_NUM_TIMERS; ++id ) {
-    if ( !_availableTimers.test( id ) && _msgs.at( id ).entity == entity ) {
-      _decrementers.at( id ) = 0;
-      _times.at( id ) = 0;
-      _msgs.at( id ) = Timeout{};
-      _availableTimers.set( id, true );
-    }
+  for ( uint32_t row = _timers.size(); row-- > 0; ) {  // backwards: removing swaps in a row already visited
+    if ( _timers.col<MSG>()[row].entity == entity ) stop( _timers.key( row ) );
   }
 }
 
-void Timer::pause( const TimerId timerId ) {
-  _decrementers.at(timerId) = 0;
-}
+void Timer::pause( const TimerId timerId ) { _timers.deactivate( timerId ); }
 
-void Timer::unpause( const TimerId timerId ) {
-  _decrementers.at(timerId) = 1;
-}
+void Timer::unpause( const TimerId timerId ) { _timers.activate( timerId ); }
 
 auto Timer::create( const unsigned timeMs, Entity entity, const unsigned timeoutType, const bool repeat, const TimeoutAddr addr) -> TimerId {
   auto timerId = findAvailableTimer();
   if ( timerId < MAX_NUM_TIMERS )  {
     unsigned nFrames{ (Constants::FRAMES_PER_SECOND * timeMs) / 1000 };
     if ( nFrames == 0 ) nFrames = 1;  // under a frame: the next frame (0 never fired: the counter wrapped around)
-    _times.at( timerId ) = nFrames;
-    _decrementers.at(timerId) = 1;
-    _msgs.at(timerId)  = Timeout{ entity, timerId, timeoutType, addr };
-    _cfgs.at(timerId) = { repeat, nFrames };
+    _timers.add( timerId, nFrames, nFrames, repeat, Timeout{ entity, timerId, timeoutType, addr } );
+    _timers.activate( timerId );
   }
   return timerId;
 }
 
 auto Timer::findAvailableTimer() -> unsigned {
   const auto idx = find_first_set( _availableTimers );
-  // const auto idx = _availableTimers._Find_first();  // _Find_first() is a g++ extension. Lucky me.
-  _availableTimers.set( idx, false );
+  if ( idx < MAX_NUM_TIMERS ) _availableTimers.set( idx, false );
   return idx;
 }

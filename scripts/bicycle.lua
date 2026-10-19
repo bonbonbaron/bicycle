@@ -241,6 +241,10 @@ ffi.cdef([[
                          int type, int parallaxPct, int parallaxPctY, int vx, int vy, int x, int y );
   void setPos( Entity entity, Position pos );
   void addCollider( Entity entity, unsigned layer, unsigned type, int x, int y, int w, int h );
+  void setCollBlockers( Entity entity, unsigned typeMask );
+  bool stepEntity( Entity entity, int dx, int dy );
+  bool stepBlocked( Entity entity );
+  void teleport( Entity entity, int x, int y );
   void setVelocity( Entity entity, int vx, int vy );
   void motionLinear( Entity entity, float speed, bool pingPong );
   void motionWaypoint( Entity entity, float x, float y );

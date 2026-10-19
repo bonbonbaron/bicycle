@@ -7,6 +7,8 @@
 #include "Constants.h"
 #include "c/Controllable.h"
 #include "c/Timeout.h"
+#include "data/ActiveFirst.h"
+#include <vector>
 
 constexpr unsigned long MAX_NUM_TIMERS{1024};
 
@@ -34,20 +36,17 @@ class Timer : public Controllable {
     void stopEntity( Entity entity );  // every timer whose timeouts go to entity (a despawned entity)
     
   private:
-    struct TimerConfig {
-      bool repeat{};
-      unsigned fullTimer{};
-    };
     Timer();
     Timer(const Timer&) = delete;
     Timer operator=(const Timer&) = delete;
     Timer(const Timer&&) = delete;
     Timer operator=(const Timer&&) = delete;
-    std::bitset<MAX_NUM_TIMERS> _availableTimers{ ~std::bitset<MAX_NUM_TIMERS>{} }; // 1 = unused
-    std::array<unsigned, MAX_NUM_TIMERS> _decrementers{};
-    std::array<Timeout, MAX_NUM_TIMERS> _msgs{};
-    std::array<TimerConfig, MAX_NUM_TIMERS> _cfgs{};  // separate this from timers since most loop iterations don't need both data together
     auto findAvailableTimer() -> unsigned;
-    std::array<unsigned, MAX_NUM_TIMERS> _times{};
+    std::bitset<MAX_NUM_TIMERS> _availableTimers{ ~std::bitset<MAX_NUM_TIMERS>{} }; // 1 = unused
+    // The timers in use, keyed by id; the running ones are the active rows, so a frame counts down only those.
+    // Frames left (0: due), the full period, whether it repeats, and what it says when it times out.
+    enum { LEFT, FULL, REPEAT, MSG };
+    ActiveFirst<unsigned, unsigned, uint8_t, Timeout> _timers;
+    std::vector<TimerId> _due;  // _run(): this frame's
     std::chrono::time_point<std::chrono::steady_clock> frameStartTime{};
 };

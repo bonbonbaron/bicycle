@@ -5,7 +5,7 @@
 #include "c/Animator.h"
 #include "c/CollisionDetector.h"
 #include "c/Kinematics.h"
-#include "c/Physics3D.h"
+#include "c/Layer3D.h"
 #include "c/Timer.h"
 #include "c/Trigger.h"
 #include "data/Mem.h"
@@ -66,7 +66,7 @@ EXPORT_API void attachEntity( Entity entity, unsigned layerIdx ) {
 }
 
 EXPORT_API void setPos( Entity entity, Position pos ) {
-  World::get<Box>( entity ).pos = pos << FIXEDPT_DEC_BITS;
+  Kinematics::getInstance().teleport( entity, pos << FIXEDPT_DEC_BITS );
 }
 
 // Not drawn while hidden (e.g. to flash a character).
@@ -82,7 +82,7 @@ EXPORT_API void despawnEntity( Entity entity ) {
   Animator::getInstance().forget( entity );
   Kinematics::getInstance().forget( entity );
   CollisionDetector::getInstance().removeEntity( entity );
-  phys3d::World3D::get().removeEntity( entity );  // true 3D: transform, body, overlaps
+  layer3d::removeEntity( entity );  // true 3D: transform, body, overlaps
   gfx::renderer().forgetEntity( entity );
   World::set<Image>( entity, Image{} );
   World::set<Box>( entity, Box{} );

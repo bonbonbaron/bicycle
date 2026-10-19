@@ -184,6 +184,9 @@ end
 -- (Scene.removeForever, e.g. collected coins) stay gone when the player comes back.
 Scene.world3d = false  -- the current scene's world3d table (false for 2D / 2.5D scenes)
 function Scene:loadWorld3d( tbl )
+  if ffi.C.renderMode() ~= 2 then  -- only 3D builds have the 3D layer (World3D's ffi.C functions)
+    error( "This is a true-3D scene (world3d): run it with the 3D build (o-3d)." )
+  end
   local W = require( "World3D" )
   local w = tbl.world3d
   local level = w.level and W.level( w.level, w.cell )
