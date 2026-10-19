@@ -26,6 +26,7 @@ expect test/genome/scene/intro.lua 's/to = "house"/to = "hosue"/' "door to scene
 expect test/genome/scene/intro.lua 's/spawn = "entry"/spawn = "entyr"/' "spawn 'entyr'"
 expect test/genome/coin.lua 's/self:sound( "collect" )/self:sound( "cllect" )/' "no sound 'cllect' in this genome"
 expect test/genome/coin.lua 's/soundfont = "meadow"/soundfont = "maedow"/' "no SoundFont 'maedow'"
+expect test/genome/coin.lua 's/^return coin/x = = 1\nreturn coin/' "genome doesn't load"
 expect test/genome/hero.lua 's/model = "pilgrim3d"/model = "pilgrim"/' "no genome model 'pilgrim'"
 expect test/genome/beetle.lua 's/initAnim = "crawl"/initAnim = "crwal"/' "initAnim 'crwal'"
 expect test/genome/scene/house.lua 's/song = "house"/song = "huose"/' "no song 'huose'"
