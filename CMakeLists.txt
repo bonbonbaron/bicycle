@@ -256,7 +256,7 @@ set( BICYCLE_SOURCES
   src/c/FrameClock.cpp src/c/ScriptedInput.cpp src/v/common/PixelImages.cpp
   src/m/Entity.cpp src/m/Box.cpp src/m/Camera.cpp src/m/World.cpp
   src/v/common/Image.cpp src/v/common/ColorPalette.cpp src/v/common/Window.cpp src/v/common/Dialogue.cpp
-  src/v/common/Menu.cpp src/v/common/TextMenu.cpp src/v/common/Scene.cpp src/v/common/Bar.cpp
+  src/v/common/Menu.cpp src/v/common/TextMenu.cpp src/v/common/Scene.cpp
   src/c/Trigger.cpp src/c/Timer.cpp src/c/WindowManager.cpp src/c/CollisionDetector.cpp
   src/c/Kinematics.cpp src/c/Animator.cpp src/c/MidiPlayer.cpp src/c/Dice.cpp
   src/c/Physics3D.cpp src/c/World3DApi.cpp src/c/InputState.cpp )

@@ -36,7 +36,9 @@ bad=$(grep ' unload ' "$out.s" | grep -v 'scene_live=0 leaked=0' || true)
 hws=$(sed -n 's/.*scene_hw=\([0-9]*\).*/\1/p' "$out.s" | tail -n +5 | sort -u | wc -l)
 [ "$hws" -le 1 ] || { echo "scene-lifecycle: SCENE high-water kept growing:"; cat "$out.s"; rm -f "$out.s"; exit 1; }
 a=${pair%%:*}
-gen=$(grep " unload $a " "$out.s" | sed -n 's/.*general_live=\([0-9]*\).*/\1/p' | sort -u | wc -l)
+# GENERAL may also settle during the first round trip (entity ids first used then, e.g. by HUD widgets, which are
+# entities); after that it must not move.
+gen=$(grep " unload $a " "$out.s" | tail -n +2 | sed -n 's/.*general_live=\([0-9]*\).*/\1/p' | sort -u | wc -l)
 [ "$gen" -le 1 ] || { echo "scene-lifecycle: GENERAL grows per cycle:"; cat "$out.s"; rm -f "$out.s"; exit 1; }
 echo "scene-lifecycle: OK, $unloads changes; $(tail -n 1 "$out.s")"
 rm -f "$out.s"

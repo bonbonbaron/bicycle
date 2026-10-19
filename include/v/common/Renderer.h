@@ -1,6 +1,5 @@
 #pragma once
-#include <algorithm>
-// The one interface between the engine and whatever draws it. The engine (Scene, Camera, Window, Dialogue, Bar,
+// The one interface between the engine and whatever draws it. The engine (Scene, Camera, Window, Dialogue,
 // TextMenu, WindowManager, input) only talks to gfx::renderer(); each render mode implements it:
 //   ASCII  src/v/ascii  curses (ncurses / PDCurses) in a terminal          (BICYCLE_RENDER=ASCII)
 //   2D     src/v/2d     SDL3 pixel graphics                                 (BICYCLE_RENDER=2D)
@@ -32,14 +31,23 @@ using WinHandle = void*;  // a curses WINDOW* in ASCII, a rectangle of cells els
 // kind; the pixel modes draw dialogue and menu windows as graphical panels and leave a scene's view undecorated.
 enum class Panel { Scene, Dialogue, Menu };
 
-// A meter (health, stamina, progress). ASCII draws "HP [#######---] 7/10"; the pixel modes draw a graphical bar
-// (frame + fill colored by fraction), or the given sprites: frame drawn as is, fill cropped to the fraction.
-struct BarSpec {
-  std::string label;
-  int curr{}, max{1};
-  int len{};  // in cells (ASCII: segments)
-  std::shared_ptr<const BImg> frameSprite, fillSprite;
+// A HUD element: an entity in a scene's HUD layer (Scene::addWidget), drawn glued to the screen over the world.
+//   BAR   a meter (health, stamina, progress): ASCII "HP [#######---] 7/10"; the pixel modes a graphical bar (frame +
+//         fill colored by fraction), or the given sprites: frame drawn as is, fill cropped to the fraction.
+//   TEXT  a label: ASCII plain text; the pixel modes text on a plate like the bar's.
+struct Widget {
+  enum Kind { BAR, TEXT } kind{ BAR };
+  std::string text;           // the bar's label, or the label's text
+  int curr{}, max{ 1 };       // BAR
+  int len{ 1 };               // BAR: in cells (ASCII: segments)
+  std::shared_ptr<const BImg> frameSprite, fillSprite;  // BAR, pixel modes (null: drawn)
+  // Where: a cell column / row, or a screen edge (inside the scene's border, on the first HUD row and column).
+  enum Edge { LEFT = -1, RIGHT = -2, CENTER = -3, TOP = -1, BOTTOM = -2 };
+  int x{}, y{};
 };
+
+// How a widget sits on its column: starting at it, ending just before it, or centered on it.
+enum class Align { Start, End, Center };
 
 class Renderer {
   public:
@@ -72,14 +80,8 @@ class Renderer {
     virtual void clearWindow( WinHandle win ) = 0;
     virtual void drawBorder( WinHandle win ) = 0;  // the window's frame (see Panel)
     virtual void setPanel( WinHandle win, Panel kind ) {}  // set before the window clears (Window::clear)
-    // UI widgets, each mode its own way (cells are the window's).
-    virtual void drawBar( WinHandle win, int y, int x, const BarSpec& bar ) = 0;
-    // A HUD text label on row y. align 0: starts at cell x; 1: ends just before cell x (right-aligned); 2: centered
-    // on cell x. ASCII prints it as plain text; the pixel modes draw it on a plate like drawBar's.
-    virtual void drawHudText( WinHandle win, int y, int x, int align, const std::string& s ) {
-      const int n = static_cast<int>( s.size() );
-      text( win, y, align == 1 ? std::max( 0, x - n - 1 ) : align == 2 ? std::max( 0, x - n / 2 ) : x, s );
-    }
+    // UI, each mode its own way (cells are the window's). A HUD widget at cell (x, y), aligned there.
+    virtual void drawWidget( WinHandle win, int y, int x, Align align, const Widget& w ) = 0;
     // A menu's selection marker in front of row y; ASCII prints the menu's cursor string.
     virtual void drawMenuCursor( WinHandle win, int y, int x, const std::string& asciiCursor ) = 0;
     virtual void text( WinHandle win, int y, int x, const std::string& s ) = 0;

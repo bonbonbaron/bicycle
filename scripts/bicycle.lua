@@ -276,6 +276,7 @@ ffi.cdef([[
   void setHudBar( int id, int val );
   int addHudText( const char* text, int x, int y );
   void setHudText( int id, const char* text );
+  void removeHudItem( int id );
   float frameRate();
   bool setHudBarSprites( int id, const char* framePath, const char* fillPath );
   void setHidden( Entity entity, bool hidden );

@@ -435,18 +435,24 @@ and the UI stays fixed. 3D reads the float position. ASCII snaps to whole cells.
 
 ## UI per render mode
 
-`src/v/common` (Window, Dialogue, TextMenu, Bar) lays UI out in cells and calls the renderer; each mode draws it
-its own way behind `gfx::Renderer` (`drawBar`, `drawMenuCursor`, `setPanel` + `clearWindow`/`drawBorder`). ASCII
+`src/v/common` (Window, Dialogue, TextMenu, Scene's HUD layer) lays UI out in cells and calls the renderer; each mode
+draws it its own way behind `gfx::Renderer` (`drawWidget`, `drawMenuCursor`, `setPanel` + `clearWindow`/`drawBorder`). ASCII
 keeps curses boxes and the text bar. 2D (`src/v/2d`) draws flat pixel-art panels and a segmented bar; 3D
 (`src/v/3d`) draws translucent gradient panels and a glossy pill bar in the overlay. Both color the bar by
 fraction (green, then yellow/amber, then red), take optional bar sprites (`hp:sprites( frame, fill )` in
 `scripts/Hud.lua`), and render text with TrueType (`fonts/ui.ttf`, stb_truetype). In the pixel modes, ASCII-art
 images that have no pixel version are drawn as solid cell blocks, not characters.
 
+The HUD is a layer of the scene glued to the screen: the camera doesn't move it, and it's drawn last, over the
+world (in 3D, into the overlay). Its meters and labels are entities in that layer, each a `gfx::Widget` (a meter or a
+text) with a Box at its screen cell; `Scene::addWidget`/`widget`/`removeWidget` hold them, and each frame the scene
+resolves their edges ("right", "bottom"...) against its size and calls the renderer's `drawWidget`.
+`scripts/Hud.lua` is a thin wrapper (`src/lua/LuaHud.cpp`).
+
 HUD text labels: `local t = Hud.text( text, ax, ay )` with `ax` = `"left"`, `"right"`, `"center"` or a cell x and
 `ay` = `"top"`, `"bottom"` or a cell y; `t:set( text )` changes it ("right" keeps its right edge at the screen's
 edge). Like bars they come back after a scene change (`Hud.rebuild`) until `Hud.forget( t )`. ASCII prints plain
-text; 2D and 3D draw it on the bars' plate (`drawHudText`). `fps()` (C `frameRate()`) is the main loop's frame
+text; 2D and 3D draw it on the bars' plate. `fps()` (C `frameRate()`) is the main loop's frame
 rate over about half a second, in every mode. Update labels from `onTimer`, e.g. plat3d's hero:
 `self.fpsLabel = Hud.text( "", "right", "top" )`, `self:every( 500, FPS_TIMER )`, and in `onTimer`
 `self.fpsLabel:set( string.format( "%.0f fps", fps() ) )`.

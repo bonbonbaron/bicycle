@@ -548,20 +548,26 @@ class Renderer3D final : public PixelRenderer {
     // 3D UI: drawn into the overlay (composited over the GL world with alpha), soft and glossy to sit over a lit
     // scene: translucent gradient panels with a soft shadow and a light rim, a pill-shaped bar with a gradient fill
     // colored by fraction (green -> amber -> red) and a glass highlight.
-    void drawBar( WinHandle win, int y, int x, const BarSpec& bar ) override {
+    void drawWidget( WinHandle win, int y, int x, Align align, const Widget& w ) override {
+      if ( w.kind == Widget::BAR ) drawMeter( win, y, x, w );
+      else drawLabel( win, y, x, align, w.text );
+    }
+
+  private:
+    void drawMeter( WinHandle win, int y, int x, const Widget& bar ) {
       const Win* w = static_cast<Win*>( win );
       if ( !w || ( w->attr & ATTR_INVISIBLE ) ) return;
       int px = ( w->x + x ) * CELL_W + 6;
       const int top = ( w->y + y ) * CELL_H + 2;
       const float frac = std::clamp( static_cast<float>( bar.curr ) / std::max( 1, bar.max ), 0.0f, 1.0f );
       const int bw = std::max( 24, bar.len * CELL_W * 2 ), bh = 16;
-      const int labelW = bar.label.empty() ? 0 : measureString( bar.label, UI_TEXT_PX, true ) + 10;
+      const int labelW = bar.text.empty() ? 0 : measureString( bar.text, UI_TEXT_PX, true ) + 10;
       const std::string nums = std::to_string( bar.curr ) + "/" + std::to_string( bar.max );
       const int numsW = measureString( nums, UI_TEXT_PX ) + 10;
       // A translucent plate behind the whole meter so it reads over any background.
       gradientRoundRect( nullptr, px - 6, top - 4, labelW + bw + numsW + 12, bh + 8, 8, 0xA0202838u, 0xA0101420u );
-      if ( !bar.label.empty() ) {
-        drawString( w, px, top, bar.label, 0xFFFFFFFFu, UI_TEXT_PX, true );
+      if ( !bar.text.empty() ) {
+        drawString( w, px, top, bar.text, 0xFFFFFFFFu, UI_TEXT_PX, true );
         px += labelW;
       }
       if ( bar.frameSprite || bar.fillSprite ) {
@@ -584,18 +590,19 @@ class Renderer3D final : public PixelRenderer {
       drawString( w, px, top, nums, 0xFFFFFFFFu, UI_TEXT_PX );
     }
 
-    // A HUD label on the same translucent plate as drawBar's.
-    void drawHudText( WinHandle win, int y, int x, int align, const std::string& s ) override {
+    // A HUD label on the same translucent plate as the meter's.
+    void drawLabel( WinHandle win, int y, int x, Align align, const std::string& s ) {
       const Win* w = static_cast<Win*>( win );
       if ( !w || ( w->attr & ATTR_INVISIBLE ) || s.empty() ) return;
       const int tw = measureString( s, UI_TEXT_PX );
       const int anchor = ( w->x + x ) * CELL_W;
-      const int px = align == 1 ? anchor - 12 - tw : align == 2 ? anchor - tw / 2 : anchor + 6;
+      const int px = align == Align::End ? anchor - 12 - tw : align == Align::Center ? anchor - tw / 2 : anchor + 6;
       const int top = ( w->y + y ) * CELL_H + 2;
       gradientRoundRect( nullptr, px - 6, top - 4, tw + 12, 16 + 8, 8, 0xA0202838u, 0xA0101420u );
       drawString( w, px, top, s, 0xFFFFFFFFu, UI_TEXT_PX );
     }
 
+  public:
     void drawMenuCursor( WinHandle win, int y, int x, const std::string& ) override {
       const Win* w = static_cast<Win*>( win );
       if ( !w || ( w->attr & ATTR_INVISIBLE ) ) return;
