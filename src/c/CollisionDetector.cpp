@@ -97,7 +97,7 @@ void CollisionDetector::checkLayer( Layer& layer ) {
 }
 
 void CollisionDetector::pairState( Entity a, Entity b, bool overlap ) {
-  const size_t bit = pairBit( a, b );
+  const std::size_t bit = pairBit( a, b );
   if ( overlap == _touching.test( bit ) ) return;
   const unsigned ta = World::get<CollBox>( a ).type, tb = World::get<CollBox>( b ).type;
   if ( overlap ) {

@@ -31,7 +31,7 @@ class Renderer2D final : public FlatRenderer<PixelRenderer> {
       const Win* w = static_cast<Win*>( win );
       if ( !w ) return;
       const uint32_t fg = colorToArgb( img.color );
-      for ( size_t c = 0; c < cells.size(); ++c ) {
+      for ( std::size_t c = 0; c < cells.size(); ++c ) {
         if ( cells[c] != ' ' ) fillRect( w, ( w->x + x + static_cast<int>( c ) ) * CELL_W, ( w->y + y ) * CELL_H, CELL_W, CELL_H, fg );
       }
     }

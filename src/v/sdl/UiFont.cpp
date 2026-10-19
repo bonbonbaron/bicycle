@@ -64,7 +64,7 @@ auto UiFont::glyph( uint32_t cp, int px ) -> const Glyph& {
   g.xoff = x0;
   g.yoff = y0;
   if ( g.w > 0 && g.h > 0 ) {
-    g.coverage.resize( static_cast<size_t>( g.w ) * g.h );
+    g.coverage.resize( static_cast<std::size_t>( g.w ) * g.h );
     stbtt_MakeCodepointBitmap( &_impl->info, g.coverage.data(), g.w, g.h, g.w, scale, scale, static_cast<int>( cp ) );
   }
   return _cache.emplace( key, std::move( g ) ).first->second;
@@ -73,7 +73,7 @@ auto UiFont::glyph( uint32_t cp, int px ) -> const Glyph& {
 auto UiFont::measure( const std::string& s, int px ) -> float {
   float w = 0;
   uint32_t prev = 0;
-  for ( size_t i = 0; i < s.size(); ) {
+  for ( std::size_t i = 0; i < s.size(); ) {
     const uint32_t cp = nextCodepoint( s, i );
     if ( prev ) w += kern( prev, cp, px );
     w += glyph( cp, px ).advance;
@@ -82,7 +82,7 @@ auto UiFont::measure( const std::string& s, int px ) -> float {
   return w;
 }
 
-auto nextCodepoint( const std::string& s, size_t& i ) -> uint32_t {
+auto nextCodepoint( const std::string& s, std::size_t& i ) -> uint32_t {
   const auto c = static_cast<unsigned char>( s[i++] );
   if ( c < 0x80 ) return c;
   int n = c >= 0xF0 ? 3 : c >= 0xE0 ? 2 : c >= 0xC0 ? 1 : -1;

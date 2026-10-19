@@ -64,13 +64,13 @@ auto decode( std::string_view s ) -> std::optional<Skin> {
     j.parent = static_cast<int16_t>( r.u16() );
     for ( auto& f : j.inverseBind ) f = r.f32();
   }
-  for ( size_t i = 0; i < k.joints.size(); ++i ) {
+  for (std::size_t i = 0; i < k.joints.size(); ++i ) {
     if ( k.joints[i].parent >= static_cast<int>( i ) ) return std::nullopt;  // parents first
   }
   if ( flags & 2 ) {
-    if ( !r.need( 8 * static_cast<size_t>( nVerts ) ) ) return std::nullopt;
-    k.vJoints.resize( 4 * static_cast<size_t>( nVerts ) );
-    k.vWeights.resize( 4 * static_cast<size_t>( nVerts ) );
+    if ( !r.need( 8 * static_cast<std::size_t>( nVerts ) ) ) return std::nullopt;
+    k.vJoints.resize( 4 * static_cast<std::size_t>( nVerts ) );
+    k.vWeights.resize( 4 * static_cast<std::size_t>( nVerts ) );
     for ( uint32_t v = 0; v < nVerts; ++v ) {
       for ( int i = 0; i < 4; ++i ) k.vJoints[4 * v + i] = r.u8();
       for ( int i = 0; i < 4; ++i ) k.vWeights[4 * v + i] = r.u8();
@@ -81,19 +81,19 @@ auto decode( std::string_view s ) -> std::optional<Skin> {
     a.name = r.str( r.u8() );
     a.fps = r.f32();
     a.nFrames = r.u16();
-    const size_t n = static_cast<size_t>( a.nFrames ) * nJoints;
+    const std::size_t n = static_cast<std::size_t>( a.nFrames ) * nJoints;
     a.t.resize( 3 * n );
     a.q.resize( 4 * n );
     if ( !( flags & 1 ) ) {
-      for ( size_t i = 0; i < n; ++i ) {
+      for ( std::size_t i = 0; i < n; ++i ) {
         for ( int c = 0; c < 3; ++c ) a.t[3 * i + c] = r.f32();
         for ( int c = 0; c < 4; ++c ) a.q[4 * i + c] = r.f32();
       }
     }
     else {
       const float tScale = r.f32();
-      std::vector<int32_t> prev( 7 * static_cast<size_t>( nJoints ), 0 );
-      for ( size_t i = 0; i < n; ++i ) {
+      std::vector<int32_t> prev( 7 * static_cast<std::size_t>( nJoints ), 0 );
+      for ( std::size_t i = 0; i < n; ++i ) {
         int32_t* p = &prev[7 * ( i % nJoints )];
         for ( int c = 0; c < 7; ++c ) p[c] += r.svarint();
         for ( int c = 0; c < 3; ++c ) a.t[3 * i + c] = p[c] / 32767.0f * tScale;
@@ -106,20 +106,20 @@ auto decode( std::string_view s ) -> std::optional<Skin> {
 }
 
 void restPose( const Skin& k, float* out ) {
-  for ( size_t j = 0; j < k.joints.size(); ++j ) {
+  for ( std::size_t j = 0; j < k.joints.size(); ++j ) {
     for ( int i = 0; i < 16; ++i ) out[16 * j + i] = ( i % 5 == 0 ) ? 1.0f : 0.0f;
   }
 }
 
 void pose( const Skin& k, const SkinAction& a, float seconds, float* out ) {
-  const size_t nJ = k.joints.size();
+  const std::size_t nJ = k.joints.size();
   if ( a.nFrames == 0 ) { restPose( k, out ); return; }
   const float f = std::fmod( std::max( 0.0f, seconds ) * a.fps, static_cast<float>( a.nFrames ) );
   const uint32_t f0 = static_cast<uint32_t>( f ) % a.nFrames, f1 = ( f0 + 1 ) % a.nFrames;
   const float u = f - std::floor( f );
   std::vector<Mat> global( nJ );
-  for ( size_t j = 0; j < nJ; ++j ) {
-    const size_t i0 = f0 * nJ + j, i1 = f1 * nJ + j;
+  for ( std::size_t j = 0; j < nJ; ++j ) {
+    const std::size_t i0 = f0 * nJ + j, i1 = f1 * nJ + j;
     float t[3], q[4];
     for ( int c = 0; c < 3; ++c ) t[c] = a.t[3 * i0 + c] + ( a.t[3 * i1 + c] - a.t[3 * i0 + c] ) * u;
     const float dot = a.q[4 * i0] * a.q[4 * i1] + a.q[4 * i0 + 1] * a.q[4 * i1 + 1] + a.q[4 * i0 + 2] * a.q[4 * i1 + 2] + a.q[4 * i0 + 3] * a.q[4 * i1 + 3];

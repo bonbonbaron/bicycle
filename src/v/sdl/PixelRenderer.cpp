@@ -148,7 +148,7 @@ void PixelRenderer::init( const std::string& gameName ) {
     std::exit( 1 );
   }
   SDL_GetWindowSizeInPixels( _window, &_fbW, &_fbH );
-  _fb.assign( static_cast<size_t>( _fbW ) * _fbH, frameClearColor() );
+  _fb.assign( static_cast<std::size_t>( _fbW ) * _fbH, frameClearColor() );
   onWindowCreated();
   reportInput();
   _up = true;
@@ -171,7 +171,7 @@ auto PixelRenderer::checkResize() -> bool {
   if ( w == _fbW && h == _fbH ) return false;
   _fbW = std::max( w, CELL_W );
   _fbH = std::max( h, CELL_H );
-  _fb.assign( static_cast<size_t>( _fbW ) * _fbH, frameClearColor() );
+  _fb.assign( static_cast<std::size_t>( _fbW ) * _fbH, frameClearColor() );
   onResized();
   return true;
 }
@@ -202,9 +202,9 @@ static auto sdlKeyToLogical( SDL_Keycode k ) -> LogicalKey {
 
 // Several physical sources can drive one logical key (W and the up arrow, the left stick): a key is pressed when its
 // first source goes down and released when its last one comes up, so games see one clean press/release pair.
-static std::array<uint8_t, static_cast<size_t>( LogicalKey::COUNT )> sourcesDown{};
+static std::array<uint8_t, static_cast<std::size_t>( LogicalKey::COUNT )> sourcesDown{};
 static void keyEdge( LogicalKey k, bool down ) {
-  auto& n = sourcesDown[static_cast<size_t>( k )];
+  auto& n = sourcesDown[static_cast<std::size_t>( k )];
   if ( down ? n++ != 0 : ( n == 0 || --n != 0 ) ) return;
   Input in{};
   in.lastPressed = k;
@@ -382,7 +382,7 @@ void PixelRenderer::fillRect( const Win* win, int x, int y, int w, int h, uint32
   x1 = std::min( x1, _fbW ); y1 = std::min( y1, _fbH );
   if ( x0 >= x1 || y0 >= y1 ) return;
   for ( int yy = y0; yy < y1; ++yy ) {
-    std::fill( _fb.begin() + static_cast<size_t>( yy ) * _fbW + x0, _fb.begin() + static_cast<size_t>( yy ) * _fbW + x1, argb );
+    std::fill( _fb.begin() + static_cast<std::size_t>( yy ) * _fbW + x0, _fb.begin() + static_cast<std::size_t>( yy ) * _fbW + x1, argb );
   }
 }
 
@@ -437,7 +437,7 @@ void PixelRenderer::blendPixel( int x, int y, uint32_t argb, unsigned coverage )
   if ( x < 0 || y < 0 || x >= _fbW || y >= _fbH ) return;
   const unsigned sa = ( ( argb >> 24 ) * coverage + 127 ) / 255;
   if ( sa == 0 ) return;
-  uint32_t& d = _fb[static_cast<size_t>( y ) * _fbW + x];
+  uint32_t& d = _fb[static_cast<std::size_t>( y ) * _fbW + x];
   if ( sa == 255 ) { d = ( argb & 0x00FFFFFFu ) | 0xFF000000u; return; }
   const unsigned da = d >> 24;
   const unsigned oa = sa + da * ( 255 - sa ) / 255;
@@ -532,7 +532,7 @@ auto PixelRenderer::measureString( const std::string& s, int sizePx, bool bold )
 auto PixelRenderer::drawString( const Win* win, int px, int top, const std::string& s, uint32_t argb, int sizePx, bool bold ) -> int {
   UiFont& f = bold && _fontBold.loaded() ? _fontBold : _font;
   if ( !f.loaded() ) {
-    for ( size_t i = 0; i < s.size(); ++i ) glyph( win, px + static_cast<int>( i ) * CELL_W, top, s[i], argb, 0 );
+    for ( std::size_t i = 0; i < s.size(); ++i ) glyph( win, px + static_cast<int>( i ) * CELL_W, top, s[i], argb, 0 );
     return static_cast<int>( s.size() ) * CELL_W;
   }
   int cx0 = 0, cy0 = 0, cx1 = _fbW, cy1 = _fbH;
@@ -541,7 +541,7 @@ auto PixelRenderer::drawString( const Win* win, int px, int top, const std::stri
   const float baseline = top + std::round( ( CELL_H * sizePx / UI_TEXT_PX - f.lineHeight( sizePx ) ) / 2 + f.ascent( sizePx ) );
   float pen = static_cast<float>( px );
   uint32_t prev = 0;
-  for ( size_t i = 0; i < s.size(); ) {
+  for ( std::size_t i = 0; i < s.size(); ) {
     const uint32_t cp = nextCodepoint( s, i );
     if ( prev ) pen += f.kern( prev, cp, sizePx );
     const auto& g = f.glyph( cp, sizePx );
@@ -552,7 +552,7 @@ auto PixelRenderer::drawString( const Win* win, int px, int top, const std::stri
       for ( int c = 0; c < g.w; ++c ) {
         const int xx = gx + c;
         if ( xx < cx0 || xx >= cx1 ) continue;
-        if ( const unsigned cov = g.coverage[static_cast<size_t>( r ) * g.w + c] ) blendPixel( xx, yy, argb, cov );
+        if ( const unsigned cov = g.coverage[static_cast<std::size_t>( r ) * g.w + c] ) blendPixel( xx, yy, argb, cov );
       }
     }
     pen += g.advance;
@@ -596,7 +596,7 @@ void PixelRenderer::applyTransition() {
   const float t = std::min( 1.0f, _transT );
   if ( _transKind == 2 ) {  // wipe: a black edge sweeping left to right
     const int edge = static_cast<int>( t * _fbW );
-    for ( int y = 0; y < _fbH; ++y ) std::fill_n( _fb.begin() + static_cast<size_t>( y ) * _fbW, edge, 0xFF000000u );
+    for ( int y = 0; y < _fbH; ++y ) std::fill_n( _fb.begin() + static_cast<std::size_t>( y ) * _fbW, edge, 0xFF000000u );
     return;
   }
   if ( _transKind == 3 ) {  // dissolve: 8x8 blocks drop out in a fixed scattered order
@@ -608,7 +608,7 @@ void PixelRenderer::applyTransition() {
         h ^= h >> 15;
         if ( ( h & 0xFFFF ) / 65535.0f >= t ) continue;
         for ( int y = by; y < std::min( _fbH, by + 8 ); ++y )
-          std::fill_n( _fb.begin() + static_cast<size_t>( y ) * _fbW + bx, std::min( 8, _fbW - bx ), 0xFF000000u );
+          std::fill_n( _fb.begin() + static_cast<std::size_t>( y ) * _fbW + bx, std::min( 8, _fbW - bx ), 0xFF000000u );
       }
     }
     return;

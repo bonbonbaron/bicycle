@@ -9,7 +9,7 @@
 extern "C" {
 
 // The asset's bytes (valid until the next call) and their length, or null.
-EXPORT_API const char* assetRead( const char* path, size_t* len ) {
+EXPORT_API const char* assetRead( const char* path, std::size_t* len ) {
   static thread_local mem::Blob buf;
   auto data = assets::read( path, mem::TEXT );
   if ( !data ) return nullptr;

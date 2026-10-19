@@ -59,7 +59,7 @@ auto parsePalette( const std::string& spec ) -> std::vector<std::pair<int, uint3
 using Palette = decltype( BImg::palette );
 auto recolored( Palette palette, const std::vector<std::pair<int, uint32_t>>& changes ) -> Palette {
   for ( auto [i, c] : changes ) {
-    if ( i >= 0 && static_cast<size_t>( i ) < palette.size() ) palette[i] = c;
+    if ( i >= 0 && static_cast<std::size_t>( i ) < palette.size() ) palette[i] = c;
   }
   return palette;
 }
@@ -70,7 +70,7 @@ void stamp( BImg& dst, int w, int h, PixelOf&& pixelOf ) {
   for ( int y = 0; y < std::min( dst.h, h ); ++y )
     for ( int x = 0; x < std::min( dst.w, w ); ++x ) {
       const uint32_t p = pixelOf( x, y );
-      if ( p >> 24 ) dst.rgba[static_cast<size_t>( y ) * dst.w + x] = p;
+      if ( p >> 24 ) dst.rgba[static_cast<std::size_t>( y ) * dst.w + x] = p;
     }
 }
 
@@ -93,9 +93,9 @@ auto sprite( const std::vector<std::string>& layers ) -> std::shared_ptr<const B
       continue;
     }
     if ( out->indexed() ) {  // a second layer: the result goes true color
-      out->rgba.resize( static_cast<size_t>( out->w ) * out->h );
+      out->rgba.resize( static_cast<std::size_t>( out->w ) * out->h );
       for ( int y = 0; y < out->h; ++y )
-        for ( int x = 0; x < out->w; ++x ) out->rgba[static_cast<size_t>( y ) * out->w + x] = out->pixel( x, y );
+        for ( int x = 0; x < out->w; ++x ) out->rgba[static_cast<std::size_t>( y ) * out->w + x] = out->pixel( x, y );
       out->palette.clear();
       out->indices.clear();
     }
@@ -132,11 +132,11 @@ auto sprite( const std::vector<std::string>& layers, const std::string& palette 
         out.emplace();
         out->w = gray->w;
         out->h = gray->h;
-        out->rgba.assign( static_cast<size_t>( gray->w ) * gray->h, 0u );
+        out->rgba.assign( static_cast<std::size_t>( gray->w ) * gray->h, 0u );
       }
       const auto p = recolored( gray->palette, changes );
       stamp( *out, gray->w, gray->h, [&]( int x, int y ) -> uint32_t {
-        const uint8_t k = gray->indices[static_cast<size_t>( y ) * gray->w + x];
+        const uint8_t k = gray->indices[static_cast<std::size_t>( y ) * gray->w + x];
         return k ? p[k] : 0u;
       } );
     }
@@ -149,8 +149,8 @@ auto tilemap( const BImg& set, const int* tiles, int nw, int nh, int tileW, int 
   map.w = nw * tileW;
   map.h = nh * tileH;
   map.palette = set.palette;
-  if ( set.indexed() ) map.indices.assign( static_cast<size_t>( map.w ) * map.h, 0 );
-  else map.rgba.assign( static_cast<size_t>( map.w ) * map.h, 0 );
+  if ( set.indexed() ) map.indices.assign( static_cast<std::size_t>( map.w ) * map.h, 0 );
+  else map.rgba.assign( static_cast<std::size_t>( map.w ) * map.h, 0 );
   const int nTiles = set.w / tileW;
   for ( int ty = 0; ty < nh; ++ty ) {
     for ( int tx = 0; tx < nw; ++tx ) {
@@ -158,8 +158,8 @@ auto tilemap( const BImg& set, const int* tiles, int nw, int nh, int tileW, int 
       if ( t <= 0 || t >= nTiles ) continue;  // tile 0 is Aseprite's empty tile
       for ( int py = 0; py < std::min( tileH, set.h ); ++py ) {
         for ( int px = 0; px < tileW; ++px ) {
-          const size_t src = static_cast<size_t>( py ) * set.w + t * tileW + px;
-          const size_t dst = static_cast<size_t>( ty * tileH + py ) * map.w + tx * tileW + px;
+          const std::size_t src = static_cast<std::size_t>( py ) * set.w + t * tileW + px;
+          const std::size_t dst = static_cast<std::size_t>( ty * tileH + py ) * map.w + tx * tileW + px;
           if ( set.indexed() ) map.indices[dst] = set.indices[src];
           else map.rgba[dst] = set.rgba[src];
         }

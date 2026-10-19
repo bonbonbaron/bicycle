@@ -22,7 +22,7 @@ auto decode( const Connectivity& conn, Decoded& out ) -> bool {
     out.pred.push_back( pred );
     return static_cast<int32_t>( out.nVerts++ );
   };
-  size_t opIdx = 0, sIdx = 0;
+  std::size_t opIdx = 0, sIdx = 0;
   int32_t g = -1;
   while ( opIdx < conn.ops.size() ) {
     if ( g < 0 ) {  // new island

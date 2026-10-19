@@ -33,14 +33,14 @@
 namespace mem {
 namespace {
 
-constexpr size_t ALIGN = 16;
-constexpr size_t alignUp( size_t x, size_t a = ALIGN ) { return ( x + a - 1 ) & ~( a - 1 ); }
+constexpr std::size_t ALIGN = 16;
+constexpr std::size_t alignUp( std::size_t x, std::size_t a = ALIGN ) { return ( x + a - 1 ) & ~( a - 1 ); }
 
 const char* POOL_NAMES[N_POOLS] = { "Permanent", "General", "Text", "Graphic", "Audio", "Temporary", "Scene" };
 const char* POOL_ENV[N_POOLS] = { "BICYCLE_MEM_PERMANENT_MB", "BICYCLE_MEM_GENERAL_MB", "BICYCLE_MEM_TEXT_MB",
                                   "BICYCLE_MEM_GRAPHIC_MB", "BICYCLE_MEM_AUDIO_MB", "BICYCLE_MEM_TEMPORARY_MB",
                                   "BICYCLE_MEM_SCENE_MB" };
-const size_t POOL_DEFAULT_MB[N_POOLS] = { BICYCLE_MEM_PERMANENT_MB, BICYCLE_MEM_GENERAL_MB, BICYCLE_MEM_TEXT_MB,
+const std::size_t POOL_DEFAULT_MB[N_POOLS] = { BICYCLE_MEM_PERMANENT_MB, BICYCLE_MEM_GENERAL_MB, BICYCLE_MEM_TEXT_MB,
                                           BICYCLE_MEM_GRAPHIC_MB, BICYCLE_MEM_AUDIO_MB, BICYCLE_MEM_TEMPORARY_MB,
                                           BICYCLE_MEM_SCENE_MB };
 thread_local bool tSceneScope = false;  // memSceneScope: this thread's GRAPHIC/AUDIO allocations go to SCENE
@@ -49,7 +49,7 @@ thread_local bool tSceneScope = false;  // memSceneScope: this thread's GRAPHIC/
 constexpr uint32_t MAGIC = 0xB1C7C1E5u;
 constexpr uint8_t BIG = 0xFF;          // size class of a block too big for the classes (first-fit list)
 constexpr int N_CLASSES = 13;          // 16 B .. 64 KB
-constexpr size_t MAX_CLASS_SIZE = size_t( ALIGN ) << ( N_CLASSES - 1 );
+constexpr std::size_t MAX_CLASS_SIZE = std::size_t( ALIGN ) << ( N_CLASSES - 1 );
 struct Header {
   uint64_t size;   // payload bytes
   uint32_t magic;
@@ -61,14 +61,14 @@ static_assert( sizeof( Header ) == ALIGN, "header keeps payloads aligned" );
 struct FreeNode { FreeNode* next; };
 
 struct MemPool {
-  size_t memAllocated{};        // capacity
+  std::size_t memAllocated{};        // capacity
   uint8_t* nextFreeP{};
   const uint8_t* originP{};
   uint8_t* lastP{};             // last allocation's header (memRewind)
   FreeNode* freeLists[N_CLASSES]{};
   FreeNode* bigFree{};
   uint16_t epoch{};
-  size_t highWater{}, inUse{}, peakInUse{}, allocs{};
+  std::size_t highWater{}, inUse{}, peakInUse{}, allocs{};
 };
 
 struct Mem {
@@ -87,11 +87,11 @@ struct Lock {
 void atExitReport() { memReport(); }
 
 void init() {  // called under the lock, the first time anything allocates (maybe before main)
-  size_t total = 0, sizes[N_POOLS];
+  std::size_t total = 0, sizes[N_POOLS];
   for ( int i = 0; i < N_POOLS; ++i ) {
-    size_t mb = POOL_DEFAULT_MB[i];
+    std::size_t mb = POOL_DEFAULT_MB[i];
     if ( const char* e = std::getenv( POOL_ENV[i] ) ) {
-      if ( long v = std::atol( e ); v > 0 ) mb = static_cast<size_t>( v );
+      if ( long v = std::atol( e ); v > 0 ) mb = static_cast<std::size_t>( v );
     }
     sizes[i] = mb << 20;
     total += sizes[i];
@@ -113,15 +113,15 @@ void init() {  // called under the lock, the first time anything allocates (mayb
   std::atexit( atExitReport );
 }
 
-auto classOf( size_t n ) -> uint8_t {
+auto classOf( std::size_t n ) -> uint8_t {
   if ( n > MAX_CLASS_SIZE ) return BIG;
   uint8_t c = 0;
-  size_t s = ALIGN;
+  std::size_t s = ALIGN;
   while ( s < n ) { s <<= 1; ++c; }
   return c;
 }
 
-[[noreturn]] void overflow( PoolId id, size_t n ) {
+[[noreturn]] void overflow( PoolId id, std::size_t n ) {
   const auto& pool = _mem.poolA[id];
   std::fprintf( stderr, "bicycle: the %s memory pool is full (%zu MB): can't allocate %zu bytes. Raise %s.\n",
                 POOL_NAMES[id], pool.memAllocated >> 20, n, POOL_ENV[id] );
@@ -133,11 +133,11 @@ auto headerOf( const void* p ) -> Header* {
   return reinterpret_cast<Header*>( static_cast<uint8_t*>( const_cast<void*>( p ) ) - sizeof( Header ) );
 }
 
-auto addLocked( size_t numBytes, PoolId id ) -> void* {
+auto addLocked( std::size_t numBytes, PoolId id ) -> void* {
   if ( !_mem.ready ) init();
   auto& pool = _mem.poolA[id];
   const uint8_t cls = classOf( numBytes );
-  const size_t size = cls == BIG ? alignUp( numBytes, 256 ) : ( ALIGN << cls );
+  const std::size_t size = cls == BIG ? alignUp( numBytes, 256 ) : ( ALIGN << cls );
   Header* h = nullptr;
   if ( cls != BIG && pool.freeLists[cls] ) {  // reuse a freed block of this class
     FreeNode* n = pool.freeLists[cls];
@@ -155,13 +155,13 @@ auto addLocked( size_t numBytes, PoolId id ) -> void* {
     }
   }
   if ( !h ) {  // bump
-    const size_t need = sizeof( Header ) + size;
-    if ( static_cast<size_t>( pool.nextFreeP - pool.originP ) + need > pool.memAllocated ) overflow( id, numBytes );
+    const std::size_t need = sizeof( Header ) + size;
+    if ( static_cast<std::size_t>( pool.nextFreeP - pool.originP ) + need > pool.memAllocated ) overflow( id, numBytes );
     h = reinterpret_cast<Header*>( pool.nextFreeP );
     h->size = size;
     pool.lastP = pool.nextFreeP;
     pool.nextFreeP += need;
-    pool.highWater = std::max( pool.highWater, static_cast<size_t>( pool.nextFreeP - pool.originP ) );
+    pool.highWater = std::max( pool.highWater, static_cast<std::size_t>( pool.nextFreeP - pool.originP ) );
   }
   h->magic = MAGIC;
   h->pool = id;
@@ -201,7 +201,7 @@ void delLocked( void* p ) {
 
 }  // namespace
 
-auto memAdd( size_t numBytes, PoolId poolId ) -> void* {
+auto memAdd( std::size_t numBytes, PoolId poolId ) -> void* {
   if ( tSceneScope && ( poolId == GRAPHIC || poolId == AUDIO ) ) poolId = SCENE;
   Lock l;
   return addLocked( numBytes, poolId );
@@ -220,8 +220,8 @@ auto memInSceneScope() -> bool {
   return tSceneScope;
 }
 
-auto memSceneReset() -> size_t {
-  size_t live{};
+auto memSceneReset() -> std::size_t {
+  std::size_t live{};
   {
     Lock l;
     if ( !_mem.ready ) return 0;
@@ -231,7 +231,7 @@ auto memSceneReset() -> size_t {
   return live;
 }
 
-auto memResize( void* p, size_t numBytes, PoolId poolId ) -> void* {
+auto memResize( void* p, std::size_t numBytes, PoolId poolId ) -> void* {
   if ( !p ) return memAdd( numBytes, poolId );
   if ( numBytes == 0 ) {
     memDel( p );
@@ -286,7 +286,7 @@ auto memPoolOf( const void* p ) -> int {
 auto memStats( PoolId id ) -> PoolStats {
   Lock l;
   const auto& pool = _mem.poolA[id];
-  return { POOL_NAMES[id], pool.memAllocated, static_cast<size_t>( pool.nextFreeP - pool.originP ), pool.highWater,
+  return { POOL_NAMES[id], pool.memAllocated, static_cast<std::size_t>( pool.nextFreeP - pool.originP ), pool.highWater,
            pool.inUse, pool.peakInUse, pool.allocs };
 }
 
@@ -299,11 +299,11 @@ void memReport( bool force ) {
   for ( int i = 0; i < N_POOLS; ++i ) {
     const auto s = memStats( static_cast<PoolId>( i ) );
     std::fprintf( stderr, "  %-9s %10zu / %10zu bytes (%5.1f%%)  peak live %10zu  allocs %8zu\n", s.name, s.highWater,
-                  s.capacity, 100.0 * s.highWater / std::max<size_t>( 1, s.capacity ), s.peakInUse, s.allocs );
+                  s.capacity, 100.0 * s.highWater / std::max<std::size_t>( 1, s.capacity ), s.peakInUse, s.allocs );
   }
 }
 
-auto Resource::do_allocate( size_t bytes, size_t align ) -> void* {
+auto Resource::do_allocate( std::size_t bytes, std::size_t align ) -> void* {
   assert( align <= ALIGN );
   (void)align;
   return memAdd( bytes, _pool );

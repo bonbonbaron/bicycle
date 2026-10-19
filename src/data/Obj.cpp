@@ -90,7 +90,7 @@ auto readObj( const std::string& objPath, MeshData& out, std::string& err ) -> b
         anyNormal |= c.n >= 0;
         poly.push_back( c );
       }
-      for ( size_t i = 2; i < poly.size(); ++i ) {  // fan-triangulate
+      for ( std::size_t i = 2; i < poly.size(); ++i ) {  // fan-triangulate
         corners.insert( corners.end(), { poly[0], poly[i - 1], poly[i] } );
         triMat.push_back( curMat );
       }
@@ -122,11 +122,11 @@ auto readObj( const std::string& objPath, MeshData& out, std::string& err ) -> b
 }
 
 auto applySkinVertices( MeshData& m, const Skin& s ) -> bool {
-  const size_t nObj = s.vJoints.size() / 4;
+  const std::size_t nObj = s.vJoints.size() / 4;
   if ( nObj == 0 || m.srcVertex.size() != m.nVerts() ) return false;
   m.joints.resize( 4 * m.nVerts() );
   m.weights.resize( 4 * m.nVerts() );
-  for ( size_t v = 0; v < m.nVerts(); ++v ) {
+  for ( std::size_t v = 0; v < m.nVerts(); ++v ) {
     const uint32_t src = m.srcVertex[v];
     if ( src >= nObj ) return false;
     for ( int k = 0; k < 4; ++k ) {

@@ -67,7 +67,7 @@ auto readFile( const std::string& path, mem::PoolId pool ) -> std::optional<mem:
 #else
   std::ifstream f( path, std::ios::binary | std::ios::ate );
   if ( !f ) return std::nullopt;
-  const auto size = static_cast<size_t>( f.tellg() );
+  const auto size = static_cast<std::size_t>( f.tellg() );
   f.seekg( 0 );
   mem::Blob out( size, '\0', mem::Allocator<char>( pool ) );
   if ( size && !f.read( out.data(), static_cast<std::streamsize>( size ) ) ) return std::nullopt;
@@ -75,7 +75,7 @@ auto readFile( const std::string& path, mem::PoolId pool ) -> std::optional<mem:
 #endif
 }
 
-auto inflateZlib( const uint8_t* src, size_t srcLen, size_t rawLen, mem::PoolId pool ) -> std::optional<mem::Blob> {
+auto inflateZlib( const uint8_t* src, std::size_t srcLen, std::size_t rawLen, mem::PoolId pool ) -> std::optional<mem::Blob> {
   mem::Blob out( rawLen, '\0', mem::Allocator<char>( pool ) );
   if ( rawLen == 0 ) return out;
   if ( !bicycleInflate( src, srcLen, reinterpret_cast<unsigned char*>( out.data() ), rawLen ) ) return std::nullopt;
@@ -93,7 +93,7 @@ auto parsePack( std::string_view bytes, std::vector<Entry>& entries ) -> bool {
     e.rawLen = r.u32();
     e.dataLen = r.u32();
     e.offset = r.u32();
-    if ( static_cast<size_t>( e.offset ) + e.dataLen > bytes.size() ) return false;
+    if ( static_cast<std::size_t>( e.offset ) + e.dataLen > bytes.size() ) return false;
     entries.push_back( e );
   }
   return r.ok;
@@ -122,7 +122,7 @@ auto mount( const std::string& gameName ) -> bool {
   m.game = gameName;
 #ifdef BICYCLE_RELEASE
   {
-    const std::string_view embedded( bicycle_embedded_pack, static_cast<size_t>( bicycle_embedded_pack_end - bicycle_embedded_pack ) );
+    const std::string_view embedded( bicycle_embedded_pack, static_cast<std::size_t>( bicycle_embedded_pack_end - bicycle_embedded_pack ) );
     std::vector<Entry> entries;
     if ( !parsePack( embedded, entries ) ) return false;
     m.view = embedded;

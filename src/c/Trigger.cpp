@@ -134,7 +134,7 @@ static void sandboxFileIo( lua_State* L ) {
 // The Lua heap lives in the TEXT pool. LuaJIT accepts a custom allocator only in GC64 builds (the default on
 // x64/arm64 since 2.1); a non-GC64 64-bit LuaJIT returns NULL from lua_newstate, so we fall back to its own
 // allocator (mmap'd low memory) and say so.
-static void* luaPoolAlloc( void*, void* ptr, size_t, size_t nsize ) {
+static void* luaPoolAlloc( void*, void* ptr, std::size_t, std::size_t nsize ) {
   if ( nsize == 0 ) {
     if ( ptr ) mem::memDel( ptr );
     return nullptr;

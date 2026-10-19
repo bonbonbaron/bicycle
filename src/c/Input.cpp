@@ -99,11 +99,11 @@ void InputListener::listen() {
         continue;
       }
       if ( ev.value == VAL_KEY_DOWN ) {
-        _state.currKeyState.set( static_cast<size_t>(lk), true );
+        _state.currKeyState.set( static_cast<std::size_t>(lk), true );
         std::cout << "down on " << ev.code << '\n';
       }
       if ( ev.value == VAL_KEY_UP ) {
-        _state.currKeysPressed.set( static_cast<size_t>(lk), false );
+        _state.currKeysPressed.set( static_cast<std::size_t>(lk), false );
         std::cout << "up on " << ev.code << '\n';
       }
     }
