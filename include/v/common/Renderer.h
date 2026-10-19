@@ -10,6 +10,7 @@
 // camera are the same in all modes. Pixel modes just draw a cell as CELL_W x CELL_H screen pixels.
 #include <memory>
 #include <string>
+#include <vector>
 #include "m/Entity.h"
 
 struct Image;
@@ -92,6 +93,9 @@ class Renderer {
     // Scenes. camBox and entity boxes are in fixed-point cells (see Constants.h).
     // A background layer: window cell (r, c) shows image cell (r + offY, c + offX), wrapping if asked.
     virtual void drawLayer( WinHandle win, const Image& img, int offX, int offY, bool wrap, int winW, int winH ) = 0;
+    // The order a layer's foreground entities are drawn in (back to front): as added, unless the mode depth-sorts
+    // (the flat modes sort overlapping images by their feet; FlatRenderer.h).
+    virtual auto drawOrder( Entity layer, const std::vector<Entity>& fg ) -> const std::vector<Entity>& { return fg; }
     // One entity seen by a camera whose box is camBox; the entity overlaps it.
     virtual void drawEntity( WinHandle win, Entity entity, const Box& camBox ) = 0;
     // Brackets one scene's layers and entities (the 3D renderer draws its world here).

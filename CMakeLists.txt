@@ -242,7 +242,7 @@ if ( NOT CMAKE_CROSSCOMPILING )
   # ActiveFirst (include/data/ActiveFirst.h), the active-first collision check and its step blocking, Kinematics'
   # and Timer's active sets (Trigger stubbed in the test). bicycle-collision-bench: the old all-pairs check vs this.
   set( activeFirstSources src/c/CollisionDetector.cpp src/c/Kinematics.cpp src/c/Timer.cpp src/c/Layer3DOff.cpp
-       src/m/World.cpp src/m/Box.cpp src/v/common/Image.cpp src/v/common/ColorPalette.cpp src/data/Mem.cpp )
+       src/c/ImageOverlaps.cpp src/m/World.cpp src/m/Box.cpp src/v/common/Image.cpp src/v/common/ColorPalette.cpp src/data/Mem.cpp )
   add_executable( bicycle-active-first-tests tests/active_first_test.cpp ${activeFirstSources} )
   add_executable( bicycle-collision-bench tests/collision_bench.cpp ${activeFirstSources} )
   foreach( t bicycle-active-first-tests bicycle-collision-bench )
@@ -274,15 +274,17 @@ set( BICYCLE_SOURCES
   src/c/Kinematics.cpp src/c/Animator.cpp src/c/MidiPlayer.cpp src/c/Dice.cpp
   src/c/InputState.cpp )
 # Each mode adds only its own code: the true-3D layer (physics, 3D motions and camera rig, their Lua API) is in 3D
-# builds alone; ASCII and 2D link its no-op stand-in, src/c/Layer3DOff.cpp (include/c/Layer3D.h).
+# builds alone; ASCII and 2D link its no-op stand-in, src/c/Layer3DOff.cpp (include/c/Layer3D.h). The flat modes'
+# image overlap groups (depth sorting, include/c/ImageOverlaps.h) are in ASCII and 2D alone; 3D links ImageOverlapsOff.
 # Not built (unfinished or replaced): src/c/Input.cpp (Linux evdev keyboard), src/c/RenderSystem.cpp, src/v/common/Graph.cpp
 if ( BICYCLE_RENDER STREQUAL "ASCII" )
-  list( APPEND BICYCLE_SOURCES src/v/ascii/AsciiRenderer.cpp src/c/SshInputListener.cpp src/c/Layer3DOff.cpp )
+  list( APPEND BICYCLE_SOURCES src/v/ascii/AsciiRenderer.cpp src/c/SshInputListener.cpp src/c/Layer3DOff.cpp src/c/ImageOverlaps.cpp )
 elseif ( BICYCLE_RENDER STREQUAL "2D" )
-  list( APPEND BICYCLE_SOURCES src/v/sdl/PixelRenderer.cpp src/v/sdl/UiFont.cpp src/v/sdl/SpriteAtlas.cpp src/v/2d/Renderer2D.cpp src/c/Layer3DOff.cpp )
+  list( APPEND BICYCLE_SOURCES src/v/sdl/PixelRenderer.cpp src/v/sdl/UiFont.cpp src/v/sdl/SpriteAtlas.cpp src/v/2d/Renderer2D.cpp src/c/Layer3DOff.cpp
+    src/c/ImageOverlaps.cpp )
 elseif ( BICYCLE_RENDER STREQUAL "3D" )
   list( APPEND BICYCLE_SOURCES src/v/sdl/PixelRenderer.cpp src/v/sdl/UiFont.cpp src/v/sdl/SpriteAtlas.cpp src/v/3d/Renderer3D.cpp
-    src/c/Layer3D.cpp src/c/Physics3D.cpp src/c/World3DApi.cpp src/c/Kinematics3D.cpp )
+    src/c/Layer3D.cpp src/c/Physics3D.cpp src/c/World3DApi.cpp src/c/Kinematics3D.cpp src/c/ImageOverlapsOff.cpp )
 endif()
 
 if ( BICYCLE_RELEASE )
@@ -358,7 +360,7 @@ if ( NOT MSVC )
 endif()
 # The systems' per-frame loops over their active rows (ActiveFirst) are written to vectorize; GCC's -O2 cost model
 # ("very cheap") refuses any loop of unknown length, so these files use the "cheap" one (clang vectorizes at -O2).
-set_source_files_properties( src/c/CollisionDetector.cpp src/c/Kinematics.cpp src/c/Timer.cpp
+set_source_files_properties( src/c/CollisionDetector.cpp src/c/Kinematics.cpp src/c/Timer.cpp src/c/ImageOverlaps.cpp
   PROPERTIES COMPILE_OPTIONS "$<$<CXX_COMPILER_ID:GNU>:-fvect-cost-model=cheap>" )
 if ( BICYCLE_LTO )
   set_property( TARGET o PROPERTY INTERPROCEDURAL_OPTIMIZATION ON )
