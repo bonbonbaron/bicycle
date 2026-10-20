@@ -39,6 +39,7 @@ class ActiveFirst {
     template <std::size_t I> const auto& at( Key k ) const { return std::get<I>( _cols )[_rowOf[k]]; }
 
     // A new, inactive row. False (and nothing changes) if the key is already in.
+    // It seems this allows vectorization.
     auto add( Key k, Columns... cells ) -> bool {
       if ( contains( k ) ) return false;
       if ( _rowOf.size() <= k ) _rowOf.resize( k + 1, NONE );
@@ -85,7 +86,7 @@ class ActiveFirst {
       std::swap( _keys[a], _keys[b] );
       _rowOf[_keys[a]] = a;
       _rowOf[_keys[b]] = b;
-      std::apply( [a, b]( auto&... c ) { ( std::swap( c[a], c[b] ), ... ); }, _cols );
+      std::apply( [a, b]( auto&... c ) { ( std::swap( c[a], c[b] ), ... ); }, _cols );  // TODO research this later
     }
 
     std::vector<Key> _keys;                  // row -> key

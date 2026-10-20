@@ -21,7 +21,7 @@ namespace {
 constexpr uint32_t LANES = 6;
 static_assert( sizeof( Box ) == LANES * sizeof( int ) && std::is_standard_layout_v<Box> );
 template <typename B> auto lanes( B* boxes ) {
-  using Int = std::conditional_t<std::is_const_v<B>, const int, int>;
+  using Int = std::conditional_t<std::is_const_v<B>, const int, int>;  // TODO research this later
   return reinterpret_cast<Int*>( boxes );
 }
 }  // namespace
@@ -59,7 +59,9 @@ void Kinematics::run() {
   auto& cd = CollisionDetector::getInstance();
   for ( uint32_t i = 0; i < n; ++i ) {
     Box& box = boxes.at( _motion.key( i ) );
-    if ( cd.blocks( _motion.key( i ) ) && !vels[i].pos.hasZeroMag() ) cd.movedFrom( _motion.key( i ), box.pos, false );
+    if ( cd.blocks( _motion.key( i ) ) && !vels[i].pos.hasZeroMag() ) {
+      cd.movedFrom( _motion.key( i ), box.pos, false );
+    }
     box += vels[i];
   }
   runDriven();
@@ -99,7 +101,9 @@ void Kinematics::update( Entity e ) {
     _motion.activate( e );
     CollisionDetector::getInstance().activate( e );  // (also when it was already moving but just got a collider)
   }
-  else if ( _motion.deactivate( e ) ) CollisionDetector::getInstance().deactivate( e );
+  else if ( _motion.deactivate( e ) ) {
+    CollisionDetector::getInstance().deactivate( e );
+  }
 }
 
 void Kinematics::moved( Entity e ) {
@@ -378,6 +382,24 @@ void Kinematics::setVelocity( const Entity entity, const Position& vel ) {
   update( entity );
 }
 
+void Kinematics::setVelX( const Entity entity, const decltype(Position::x)& velX ) {
+  motionRow( entity );
+  _motion.at<VEL>( entity ).pos.x = velX;
+  update( entity );
+}
+
+void Kinematics::setVelY( const Entity entity, const decltype(Position::y)& velY ) {
+  motionRow( entity );
+  _motion.at<VEL>( entity ).pos.y = velY;
+  update( entity );
+}
+
+void Kinematics::setVelZ( const Entity entity, const decltype(Position::z)& velZ ) {
+  motionRow( entity );
+  _motion.at<VEL>( entity ).pos.z = velZ;
+  update( entity );
+}
+
 void Kinematics::track( Entity follower, Entity tgt ) {
   motionRow( follower );
   _motion.at<TRACK>( follower ) = tgt;
@@ -385,4 +407,3 @@ void Kinematics::track( Entity follower, Entity tgt ) {
 }
 
 void Kinematics::untrack( Entity follower ) { track( follower, 0 ); }
-

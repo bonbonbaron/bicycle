@@ -64,6 +64,13 @@ void CollisionDetector::refresh( Layer& layer, uint32_t row ) {
 }
 
 namespace {
+/*
+  In C++, __restrict (or __restrict__) is a compiler-specific extension rather than a standard C++ keyword. 
+  It is used as a pointer optimization hint to tell the compiler that the pointer is the sole means of accessing 
+  a given memory region within its scope. By eliminating the compiler's worry about pointer aliasing (where two 
+  pointers could point to overlapping memory locations), the optimizer can generate much cleaner assembly, avoid 
+  redundant memory reloads, and easily apply loop vectorization.
+*/
 // hits[j] = whether box a overlaps row j's box, for j in [from, to): branch-free over contiguous columns (vectorizes).
 void overlapRow( const int a[4], const int* __restrict x0, const int* __restrict y0, const int* __restrict x1,
                  const int* __restrict y1, uint8_t* __restrict hits, uint32_t from, uint32_t to ) {

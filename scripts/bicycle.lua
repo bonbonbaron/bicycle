@@ -276,14 +276,18 @@ ffi.cdef([[
   int loadSoundfont( const char* sfFilepath );
   bool selectProgram( const int chan, const int sfontId, const int bank, const int program );
   int getSfxChannel();
+
+  // HUD
   int addHudBar( const char* label, int max, int len, int x, int y );
   void setHudBar( int id, int val );
   int addHudText( const char* text, int x, int y );
   void setHudText( int id, const char* text );
   void removeHudItem( int id );
-  float frameRate();
   bool setHudBarSprites( int id, const char* framePath, const char* fillPath );
+  
   void setHidden( Entity entity, bool hidden );
+  
+  float frameRate();
 
   // Scene changes (Scene.goto in scripts/Scene.lua)
   void despawnEntity( Entity entity );

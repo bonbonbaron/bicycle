@@ -28,4 +28,9 @@ inline auto velocity( int vx, int vy ) -> Position {
 // A position already in fixed point (no shift, unlike Position( x, y )).
 inline auto fixedPos( int x, int y ) -> Position { return velocity( x, y ); }
 
+// These functions are essentially protectors, ensuring that if you change definition of Position, this breaks as an alarm.
+inline auto velX( int vx ) -> decltype(Position::x) { return vx; }
+inline auto velY( int vy ) -> decltype(Position::y) { return vy; }
+inline auto velZ( int vz ) -> decltype(Position::z) { return vz; }
+
 }  // namespace lua

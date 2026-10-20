@@ -5,7 +5,7 @@
 #include "c/Kinematics.h"
 #include "c/Timer.h"
 
-namespace {
+namespace {  // TODO research anonymous namespaces
 auto animator() -> Animator& { return Animator::getInstance(); }
 auto kinematics() -> Kinematics& { return Kinematics::getInstance(); }
 }  // namespace
@@ -52,6 +52,16 @@ EXPORT_API void teleport( Entity entity, int x, int y ) { kinematics().teleport(
 // --- motion (cells, seconds, degrees; see Kinematics.h and the motion gene in scripts/Genome.lua) -------------------
 // Constant velocity in fixed-point cells per frame (256 = one cell per frame).
 EXPORT_API void setVelocity( Entity entity, int vx, int vy ) { kinematics().setVelocity( entity, lua::velocity( vx, vy ) ); }
+EXPORT_API void setVelX( const Entity entity, int velX ) {
+  kinematics().setVelX( entity, lua::velX( velX ) );
+}
+EXPORT_API void setVelY( const Entity entity, int velY ) {
+  kinematics().setVelY( entity, lua::velY( velY ) );
+}
+EXPORT_API void setVelZ( const Entity entity, int velZ ) {
+  kinematics().setVelZ( entity, lua::velZ( velZ ) );
+}
+
 EXPORT_API void motionLinear( Entity entity, float speed, bool pingPong ) { kinematics().linear( entity, speed, pingPong ); }
 EXPORT_API void motionWaypoint( Entity entity, float x, float y ) { kinematics().addWaypoint( entity, x, y ); }
 EXPORT_API void motionOrbit( Entity entity, Entity center, float cx, float cy, float rx, float ry, float degPerSec, float phaseDeg ) {

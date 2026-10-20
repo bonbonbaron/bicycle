@@ -22,6 +22,9 @@ class Kinematics : public Controllable {
     void track( Entity follower, Entity tgt );  // tgt=0 to disable tracking
     void untrack( Entity follower );
     void setVelocity( const Entity entity, const Position& vel );  // constant velocity (fixed point per frame)  // tgt=0 to disable tracking
+    void setVelX( const Entity entity, const decltype(Position::x)& velX );  // constant velocity (fixed point per frame)  // tgt=0 to disable tracking
+    void setVelY( const Entity entity, const decltype(Position::y)& velY );  // constant velocity (fixed point per frame)  // tgt=0 to disable tracking
+    void setVelZ( const Entity entity, const decltype(Position::z)& velZ );  // constant velocity (fixed point per frame)  // tgt=0 to disable tracking
 
     // Scripted motions (Lua: Genome motion gene, see scripts/Genome.lua). Units are cells, seconds and degrees;
     // an entity's position is its box's top-left, while orbits and follows place the entity's center.

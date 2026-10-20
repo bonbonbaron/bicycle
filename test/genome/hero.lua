@@ -12,9 +12,10 @@ local WALK_MS = 90              -- while a direction key is held: one step this 
 local WALK_DELAY_MS = 200       -- ...after this long held, so a quick tap is exactly one step
 local WALK_TIMER, WALK_DELAY_TIMER = 7, 8  -- their timer types (the timer gene's is 0)
 local hero = {
-  sprite = "pilgrim", model = "pilgrim3d", initAnim = "walk_down", persist = true,
+  sprite = "pilgrim", initAnim = "walk_down", persist = true,
   coll = { type = "hero", blockedBy = { "solid", "enemy", "npc" } },  -- the engine stops its steps flush against these
   timer = { ms = TICK_MS },
+  vel = {x = 0, y = 0, z = 0},
   sfx = {
 	  soundfont = "meadow",
 	  program = 120,
@@ -31,22 +32,19 @@ local stepSize = 3
 local ACTIONS = {
   [ffi.C.A] = function()
      strip="walk_left"
-     dx=-stepSize * STEP
-     dy=0
+     ffi.C.setVelocity(hero.id, -stepSize * STEP, 0)  -- TODO add velX/Y/Z setters so you don't have to set untouched components to themselves
   end,
   [ffi.C.D] = function()
      strip="walk_right"
-     dx= stepSize * STEP
-     dy=0
+     ffi.C.setVelocity(hero.id, stepSize * STEP, 0)
   end,
   [ffi.C.W] = function()
      strip="walk_up"
-     dx=0
-     dy=-STEP
+     ffi.C.setVelocity(hero.id, 0, -STEP * stepSize)
   end,
   [ffi.C.S] = function()
      strip="walk_down"
-     dy= 
+     ffi.C.setVelocity(hero.id, 0, STEP * stepSize)
   end,
   [ffi.C.LeftShift] = function()
     stepSize = 6
@@ -88,14 +86,8 @@ end
 -- it's released; the newest held direction wins. Releases of other keys mean nothing here.
 function hero:onInput(input, pressed)
   input = tonumber( input )
-  if DIRS[input] then
+  if ACTIONS[input] then
     self.held = self.held or {}
-    for i = #self.held, 1, -1 do
-      if self.held[i] == input then
-        table.remove( self.held, i )
-      end
-    end
-    if pressed then table.insert( self.held, input ) end
     if #self.held == 0 and self.walkTimer then
       self:stopTimer( self.walkTimer )
       self.walkTimer = nil
@@ -103,11 +95,10 @@ function hero:onInput(input, pressed)
       self.walkTimer = self:after( WALK_DELAY_MS, WALK_DELAY_TIMER )
     end
     if pressed then 
-      self:step( DIRS[input] )
+      -- self:step( DIRS[input] )
     end
     return
   end
-  if not pressed then return end
   if input == ffi.C.Q then
     ffi.C.popWindow()
     return
@@ -186,7 +177,7 @@ function hero:onTimer(timerId, timeoutType)
       self:stopTimer( timerId )
       self.walkTimer = nil
     elseif #held > 0 then
-      self:step( DIRS[held[#held]] )
+      -- self:step( DIRS[held[#held]] )
     end
     return
   end
