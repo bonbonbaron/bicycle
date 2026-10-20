@@ -71,11 +71,11 @@ local function loadData( path )
     if g ~= nil then return g end
     return stub()
   end } )
-  local f = loadChunk( src, "@" .. path, env )
-  if not f then return nil end
+  local f, err = loadChunk( src, "@" .. path, env )
+  if not f then return nil, err end
   local ok, v = pcall( f )
   if ok and type( v ) == "table" then return v end
-  return nil
+  return nil, ok and "it doesn't return its table" or ( type( v ) == "string" and v or "it raised an error" )
 end
 
 -- ---- inputs ----
@@ -127,7 +127,7 @@ local games = {}  -- game -> { scenes = { name -> tbl }, music = { path -> true 
 local function game( g )
   if not games[g] then
     games[g] = { scenes = {}, music = {}, genomes = {}, bodies = {}, anims = {}, srcRects = {}, sources = {},
-                 levels = {}, found = { soundfont = {}, song = {}, model = {}, level = {} }, genomeSrc = {} }
+                 levels = {}, found = { soundfont = {}, song = {}, model = {}, level = {} }, genomeSrc = {}, unloadable = {} }
   end
   return games[g]
 end
@@ -212,7 +212,13 @@ for _, path in ipairs( files ) do
     elseif sub:match( "^[^/]+%.lua$" ) then
       local name = sub:gsub( "%.lua$", "" )
       add( "genome", name )
-      local gt = loadData( path ) or {}
+      local gt, err = loadData( path )
+      -- A genome that doesn't load (a syntax error) can't be checked: say so, not that its sounds etc. are missing.
+      if not gt then
+        problem( "genome doesn't load: " .. ( err or path ) )
+        G.unloadable[name] = true
+      end
+      gt = gt or {}
       G.genomes[name] = gt
       G.genomeSrc[name] = path
       G.sources[#G.sources + 1] = path
@@ -341,7 +347,7 @@ for gname, G in pairs( games ) do
       end
     end
     if type( t.model ) == "string" then checkRef( G, gname, where, "model", t.model ) end
-    local src = readFile( G.genomeSrc[gn] ) or ""
+    local src = not G.unloadable[gn] and readFile( G.genomeSrc[gn] ) or ""
     for name in src:gmatch( "self:sound%s*%(%s*\"([^\"]+)\"" ) do
       if not own[name] then problem( where .. ": self:sound: no sound '" .. name .. "' in this genome's sfx.sounds" ) end
     end
