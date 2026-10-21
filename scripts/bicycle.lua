@@ -213,7 +213,7 @@ ffi.cdef([[
 
   typedef enum { START, STOP, PAUSE, UNPAUSE } Action;
   typedef enum { RECT, COLLRECT, IMAGE } Component;
-  typedef enum { SYS_TIMER, SYS_MOTION } System;
+  typedef enum { SYS_TIMER, SYS_MOTION, SYS_ANIMATION } System;
   Entity pushDialogue( const char* text, int x, int y, int w, int h );
   bool isDialogueDone();
   int getScreenWidth();

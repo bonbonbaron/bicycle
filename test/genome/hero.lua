@@ -27,43 +27,58 @@ local hero = {
   },
 }
 
-local STEP = 256  -- one cell in fixed-point (FIXEDPT_DEC_BITS = 8)
-local stepSize = 3
-local ACTIONS = {
-  [ffi.C.A] = function()
-     strip="walk_left"
-     ffi.C.setVelocity(hero.id, -stepSize * STEP, 0)  -- TODO add velX/Y/Z setters so you don't have to set untouched components to themselves
-  end,
-  [ffi.C.D] = function()
-     strip="walk_right"
-     ffi.C.setVelocity(hero.id, stepSize * STEP, 0)
-  end,
-  [ffi.C.W] = function()
-     strip="walk_up"
-     ffi.C.setVelocity(hero.id, 0, -STEP * stepSize)
-  end,
-  [ffi.C.S] = function()
-     strip="walk_down"
-     ffi.C.setVelocity(hero.id, 0, STEP * stepSize)
-  end,
-  [ffi.C.LeftShift] = function()
-    stepSize = 6
+hero.STEP = 256  -- one cell in fixed-point (FIXEDPT_DEC_BITS = 8)
+hero.stepSize = 3
+function hero:actOnInput(input)
+  if input == ffi.C.A then
+     self.anim:set( "walk_left" )
+     ffi.C.setVelocity(self.id, -self.stepSize * self.STEP, 0)  -- TODO add velX/Y/Z setters so you don't have to set untouched components to themselves
+  elseif input == ffi.C.D then
+     self.anim:set( "walk_right" )
+     ffi.C.setVelocity(self.id, self.stepSize * self.STEP, 0)
+  elseif input == ffi.C.W then
+     self.anim:set( "walk_up" )
+     ffi.C.setVelocity(self.id, 0, -self.STEP * self.stepSize)
+    elseif input == ffi.C.S then
+      self.anim:set( "walk_down" )
+      ffi.C.setVelocity(self.id, 0, self.STEP * self.stepSize)
+  elseif input == ffi.C.LeftShift then
+      self.stepSize = 6
   end
-}
+end
+
+function hero:actOffInput(input)
+  if input == ffi.C.A then
+    ffi.C.sys(ffi.C.STOP, ffi.C.SYS_MOTION, self.id);
+    ffi.C.sys(ffi.C.STOP, ffi.C.SYS_ANIMATION, self.id);
+  elseif input == ffi.C.D then
+    ffi.C.sys(ffi.C.STOP, ffi.C.SYS_MOTION, self.id);
+    ffi.C.sys(ffi.C.STOP, ffi.C.SYS_ANIMATION, self.id);
+  elseif input == ffi.C.W then
+    ffi.C.sys(ffi.C.STOP, ffi.C.SYS_MOTION, self.id);
+    ffi.C.sys(ffi.C.STOP, ffi.C.SYS_ANIMATION, self.id);
+  elseif input == ffi.C.S then
+    ffi.C.sys(ffi.C.STOP, ffi.C.SYS_MOTION, self.id);
+    ffi.C.sys(ffi.C.STOP, ffi.C.SYS_ANIMATION, self.id);
+  elseif input == ffi.C.LeftShift then
+    self.stepSize = 6
+  end
+end
+
 local SOLID, ENEMY, NPC = 2, 4, 5  -- Genome.COLL
-local MAX_HEALTH = 10
-local DAMAGE = 2
-local KNOCKBACK = 6 * STEP      -- columns pushed away from whatever hurt us
-local INVULNERABLE_TICKS = 10   -- ~1 s of invulnerability (and flashing) after a hit
-local TALK_REACH = 2            -- cells of gap allowed between us and someone we talk to
+hero.MAX_HEALTH = 10
+hero.DAMAGE = 2
+hero.KNOCKBACK = 6 * hero.STEP      -- columns pushed away from whatever hurt us
+hero.INVULNERABLE_TICKS = 10   -- ~1 s of invulnerability (and flashing) after a hit
+hero.TALK_REACH = 2            -- cells of gap allowed between us and someone we talk to
 
 local function box( id ) return ffi.C.World_getBoxes().arr[id] end
 
 function hero:onSpawn()
   local pos = box( self.id ).pos
   self.spawn = { x = pos.x, y = pos.y }
-  self.health = MAX_HEALTH
-  self.hp = Hud.bar( "HP", MAX_HEALTH )
+  self.health = self.MAX_HEALTH
+  self.hp = Hud.bar( "HP", self.MAX_HEALTH )
   self.invulnerable = 0
   -- The camera is a kinematic body tracking us (Camera.track in scripts/bicycle.lua). It glides after us with a
   -- dead zone; BICYCLE_CAMERA=hard makes it hard-track instead (snap, no dead zone).
@@ -73,7 +88,7 @@ end
 -- The speaker whose box is within TALK_REACH cells of ours (touching counts), if any.
 function hero:speakerInReach()
   local me = box( self.id )
-  local reach = TALK_REACH * STEP
+  local reach = self.TALK_REACH * self.STEP
   for _, npc in ipairs( Dialogue.speakers ) do
     local b = box( npc.id )
     local gapX = math.max( b.pos.x - ( me.pos.x + me.size.w ), me.pos.x - ( b.pos.x + b.size.w ) )
@@ -85,19 +100,12 @@ end
 -- Input: a direction key steps once when pressed and, held past WALK_DELAY_MS, keeps stepping (a walk timer) until
 -- it's released; the newest held direction wins. Releases of other keys mean nothing here.
 function hero:onInput(input, pressed)
-  input = tonumber( input )
-  if ACTIONS[input] then
-    self.held = self.held or {}
-    if #self.held == 0 and self.walkTimer then
-      self:stopTimer( self.walkTimer )
-      self.walkTimer = nil
-    elseif #self.held > 0 and not self.walkTimer then
-      self.walkTimer = self:after( WALK_DELAY_MS, WALK_DELAY_TIMER )
-    end
-    if pressed then 
-      -- self:step( DIRS[input] )
-    end
-    return
+  if pressed then
+    print("on input for "..input)
+    self:actOnInput(input)
+  else
+    print("off input for "..input)
+    self:actOffInput(input)
   end
   if input == ffi.C.Q then
     ffi.C.popWindow()
@@ -116,31 +124,18 @@ function hero:onInput(input, pressed)
   end
 end
 
-function hero:step( dir )
-  self.anim:set( dir.strip )  -- no-op if already walking this way
-  if ffi.C.stepEntity( self.id, dir.dx, dir.dy ) then
-    local pos = box( self.id ).pos
-    dbglog( "hero move to %d,%d", pos.x / STEP, pos.y / STEP )
-    self.blocked = false
-  elseif not self.blocked then  -- up against something solid that way: bump once, not every frame it pushes
-    self:sound( "bump" )
-    dbglog( "hero blocked" )
-    self.blocked = true
-  end
-end
-
 function hero:hurt( by )
   if self.invulnerable > 0 or self.health <= 0 then
     dbglog( "hero hit while invulnerable; no damage" )
     return
   end
-  self.health = self.hp:set( self.health - DAMAGE )
-  self.invulnerable = INVULNERABLE_TICKS
+  self.health = self.hp:set( self.health - self.DAMAGE )
+  self.invulnerable = self.INVULNERABLE_TICKS
   self:sound( "hurt" )
   -- Knock back, away from whatever hit us.
   local me, b = box( self.id ), box( by )
   local away = ( me.pos.x + me.size.w / 2 ) < ( b.pos.x + b.size.w / 2 ) and -1 or 1
-  ffi.C.teleport( self.id, me.pos.x + away * KNOCKBACK, me.pos.y )
+  ffi.C.teleport( self.id, me.pos.x + away * self.KNOCKBACK, me.pos.y )
   dbglog( "hero hurt: health %d", self.health )
   if self.health <= 0 then
     dbglog( "game over" )
@@ -151,8 +146,8 @@ end
 
 function hero:respawn()
   ffi.C.teleport( self.id, self.spawn.x, self.spawn.y )
-  self.health = self.hp:set( MAX_HEALTH )
-  self.invulnerable = INVULNERABLE_TICKS
+  self.health = self.hp:set( self.MAX_HEALTH )
+  self.invulnerable = self.INVULNERABLE_TICKS
   dbglog( "respawn: health %d", self.health )
 end
 
@@ -165,22 +160,6 @@ end
 
 -- The walk timer steps in the newest held direction; the timer gene's tick flashes while invulnerable.
 function hero:onTimer(timerId, timeoutType)
-  if timeoutType == WALK_DELAY_TIMER then  -- held past a tap: walk on
-    if tonumber( self.walkTimer ) ~= tonumber( timerId ) then return end  -- (released and pressed again meanwhile: a newer timer counts)
-    self.walkTimer = self:every( WALK_MS, WALK_TIMER )
-    timerId, timeoutType = self.walkTimer, WALK_TIMER
-  end
-  if timeoutType == WALK_TIMER then
-    local held = self.held or {}
-    if getFocus() ~= self.id then  -- a dialogue took the input (and will get the key's release): stop walking
-      self.held = {}
-      self:stopTimer( timerId )
-      self.walkTimer = nil
-    elseif #held > 0 then
-      -- self:step( DIRS[held[#held]] )
-    end
-    return
-  end
   if self.invulnerable > 0 then
     self.invulnerable = self.invulnerable - 1
     ffi.C.setHidden( self.id, self.invulnerable % 2 == 1 )
@@ -194,7 +173,7 @@ function hero:onCollision(other, collType)
     self:sound( "bump" )
     self.blocked = true
     local pos = box( self.id ).pos
-    dbglog( "hero bumped; flush at %d,%d", pos.x / STEP, pos.y / STEP )
+    dbglog( "hero bumped; flush at %d,%d", pos.x / self.STEP, pos.y / self.STEP )
   end
 end
 

@@ -3,6 +3,7 @@
 #include "v/common/Capture.h"
 #include "curses_compat.h"
 #include "c/SshInputListener.h"
+#include "c/InputListener.h"
 #include "m/World.h"
 #include "m/Box.h"
 #include "m/Rect.h"
@@ -117,7 +118,9 @@ auto AsciiRenderer::checkResize() -> bool {
 }
 
 void AsciiRenderer::pollInput() {
-  SshInput::listen();
+  // SshInput::listen();
+  auto input = InputListener::getInstance();
+  input.listen();
 }
 
 // Each window is an off-screen buffer: frames werase() and redraw it, wnoutrefresh() copies it to curses' virtual

@@ -4,24 +4,31 @@
 #include <string>
 #include <array>
 #include <vector>
-#include <fcntl.h>
-#include <unistd.h> // For read/write
-#include <poll.h>
-#include <linux/input.h>
 #include <string_view>
-#include <libevdev/libevdev.h>
-#include <dirent.h>
-#include <sys/types.h>
 
 #include "c/LogicalKey.h"
+
+#if defined(_WIN32)
+#  include <windows.h>
+#else
+#  include <fcntl.h>
+#  include <unistd.h>
+#  include <poll.h>
+#  include <linux/input.h>
+#  include <libevdev/libevdev.h>
+#  include <dirent.h>
+#  include <sys/types.h>
+#endif
+
 // ────────────────────────────────────────────────
 //  Main listener class
 // ────────────────────────────────────────────────
 class Input {
-  public:
+public:
     static auto getInstance() -> Input&;
-    void listen();   // this is called by the Input instance itself
-  private:
+    void listen();   // platform-specific implementation
+
+private:
     Input();
     Input(const Input&) = delete;
     Input operator=(const Input&) = delete;
@@ -30,21 +37,17 @@ class Input {
 
     auto convertCodeToLogicalInt(int code) -> LogicalKey;
 
-    // Most importantly...
     Input _inputState{};
 
-    // To support not knowing where keyboard lives...
+#if !defined(_WIN32)
     struct Device {
-      int fd = -1;
-      struct libevdev* dev = nullptr;
-      std::string path;
+        int fd = -1;
+        struct libevdev* dev = nullptr;
+        std::string path;
     };
-
     std::vector<Device> _devices;
 
     void discoverPotentialKeyboards();
-    // void close_all();
-    void reopenIfNeeded();  // optional: call every ~5s for hot-switch support
-
-};  // class Input
-
+    void reopenIfNeeded();
+#endif
+};

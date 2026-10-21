@@ -542,6 +542,7 @@ Gene["GeneLoader"] = {
     checkType( c, "table" )
     -- Without a type, a genome's collision palette (collpal) picks it for the body's region (default 1).
     local name = c.type or ( tbl and tbl.collpal and Sprite.collisionType( tbl.collpal, c.region ) ) or "solid"
+    -- TODO: AI goofed up here by sticking this in Genome.lua. Figure this out elsewhere.
     local collType = type( name ) == "number" and name or COLL[name]
     if not collType then error( "Unknown collision type '"..tostring( c.type ).."'." ) end
     local box = c.box or { 0, 0, 0, 0 }
@@ -628,21 +629,23 @@ function Gene:load( entity, genomeName, tbl )
   if not loader and type( self.val ) == "function" then return end  -- genome-specific methods are fine
   if loader == 0 then return end  -- placeholder gene with nothing to load
 
-  -- Error-handling
-  if not loader then
-    local recognizedGenes = ""
-    for key, _ in pairs(Gene.GeneLoader) do
-      recognizedGenes = recognizedGenes.."  "..key
-    end
-    for key, _ in pairs(gameSupportedGenes) do
-      recognizedGenes = recognizedGenes.."  "..key
-    end
-    error( "Genome '"..genomeName.."' has unrecognized gene key '"..self.type.."'.\nThese are the available genes:\n"..recognizedGenes )
-  end
+  -- -- Error-handling
+  -- if not loader then
+  --   local recognizedGenes = ""
+  --   for key, _ in pairs(Gene.GeneLoader) do
+  --     recognizedGenes = recognizedGenes.."  "..key
+  --   end
+  --   for key, _ in pairs(gameSupportedGenes) do
+  --     recognizedGenes = recognizedGenes.."  "..key
+  --   end
+  --   error( "Genome '"..genomeName.."' has unrecognized gene key '"..self.type.."'.\nThese are the available genes:\n"..recognizedGenes )
+  -- end
 
   -- Time to load the gene already. Geez!!
   -- TODO load processed gene straight into the entity's table. I think that table in turn should reside in global entities.
-  loader( entity, self, tbl )
+  if loader then
+    loader( entity, self, tbl )
+  end
 end
 
 --------------------
