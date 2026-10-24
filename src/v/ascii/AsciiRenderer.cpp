@@ -33,7 +33,29 @@ static auto W( WinHandle win ) -> WINDOW* {
   return static_cast<WINDOW*>( win );
 }
 
+#ifdef _WIN32
+// PDCurses draws through the console behind stdout. Without one (VS Code's gdb with externalConsole off, mintty
+// without ConPTY: stdout is a pipe) it reads a garbage screen size, and its 512-cell line buffer overflows on the
+// first refresh. So give the game a console of its own, and point stdin/stdout at it, before initscr().
+static void ensureConsole() {
+  DWORD mode{};
+  if ( GetConsoleMode( GetStdHandle( STD_OUTPUT_HANDLE ), &mode ) ) return;  // already a real console
+  FreeConsole();  // a hidden one (mintty's) is no use: nobody can see it
+  if ( !AllocConsole() ) return;
+  const auto open = []( const wchar_t* name ) {
+    return CreateFileW( name, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING,
+                        0, nullptr );
+  };
+  SetStdHandle( STD_OUTPUT_HANDLE, open( L"CONOUT$" ) );
+  SetStdHandle( STD_ERROR_HANDLE, open( L"CONOUT$" ) );
+  SetStdHandle( STD_INPUT_HANDLE, open( L"CONIN$" ) );
+}
+#endif
+
 void AsciiRenderer::init( const std::string& ) {
+#ifdef _WIN32
+  ensureConsole();
+#endif
 #ifdef BICYCLE_RELEASE
   setlocale( LC_CTYPE, "" );  // only the character set (UTF-8 for the box drawing): one locale file, not twelve
 #else
