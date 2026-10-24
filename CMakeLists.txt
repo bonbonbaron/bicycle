@@ -276,10 +276,11 @@ set( BICYCLE_SOURCES
 # Each mode adds only its own code: the true-3D layer (physics, 3D motions and camera rig, their Lua API) is in 3D
 # builds alone; ASCII and 2D link its no-op stand-in, src/c/Layer3DOff.cpp (include/c/Layer3D.h). The flat modes'
 # image overlap groups (depth sorting, include/c/ImageOverlaps.h) are in ASCII and 2D alone; 3D links ImageOverlapsOff.
-# Not built (unfinished or replaced): src/c/Input.cpp (Linux evdev keyboard), src/c/RenderSystem.cpp, src/v/common/Graph.cpp
+# Not built (unfinished or replaced): src/c/RenderSystem.cpp, src/v/common/Graph.cpp
 if ( BICYCLE_RENDER STREQUAL "ASCII" )
 	#list( APPEND BICYCLE_SOURCES src/v/ascii/AsciiRenderer.cpp src/c/SshInputListener.cpp src/c/Layer3DOff.cpp src/c/ImageOverlaps.cpp )
-  list( APPEND BICYCLE_SOURCES src/v/ascii/AsciiRenderer.cpp src/c/InputListener.cpp src/c/Layer3DOff.cpp src/c/ImageOverlaps.cpp )
+  # InputListener: evdev keyboards on Linux (Pi console), console key records on Windows; SshInput (stdin) otherwise.
+  list( APPEND BICYCLE_SOURCES src/v/ascii/AsciiRenderer.cpp src/c/InputListener.cpp src/c/SshInputListener.cpp src/c/Layer3DOff.cpp src/c/ImageOverlaps.cpp )
 elseif ( BICYCLE_RENDER STREQUAL "2D" )
   list( APPEND BICYCLE_SOURCES src/v/sdl/PixelRenderer.cpp src/v/sdl/UiFont.cpp src/v/sdl/SpriteAtlas.cpp src/v/2d/Renderer2D.cpp src/c/Layer3DOff.cpp
     src/c/ImageOverlaps.cpp )
@@ -318,6 +319,11 @@ if ( BICYCLE_RELEASE )
 endif()
 if ( BICYCLE_RENDER STREQUAL "ASCII" )
   target_link_libraries( o PRIVATE bicycle_curses )
+  if ( CMAKE_SYSTEM_NAME STREQUAL "Linux" )  # InputListener reads /dev/input keyboards through libevdev
+    find_package( PkgConfig REQUIRED )
+    pkg_check_modules( LIBEVDEV REQUIRED IMPORTED_TARGET libevdev )
+    target_link_libraries( o PRIVATE PkgConfig::LIBEVDEV )
+  endif()
 else()
   target_link_libraries( o PRIVATE bicycle_sdl3 )
 endif()

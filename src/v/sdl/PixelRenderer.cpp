@@ -129,7 +129,6 @@ void PixelRenderer::init( const std::string& gameName ) {
   if ( const char* s = std::getenv( "BICYCLE_WINDOW_SIZE" ) ) {
     std::sscanf( s, "%dx%d", &w, &h );
   }
-  startup::mark( "  SDL_Init (video)" );
   _gameName = gameName;
   // UI text: fonts/ui.ttf (a game can ship its own as <game>/fonts/ui.ttf).
   for ( const std::string dir : { "./" + gameName + "/fonts/", std::string( "./fonts/" ) } ) {
@@ -139,7 +138,6 @@ void PixelRenderer::init( const std::string& gameName ) {
     }
   }
   if ( !_font.loaded() ) std::fprintf( stderr, "bicycle: no fonts/ui.ttf; UI text falls back to the bitmap font\n" );
-  startup::mark( "  UI fonts" );
   beforeWindowCreated();
   _window = SDL_CreateWindow( ( "bicycle - " + gameName ).c_str(), w, h, windowFlags() );
   if ( !_window ) {
@@ -208,7 +206,8 @@ static void keyEdge( LogicalKey k, bool down ) {
   Input in{};
   in.lastPressed = k;
   if ( down ) in.currKeysPressed.set( static_cast<unsigned>( k ) );
-  Trigger::sendInput( in, down );
+  in.pressed = down;
+  Trigger::sendInput( in );
 }
 
 void PixelRenderer::handleEvent( const SDL_Event& e ) {
