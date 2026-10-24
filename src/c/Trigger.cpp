@@ -198,10 +198,12 @@ void Trigger::init( const std::string& gameName ) {
 }
 
 void Trigger::sendInput( Input& input ) {
-  const auto& wm = WindowManager::getInstance();
-  auto currWindow = wm.back();
-  assert( currWindow != nullptr );
-  currWindow->onInput( input );
+  if ( input.pressed ) {  // dialogues and menus page and select on presses, not on releases too
+    const auto& wm = WindowManager::getInstance();
+    auto currWindow = wm.back();
+    assert( currWindow != nullptr );
+    currWindow->onInput( input );
+  }
   bridge.input = input;
   bridge.keys.add( input.lastPressed, input.pressed );
 }

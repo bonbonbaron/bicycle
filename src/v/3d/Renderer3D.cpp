@@ -758,7 +758,6 @@ class Renderer3D final : public PixelRenderer {
       }
       std::fprintf( stderr, "bicycle 3D: %s tier (GL %s on %s)\n", tierName( s_tier ), gl.GetString( GL_VERSION ), gl.GetString( GL_RENDERER ) );
       SDL_GL_SetSwapInterval( 0 );
-      startup::mark( "  window + GL context" );
       if ( s_tier != CORE ) glInfo();
       if ( s_es2 ) {
         bool ok = false;
@@ -801,7 +800,6 @@ class Renderer3D final : public PixelRenderer {
         if ( _skinProg ) reportUniforms( "skinned", _skinProg );
         if ( _shadowProg ) reportUniforms( "shadowed", _shadowProg );
       }
-      startup::mark( "  shaders (compile + link)" );
       // The color texture is on unit 0 and the shadow map on unit 1, always (two sampler types may not share a unit).
       for ( GLuint pr : { _prog, _skinProg, _shadowProg } ) {
         if ( !pr ) continue;

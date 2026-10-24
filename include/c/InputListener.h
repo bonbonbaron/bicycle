@@ -7,6 +7,7 @@
 #include <string_view>
 
 #include "c/Input.h"
+#include <iostream>
 
 #if defined(_WIN32)
 #  ifndef WIN32_LEAN_AND_MEAN
@@ -43,8 +44,14 @@ private:
     InputListener operator=(const InputListener&&) = delete;
 
     auto convertCodeToLogicalInt(int code) -> LogicalKey;
-    void discoverPotentialKeyboards();
+    void press(LogicalKey lk, bool down);  // record one key edge in _state.currKeysPressed
+    void flush();                          // send every key that changed since last frame to Trigger
     Input _state{};
+    bool _useTerminal{};                   // no keyboard device/console of our own: fall back to SshInput (stdin)
+
+#if defined(_WIN32)
+    HANDLE _console{ INVALID_HANDLE_VALUE };
+#endif
 
 #if !defined(_WIN32)
     struct Device {
@@ -55,6 +62,5 @@ private:
     std::vector<Device> _devices;
 
     void discoverPotentialKeyboards();
-    void reopenIfNeeded();
 #endif
 };
