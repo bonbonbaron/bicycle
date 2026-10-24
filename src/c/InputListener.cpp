@@ -1,6 +1,5 @@
 #include "c/InputListener.h"
 #include "c/Trigger.h"
-#include <chrono>
 #include <cstdlib>
 #include <iostream>
 #if defined(BICYCLE_RENDER_ASCII)
@@ -84,30 +83,70 @@ void InputListener::listen() {
 }
 
 #if defined(_WIN32)
-// Console key records: real downs and ups, only while our terminal has focus. Peek first so we never block.
+#  include <tlhelp32.h>
+
+// Our ancestor processes (shell, terminal, VS Code ...), found once. The terminal's window belongs to one of them.
+static auto ancestorPids() -> std::vector<DWORD> {
+  std::vector<std::pair<DWORD, DWORD>> parentOf;  // { pid, parent pid }
+  HANDLE snap = CreateToolhelp32Snapshot( TH32CS_SNAPPROCESS, 0 );
+  if ( snap != INVALID_HANDLE_VALUE ) {
+    PROCESSENTRY32W e{ sizeof e };
+    for ( BOOL ok = Process32FirstW( snap, &e ); ok; ok = Process32NextW( snap, &e ) )
+      parentOf.emplace_back( e.th32ProcessID, e.th32ParentProcessID );
+    CloseHandle( snap );
+  }
+  std::vector<DWORD> chain{ GetCurrentProcessId() };
+  for ( bool found = true; found && chain.size() < 64; ) {
+    found = false;
+    for ( const auto& [pid, ppid] : parentOf ) {
+      if ( pid != chain.back() || ppid == 0 ) continue;
+      for ( DWORD c : chain ) if ( c == ppid ) return chain;  // pid reuse loop
+      chain.push_back( ppid );
+      found = true;
+      break;
+    }
+  }
+  return chain;
+}
+
+// Does the foreground window belong to our terminal? A classic console window is GetConsoleWindow(). Under ConPTY
+// (Windows Terminal, VS Code) that's a hidden pseudo window, so accept a window owned by an ancestor, or the window
+// that was in front when our console last got a key (a terminal that isn't our ancestor, e.g. Windows Terminal
+// opened by default-terminal handoff).
+auto InputListener::terminalHasFocus() -> bool {
+  HWND fg = GetForegroundWindow();
+  if ( !fg ) return false;
+  if ( fg == GetConsoleWindow() || fg == _typedWindow ) return true;
+  DWORD pid{};
+  GetWindowThreadProcessId( fg, &pid );
+  for ( DWORD a : _ancestors ) if ( a == pid ) return true;
+  return false;
+}
+
+// Console key records only say a key was typed: ConPTY sends each one as a down+up pair and auto-repeats only the
+// last key held. So drain them (the buffer must not fill; a key there also tells us which window is our terminal)
+// and take the held keys from the keyboard itself.
 void InputListener::pollConsole() {
-  const double t = std::chrono::duration<double, std::milli>( std::chrono::steady_clock::now().time_since_epoch() ).count();
-  auto emit = [this]( LogicalKey key, bool down ) { press( key, down ); };
   DWORD n{};
   while ( GetNumberOfConsoleInputEvents( _conin, &n ) && n > 0 ) {
     INPUT_RECORD rec[32];
     DWORD got{};
     if ( !ReadConsoleInputW( _conin, rec, 32, &got ) || got == 0 ) break;
-    for ( DWORD i = 0; i < got; ++i ) {
-      if ( rec[i].EventType != KEY_EVENT ) continue;
-      const auto& k = rec[i].Event.KeyEvent;
-      _consoleKeys.record( nativeToLogical( k.wVirtualKeyCode & 0xFF ), k.bKeyDown != 0, t, emit );
-    }
+    for ( DWORD i = 0; i < got; ++i )
+      if ( rec[i].EventType == KEY_EVENT && rec[i].Event.KeyEvent.bKeyDown ) _typedWindow = GetForegroundWindow();
   }
-  _consoleKeys.endFrame( t, emit );
+  pollAsyncKeys();
 }
 
-// No console to read (mintty with a piped stdin): poll the keyboard. This can't tell whether our terminal has focus.
+// The real keyboard: true multi-key state and exact releases. Only while our terminal has focus, so typing in
+// another app doesn't drive the game; losing focus releases everything.
 void InputListener::pollAsyncKeys() {
+  if ( _ancestors.empty() ) _ancestors = ancestorPids();
+  const bool focus = terminalHasFocus();
   for ( int vk = 1; vk < 256; ++vk ) {
     const LogicalKey lk = nativeToLogical( vk );
     if ( lk == LogicalKey::COUNT ) continue;
-    const bool down = ( GetAsyncKeyState( vk ) & 0x8000 ) != 0;
+    const bool down = focus && ( GetAsyncKeyState( vk ) & 0x8000 ) != 0;
     if ( down == _vkDown[vk] ) continue;
     _vkDown[vk] = down;
     press( lk, down );

@@ -6,15 +6,18 @@
 //   2D / 3D (SDL window, any OS)      PixelRenderer's SDL event pump calls press(); nothing else to poll
 //   ASCII, Linux local console / Pi   evdev keyboards (/dev/input/event*, needs the "input" group)
 //   ASCII, Linux over SSH or no evdev the terminal (SshInput: raw stdin, kitty key releases or auto key-up)
-//   ASCII, Windows with a console     CONIN$ key records (conhost, Windows Terminal, VS Code, mintty with ConPTY)
-//   ASCII, Windows without one        GetAsyncKeyState (mintty with a piped stdin)
+//   ASCII, Windows                    GetAsyncKeyState while our terminal has focus (multi-key, exact releases);
+//                                     CONIN$ records are only drained. ConPTY (VS Code, Windows Terminal) turns
+//                                     each key into a down+up pair and repeats only the last key, so it can't be
+//                                     the source of held state.
+//   Note: over SSH a terminal sends only characters and repeats only the last key held, so without kitty key
+//   releases it's one key at a time (no diagonals). That's inherent; a local Pi console uses evdev (multi-key).
 #include <array>
 #include <cstdint>
 #include <string>
 #include <vector>
 
 #include "c/Input.h"
-#include "c/TermInput.h"
 
 #if defined(_WIN32)
 #  ifndef WIN32_LEAN_AND_MEAN
@@ -51,8 +54,10 @@ private:
 
 #if defined(_WIN32)
     HANDLE _conin{ INVALID_HANDLE_VALUE };
-    std::array<bool, 256> _vkDown{};  // (ASYNC_KEYS)
-    term::ConsoleKeys _consoleKeys{};
+    std::array<bool, 256> _vkDown{};  // held keys, from GetAsyncKeyState (CONSOLE and ASYNC_KEYS)
+    std::vector<DWORD> _ancestors;     // our process and its parents, for the focus check
+    HWND _typedWindow{};               // the foreground window when our console last got a key
+    auto terminalHasFocus() -> bool;
     void pollConsole();
     void pollAsyncKeys();
 #else
