@@ -3,7 +3,7 @@
 #endif
 #include "c/SshInputListener.h"
 #include "c/InputState.h"
-#include "c/Trigger.h"
+#include "c/InputListener.h"
 #include <chrono>
 #include <cstdlib>
 #include <cstring>
@@ -79,11 +79,7 @@ SshInput::SshInput() {
 #endif
 
 void SshInput::send( LogicalKey k, bool pressed ) {
-  _inputState.currKeysPressed.reset();
-  if ( pressed ) _inputState.currKeysPressed.set( static_cast<unsigned>( k ) );
-  _inputState.lastPressed = k;
-  _inputState.pressed = pressed;
-  Trigger::sendInput( _inputState );
+  InputListener::getInstance().press( k, pressed );  // InputListener::listen() sends it
   if ( pressed ) inputState().pressed.set( static_cast<unsigned>( k ) );
 }
 

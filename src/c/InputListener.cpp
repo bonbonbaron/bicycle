@@ -1,299 +1,120 @@
 #include "c/InputListener.h"
 #include "c/Trigger.h"
-#include <iostream>
-
-auto InputListener::getInstance() -> InputListener& {
-  static InputListener kbListener;
-  return kbListener;
-}
-
-#if !defined(_WIN32)
-void InputListener::discoverPotentialKeyboards() {
-  auto dir = opendir("/dev/input");
-  if (!dir) return;
-
-  struct dirent* ent;
-  while ((ent = readdir(dir))) {
-    if (std::string(ent->d_name).find("event") == std::string::npos)
-      continue;
-
-    std::string path = "/dev/input/" + std::string(ent->d_name);
-    int fd = open(path.c_str(), O_RDONLY | O_NONBLOCK);
-    if (fd < 0) continue;
-
-    struct libevdev* dev = nullptr;
-    if (libevdev_new_from_fd(fd, &dev) != 0) {
-      close(fd);
-      continue;
-    }
-
-    bool isKeyboard = libevdev_has_event_code(dev, EV_KEY, KEY_A) ||
-                      libevdev_has_event_code(dev, EV_KEY, KEY_ENTER) ||
-                      libevdev_has_event_type(dev, EV_KEY);
-
-    if (isKeyboard) {
-      _devices.push_back({fd, dev, path});
-      std::cout << "Keyboard listener attached: " << libevdev_get_name(dev) << " → " << path << "\n";
-    } else {
-      libevdev_free(dev);
-      close(fd);
-    }
-  }
-  closedir(dir);
-}
-#endif
-
-InputListener::InputListener() {
-#if !defined(_WIN32)
-  discoverPotentialKeyboards();
-#endif
-}
-
-void InputListener::listen() {
-  // constexpr unsigned VAL_KEY_UP    = 0;
-  // constexpr unsigned VAL_KEY_DOWN  = 1;
-  // constexpr unsigned VAL_KEY_REPEAT = 2;
-
-#if defined(_WIN32)
-  // Poll Windows virtual keys (simple cross-platform stand-in for the Linux event loop)
-  static const struct { int vk; LogicalKey lk; } map[] = {
-    {'A', LogicalKey::A}, {'B', LogicalKey::B}, {'C', LogicalKey::C}, {'D', LogicalKey::D},
-    {'E', LogicalKey::E}, {'F', LogicalKey::F}, {'G', LogicalKey::G}, {'H', LogicalKey::H},
-    {'I', LogicalKey::I}, {'J', LogicalKey::J}, {'K', LogicalKey::K}, {'L', LogicalKey::L},
-    {'M', LogicalKey::M}, {'N', LogicalKey::N}, {'O', LogicalKey::O}, {'P', LogicalKey::P},
-    {'Q', LogicalKey::Q}, {'R', LogicalKey::R}, {'S', LogicalKey::S}, {'T', LogicalKey::T},
-    {'U', LogicalKey::U}, {'V', LogicalKey::V}, {'W', LogicalKey::W}, {'X', LogicalKey::X},
-    {'Y', LogicalKey::Y}, {'Z', LogicalKey::Z},
-    {'0', LogicalKey::Key0}, {'1', LogicalKey::Key1}, {'2', LogicalKey::Key2},
-    {'3', LogicalKey::Key3}, {'4', LogicalKey::Key4}, {'5', LogicalKey::Key5},
-    {'6', LogicalKey::Key6}, {'7', LogicalKey::Key7}, {'8', LogicalKey::Key8},
-    {'9', LogicalKey::Key9},
-    {VK_RETURN, LogicalKey::Enter}, {VK_ESCAPE, LogicalKey::Escape},
-    {VK_TAB, LogicalKey::Tab}, {VK_SPACE, LogicalKey::Space},
-    {VK_LCONTROL, LogicalKey::LeftCtrl}, {VK_RCONTROL, LogicalKey::RightCtrl},
-    {VK_LSHIFT, LogicalKey::LeftShift}, {VK_RSHIFT, LogicalKey::RightShift},
-    {VK_LMENU, LogicalKey::LeftAlt}, {VK_RMENU, LogicalKey::RightAlt},
-    {VK_LWIN, LogicalKey::LeftMeta}, {VK_RWIN, LogicalKey::RightMeta}
-  };
-
-  for (const auto& m : map) {
-    bool down = (GetAsyncKeyState(m.vk) & 0x8000) != 0;
-    _state.currKeysPressed.set(static_cast<std::size_t>(m.lk), down);
-  }
-  // Compute delta and fire if needed (adjust field names to match your _state)
-  _state.deltaKeysPressed = _state.currKeysPressed ^ _state.prevKeysPressed;
-  _state.prevKeysPressed = _state.currKeysPressed;
-  if (_state.deltaKeysPressed.any()) {
-    Trigger::sendInput(_state);
-  }
-
-#else
-  if (_devices.empty()) {
-    return;
-  }
-
-  for (unsigned i = 0; i < _devices.size(); ++i) {
-    input_event ev{};
-    while (read(_devices.at(i).fd, &ev, sizeof(ev)) == sizeof(ev)) {
-      if (ev.type != EV_KEY || ev.value == VAL_KEY_REPEAT)
-        continue;
-
-      auto lk = convertCodeToLogicalInt(ev.code);
-      if (lk == LogicalKey::COUNT)
-        continue;
-
-      if (ev.value == VAL_KEY_DOWN) {
-        _state.currKeysPressed.set(static_cast<std::size_t>(lk), true);
-        std::cout << "down on " << ev.code << '\n';
-      } else if (ev.value == VAL_KEY_UP) {
-        _state.currKeysPressed.set(static_cast<std::size_t>(lk), false);
-        std::cout << "up on " << ev.code << '\n';
-      }
-    }
-  }
-
-  // if (_state.deltaKeysPressed.any())
-  //   Trigger::sendInput(_state);
-#endif
-}
-
-#if !defined(_WIN32)
-auto InputListener::convertCodeToLogicalInt(int code) -> LogicalKey {
-  switch (code) {
-    case KEY_A: return LogicalKey::A;
-    case KEY_B: return LogicalKey::B;
-    // ... (rest of your existing switch)
-    default: return LogicalKey::COUNT;
-  }
-}
-#endif
-#include "c/InputListener.h"
-#include "c/Trigger.h"
-#include "c/SshInputListener.h"
 #include <cstdlib>
-
-// ────────────────────────────────────────────────
-//  Logical keys – our unified, cross-platform key namespace
-//  Based on USB HID Usage IDs (Keyboard page 0x07)
-// ────────────────────────────────────────────────
-
-// Get singleton
-auto InputListener::getInstance() -> InputListener& {
-  static InputListener kbListener;
-  return kbListener;
-}
-
+#include <iostream>
+#if defined(BICYCLE_RENDER_ASCII)
+#  include "c/SshInputListener.h"
+#endif
 #if !defined(_WIN32)
-void InputListener::discoverPotentialKeyboards()
-{
-  // close_all();  // TODO is this needed?
-
-  auto dir = opendir("/dev/input");
-  if (!dir) {
-    return;
-  }
-
-  struct dirent* ent;
-  while ((ent = readdir(dir))) {
-    if ( std::string( ent->d_name ).find( "event" ) == std::string::npos ) {
-      continue;
-    }
-
-    std::string path = "/dev/input/" + std::string(ent->d_name);
-
-    int fd = open(path.c_str(), O_RDONLY | O_NONBLOCK);
-    if (fd < 0) {
-      continue;
-    }
-
-    struct libevdev* dev = nullptr;
-    if (libevdev_new_from_fd(fd, &dev) != 0) {
-      close(fd);
-      continue;
-    }
-
-    // This is the test that reliably identifies keyboards (even through KVM switches)
-    bool isKeyboard = libevdev_has_event_code(dev, EV_KEY, KEY_A) ||
-      libevdev_has_event_code(dev, EV_KEY, KEY_ENTER) ||
-      libevdev_has_event_type(dev, EV_KEY);
-
-    if (isKeyboard) {
-      _devices.push_back({fd, dev, path});
-      std::cout << "Keyboard listener attached: " << libevdev_get_name(dev) << " → " << path << "\n";
-    } 
-    else {
-      libevdev_free(dev);
-      close(fd);
-    }
-  }
-  closedir(dir);
-}
+#  include <dirent.h>
+#  include <fcntl.h>
+#  include <unistd.h>
+#  include <linux/input.h>
+#  if defined(BICYCLE_RENDER_ASCII)
+#    include <libevdev/libevdev.h>
+#  endif
 #endif
 
-// Constructor
+auto InputListener::getInstance() -> InputListener& {
+  static InputListener listener;
+  return listener;
+}
+
+// Pick the backend. SDL builds get their keys from the window, so there's nothing to open.
 InputListener::InputListener() {
-#if defined(_WIN32)
-  // Windows console: read real key-down/key-up records (no evdev here). Under mintty/MSYS2's default terminal stdin
-  // is a pipe, not a console, so fall back to the terminal reader (SshInput) there.
-  _console = GetStdHandle( STD_INPUT_HANDLE );
+#if defined(BICYCLE_RENDER_ASCII)
+#  if defined(_WIN32)
+  // CONIN$ is the console even when stdin is redirected. A pipe on stdin means mintty without ConPTY: its keys
+  // never reach the console, so read the keyboard state instead.
   DWORD mode{};
-  if ( _console != INVALID_HANDLE_VALUE && GetConsoleMode( _console, &mode ) ) {
-    SetConsoleMode( _console, ( mode | ENABLE_WINDOW_INPUT ) & ~( ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT | ENABLE_QUICK_EDIT_MODE ) | ENABLE_EXTENDED_FLAGS );
+  const bool stdinIsConsole = GetConsoleMode( GetStdHandle( STD_INPUT_HANDLE ), &mode );
+  _conin = CreateFileW( L"CONIN$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
+                        OPEN_EXISTING, 0, nullptr );
+  if ( stdinIsConsole && _conin != INVALID_HANDLE_VALUE && GetConsoleMode( _conin, &mode ) ) {
+    mode &= ~( ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT | ENABLE_QUICK_EDIT_MODE | ENABLE_MOUSE_INPUT );
+    SetConsoleMode( _conin, mode | ENABLE_EXTENDED_FLAGS );
+    _backend = Backend::CONSOLE;
   }
   else {
-    _useTerminal = true;
+    _backend = Backend::ASYNC_KEYS;
   }
-#else
-  // Over SSH the keys arrive on stdin, not on this machine's /dev/input keyboards.
-  if ( !std::getenv( "SSH_CONNECTION" ) && !std::getenv( "SSH_TTY" ) ) {
-    discoverPotentialKeyboards();
-  }
-  _useTerminal = _devices.empty();
+#  else
+  // Over SSH the keys arrive on stdin, not on this machine's keyboards.
+  const bool ssh = std::getenv( "SSH_CONNECTION" ) || std::getenv( "SSH_TTY" );
+  if ( !ssh && !std::getenv( "BICYCLE_NO_EVDEV" ) ) openEvdevKeyboards();
+  _backend = _evdevFds.empty() ? Backend::TERMINAL : Backend::EVDEV;
+  if ( _backend == Backend::TERMINAL ) SshInput::getInstance();  // raw terminal mode now, not on the first key
+#  endif
 #endif
-  if ( _useTerminal ) {
-    SshInput::getInstance();  // raw terminal mode now, not on the first key
-  }
 }
 
-void InputListener::press( LogicalKey lk, bool down ) {
-  if ( lk == LogicalKey::COUNT || lk == LogicalKey::NOTHING ) {
-    return;
-  }
-  _state.currKeysPressed.set( static_cast<std::size_t>( lk ), down );
+void InputListener::press( LogicalKey key, bool down ) {
+  if ( key == LogicalKey::NOTHING || key >= LogicalKey::COUNT ) return;
+  auto& n = _sourcesDown[static_cast<std::size_t>( key )];
+  if ( down ? n++ != 0 : ( n == 0 || --n != 0 ) ) return;  // not the first source down / last source up
+  _edges.push_back( { key, down } );
 }
 
-// One Trigger::sendInput per key that went down or up since the last frame, as Lua's onInput( self, key, pressed ).
-void InputListener::flush() {
-  _state.deltaKeysPressed = _state.currKeysPressed ^ _state.prevKeysPressed;
-  if ( _state.deltaKeysPressed.any() ) {
-    // We don't have to know who has focus. Knowing focus is Lua-side's responsibility.
-    for ( std::size_t i = 0; i < _state.deltaKeysPressed.size(); ++i ) {
-      if ( !_state.deltaKeysPressed.test( i ) ) {
-        continue;
-      }
-      Input ev = _state;
-      ev.lastPressed = static_cast<LogicalKey>( i );
-      ev.pressed = _state.currKeysPressed.test( i );
-      Trigger::sendInput( ev );
-    }
-  }
-  _state.prevKeysPressed = _state.currKeysPressed;
-}
-
-// Check for keyboard events; called once per frame by the ASCII renderer's pollInput().
 void InputListener::listen() {
-  if ( _useTerminal ) {
-    SshInput::listen();
-    return;
+  switch ( _backend ) {
+    case Backend::WINDOW: break;  // PixelRenderer already pumped SDL's events into press()
+#if defined(BICYCLE_RENDER_ASCII)
+#  if defined(_WIN32)
+    case Backend::CONSOLE: pollConsole(); break;
+    case Backend::ASYNC_KEYS: pollAsyncKeys(); break;
+#  else
+    case Backend::EVDEV: pollEvdev(); break;
+    case Backend::TERMINAL: SshInput::listen(); break;
+#  endif
+#endif
+    default: break;
   }
+  // We don't have to know who has focus. Knowing focus is Lua-side's responsibility.
+  Bitset held{};
+  for ( std::size_t k = 0; k < _sourcesDown.size(); ++k ) held.set( k, _sourcesDown[k] != 0 );
+  for ( const auto& e : _edges ) {
+    Input in{};
+    in.lastPressed = e.key;
+    in.pressed = e.down;
+    in.currKeysPressed = held;
+    Trigger::sendInput( in );
+  }
+  _edges.clear();
+}
+
 #if defined(_WIN32)
+// Console key records: real downs and ups, only while our terminal has focus. Peek first so we never block.
+void InputListener::pollConsole() {
   DWORD n{};
-  while ( GetNumberOfConsoleInputEvents( _console, &n ) && n > 0 ) {
+  while ( GetNumberOfConsoleInputEvents( _conin, &n ) && n > 0 ) {
     INPUT_RECORD rec[32];
     DWORD got{};
-    if ( !ReadConsoleInputW( _console, rec, 32, &got ) || got == 0 ) {
-      break;
-    }
+    if ( !ReadConsoleInputW( _conin, rec, 32, &got ) || got == 0 ) break;
     for ( DWORD i = 0; i < got; ++i ) {
-      if ( rec[i].EventType != KEY_EVENT ) {
-        continue;
-      }
+      if ( rec[i].EventType != KEY_EVENT ) continue;
       const auto& k = rec[i].Event.KeyEvent;
-      press( convertCodeToLogicalInt( k.wVirtualKeyCode ), k.bKeyDown != 0 );  // repeats don't change the bitset
+      const int vk = k.wVirtualKeyCode & 0xFF;
+      if ( static_cast<bool>( k.bKeyDown ) == _vkDown[vk] ) continue;  // auto-repeat
+      _vkDown[vk] = k.bKeyDown != 0;
+      press( nativeToLogical( vk ), _vkDown[vk] );
     }
   }
-#else
-  // Constants
-  constexpr int VAL_KEY_UP{0};
-  constexpr int VAL_KEY_DOWN{1};
-  constexpr int VAL_KEY_REPEAT{2};
+}
 
-  // Check for key-up-or-down events.
-  for ( unsigned i = 0; i < _devices.size(); ++i ) {
-    input_event ev{};
-    // power through all the events currently queued on this device
-    while ( read( _devices.at( i ).fd, &ev, sizeof( ev ) ) == sizeof( ev ) ) {
-      // If it's not a key event, we're not interested.
-      if ( ev.type != EV_KEY || ev.value == VAL_KEY_REPEAT ) {
-        continue;
-      }
-      if ( ev.value == VAL_KEY_DOWN || ev.value == VAL_KEY_UP ) {
-        press( convertCodeToLogicalInt( ev.code ), ev.value == VAL_KEY_DOWN );
-      }
-    }
+// No console to read (mintty with a piped stdin): poll the keyboard. This can't tell whether our terminal has focus.
+void InputListener::pollAsyncKeys() {
+  for ( int vk = 1; vk < 256; ++vk ) {
+    const LogicalKey lk = nativeToLogical( vk );
+    if ( lk == LogicalKey::COUNT ) continue;
+    const bool down = ( GetAsyncKeyState( vk ) & 0x8000 ) != 0;
+    if ( down == _vkDown[vk] ) continue;
+    _vkDown[vk] = down;
+    press( lk, down );
   }
-#endif
-  flush();
-}  // InputListener::listen()
+}
 
-// ────────────────────────────────────────────────
-// Platform implementations (mapping native → LogicalKey)
-// ────────────────────────────────────────────────
-
-
-#if defined(_WIN32)
-// Windows virtual-key codes. Arrows drive the same keys as WASD, as in the SDL renderers.
-auto InputListener::convertCodeToLogicalInt(int code) -> LogicalKey {
+// Windows virtual-key codes. Arrows drive the same keys as WASD, as in SDL mode.
+auto InputListener::nativeToLogical( int code ) -> LogicalKey {
   if ( code >= 'A' && code <= 'Z' ) return static_cast<LogicalKey>( static_cast<int>( LogicalKey::A ) + ( code - 'A' ) );
   if ( code >= '1' && code <= '9' ) return static_cast<LogicalKey>( static_cast<int>( LogicalKey::Key1 ) + ( code - '1' ) );
   switch ( code ) {
@@ -302,12 +123,14 @@ auto InputListener::convertCodeToLogicalInt(int code) -> LogicalKey {
     case VK_ESCAPE:   return LogicalKey::Escape;
     case VK_TAB:      return LogicalKey::Tab;
     case VK_SPACE:    return LogicalKey::Space;
-    case VK_LCONTROL: case VK_CONTROL: return LogicalKey::LeftCtrl;
+    case VK_LCONTROL: return LogicalKey::LeftCtrl;
     case VK_RCONTROL: return LogicalKey::RightCtrl;
-    case VK_LSHIFT:   case VK_SHIFT: return LogicalKey::LeftShift;
+    case VK_LSHIFT:   return LogicalKey::LeftShift;
     case VK_RSHIFT:   return LogicalKey::RightShift;
-    case VK_LMENU:    case VK_MENU: return LogicalKey::LeftAlt;
+    case VK_LMENU:    return LogicalKey::LeftAlt;
     case VK_RMENU:    return LogicalKey::RightAlt;
+    case VK_LWIN:     return LogicalKey::LeftMeta;
+    case VK_RWIN:     return LogicalKey::RightMeta;
     case VK_UP:       return LogicalKey::W;
     case VK_LEFT:     return LogicalKey::A;
     case VK_DOWN:     return LogicalKey::S;
@@ -315,9 +138,46 @@ auto InputListener::convertCodeToLogicalInt(int code) -> LogicalKey {
     default:          return LogicalKey::COUNT;
   }
 }
-#else
+
+#else  // Linux
+
+// Keyboards are the event devices that have letter or Enter keys (this holds even through KVM switches).
+void InputListener::openEvdevKeyboards() {
+#if defined(BICYCLE_RENDER_ASCII)
+  DIR* dir = opendir( "/dev/input" );
+  if ( !dir ) return;
+  while ( dirent* ent = readdir( dir ) ) {
+    if ( std::string( ent->d_name ).rfind( "event", 0 ) != 0 ) continue;
+    const std::string path = "/dev/input/" + std::string( ent->d_name );
+    const int fd = open( path.c_str(), O_RDONLY | O_NONBLOCK );
+    if ( fd < 0 ) continue;  // no permission: add yourself to the "input" group
+    libevdev* dev = nullptr;
+    if ( libevdev_new_from_fd( fd, &dev ) == 0 &&
+         ( libevdev_has_event_code( dev, EV_KEY, KEY_A ) || libevdev_has_event_code( dev, EV_KEY, KEY_ENTER ) ) ) {
+      std::cerr << "Keyboard listener attached: " << libevdev_get_name( dev ) << " -> " << path << "\n";
+      _evdevFds.push_back( fd );
+    }
+    else close( fd );
+    if ( dev ) libevdev_free( dev );
+  }
+  closedir( dir );
+#endif
+}
+
+void InputListener::pollEvdev() {
+  constexpr int VAL_KEY_UP{ 0 }, VAL_KEY_DOWN{ 1 };  // 2 is auto-repeat
+  for ( const int fd : _evdevFds ) {
+    input_event ev{};
+    while ( read( fd, &ev, sizeof ev ) == sizeof ev ) {
+      if ( ev.type == EV_KEY && ( ev.value == VAL_KEY_DOWN || ev.value == VAL_KEY_UP ) ) {
+        press( nativeToLogical( ev.code ), ev.value == VAL_KEY_DOWN );
+      }
+    }
+  }
+}
+
 // Linux evdev / input-event-codes.h uses its own set (often close to USB HID)
-auto InputListener::convertCodeToLogicalInt(int code) -> LogicalKey {
+auto InputListener::nativeToLogical( int code ) -> LogicalKey {
   switch (code)
   {
     case KEY_A: return LogicalKey::A;

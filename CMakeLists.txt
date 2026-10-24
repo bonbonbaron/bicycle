@@ -266,7 +266,7 @@ set( BICYCLE_SOURCES
   src/main.cpp src/bicycle.cpp src/trigLUT.cpp src/data/MemNew.cpp
   src/lua/LuaWindows.cpp src/lua/LuaScene.cpp src/lua/LuaGraphics.cpp src/lua/LuaMotion.cpp src/lua/LuaAudio.cpp
   src/lua/LuaHud.cpp src/lua/LuaSystem.cpp
-  src/c/ScriptedInput.cpp src/v/common/PixelImages.cpp
+  src/c/InputListener.cpp src/c/ScriptedInput.cpp src/v/common/PixelImages.cpp
   src/m/Entity.cpp src/m/Box.cpp src/m/Camera.cpp src/m/World.cpp
   src/v/common/Image.cpp src/v/common/ColorPalette.cpp src/v/common/Window.cpp src/v/common/Dialogue.cpp
   src/v/common/Menu.cpp src/v/common/TextMenu.cpp src/v/common/Scene.cpp
@@ -279,8 +279,8 @@ set( BICYCLE_SOURCES
 # Not built (unfinished or replaced): src/c/RenderSystem.cpp, src/v/common/Graph.cpp
 if ( BICYCLE_RENDER STREQUAL "ASCII" )
 	#list( APPEND BICYCLE_SOURCES src/v/ascii/AsciiRenderer.cpp src/c/SshInputListener.cpp src/c/Layer3DOff.cpp src/c/ImageOverlaps.cpp )
-  # InputListener: evdev keyboards on Linux (Pi console), console key records on Windows; SshInput (stdin) otherwise.
-  list( APPEND BICYCLE_SOURCES src/v/ascii/AsciiRenderer.cpp src/c/InputListener.cpp src/c/SshInputListener.cpp src/c/Layer3DOff.cpp src/c/ImageOverlaps.cpp )
+  # InputListener's terminal backends (include/c/InputListener.h): SshInput reads stdin; evdev on Linux.
+  list( APPEND BICYCLE_SOURCES src/v/ascii/AsciiRenderer.cpp src/c/SshInputListener.cpp src/c/Layer3DOff.cpp src/c/ImageOverlaps.cpp )
 elseif ( BICYCLE_RENDER STREQUAL "2D" )
   list( APPEND BICYCLE_SOURCES src/v/sdl/PixelRenderer.cpp src/v/sdl/UiFont.cpp src/v/sdl/SpriteAtlas.cpp src/v/2d/Renderer2D.cpp src/c/Layer3DOff.cpp
     src/c/ImageOverlaps.cpp )
