@@ -11,6 +11,15 @@
       }
     },
     {
+      "name": "debug",
+      "displayName": "Ninja (Linux, MSYS2, MinGW); Debug: -O0, full DWARF in the executable",
+      "inherits": "default",
+      "binaryDir": "${sourceDir}/build/debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
       "name": "system",
       "displayName": "Ninja, using installed packages only (BICYCLE_USE_SYSTEM_DEPS=ON)",
       "inherits": "default",
@@ -27,6 +36,15 @@
       "cacheVariables": {
         "CMAKE_C_COMPILER": "clang",
         "CMAKE_CXX_COMPILER": "clang++"
+      }
+    },
+    {
+      "name": "windows-clang64-debug",
+      "displayName": "Windows, MSYS2 CLANG64 (clang, Ninja); Debug: -O0, full DWARF in o.exe, for gdb",
+      "inherits": "windows-clang64",
+      "binaryDir": "${sourceDir}/build/clang64-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
       }
     },
     {
@@ -53,12 +71,20 @@
       "configurePreset": "default"
     },
     {
+      "name": "debug",
+      "configurePreset": "debug"
+    },
+    {
       "name": "system",
       "configurePreset": "system"
     },
     {
       "name": "windows-clang64",
       "configurePreset": "windows-clang64"
+    },
+    {
+      "name": "windows-clang64-debug",
+      "configurePreset": "windows-clang64-debug"
     },
     {
       "name": "windows-ucrt64",
