@@ -16,10 +16,12 @@ auto SshInput::getInstance() -> SshInput& {
 }
 
 namespace {
+  #ifndef _WIN32
   auto envOff( const char* name ) -> bool {
     const char* v = std::getenv( name );
     return v && ( *v == '0' || *v == 'n' || *v == 'N' );
   }
+  #endif
   auto nowMs() -> double {
     using namespace std::chrono;
     return duration<double, std::milli>( steady_clock::now().time_since_epoch() ).count();
