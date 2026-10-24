@@ -30,12 +30,16 @@
     },
     {
       "name": "windows-clang64",
-      "displayName": "Windows, MSYS2 CLANG64 shell (clang, Ninja); dependencies fetched and built; RelWithDebInfo",
+      "displayName": "Windows, MSYS2 CLANG64 (C:/msys64; VS Code or the shell) (clang, Ninja); dependencies fetched and built; RelWithDebInfo",
       "inherits": "default",
       "binaryDir": "${sourceDir}/build/clang64",
       "cacheVariables": {
-        "CMAKE_C_COMPILER": "clang",
-        "CMAKE_CXX_COMPILER": "clang++"
+        "CMAKE_C_COMPILER": "C:/msys64/clang64/bin/clang.exe",
+        "CMAKE_CXX_COMPILER": "C:/msys64/clang64/bin/clang++.exe",
+        "CMAKE_MAKE_PROGRAM": "C:/msys64/clang64/bin/ninja.exe"
+      },
+      "environment": {
+        "PATH": "C:/msys64/clang64/bin;C:/msys64/usr/bin;$penv{PATH}"
       }
     },
     {
@@ -49,12 +53,16 @@
     },
     {
       "name": "windows-ucrt64",
-      "displayName": "Windows, MSYS2 UCRT64 shell (gcc, Ninja); dependencies fetched and built; RelWithDebInfo",
+      "displayName": "Windows, MSYS2 UCRT64 (C:/msys64; VS Code or the shell) (gcc, Ninja); dependencies fetched and built; RelWithDebInfo",
       "inherits": "default",
       "binaryDir": "${sourceDir}/build/ucrt64",
       "cacheVariables": {
-        "CMAKE_C_COMPILER": "gcc",
-        "CMAKE_CXX_COMPILER": "g++"
+        "CMAKE_C_COMPILER": "C:/msys64/ucrt64/bin/gcc.exe",
+        "CMAKE_CXX_COMPILER": "C:/msys64/ucrt64/bin/g++.exe",
+        "CMAKE_MAKE_PROGRAM": "C:/msys64/ucrt64/bin/ninja.exe"
+      },
+      "environment": {
+        "PATH": "C:/msys64/ucrt64/bin;C:/msys64/usr/bin;$penv{PATH}"
       }
     },
     {
