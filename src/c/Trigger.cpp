@@ -1,4 +1,3 @@
-#include "c/StartupStats.h"
 #include "data/Mem.h"
 #include <cstdio>
 #include "c/Trigger.h"
@@ -35,6 +34,9 @@ void Trigger::sys(const Action action, const System system, Entity entity) {
       break;
     case System::MOTION:
       ctrl = _motion;
+      break;
+    case System::ANIMATION:
+      ctrl = &Animator::getInstance();
       break;
   }
 
@@ -149,7 +151,6 @@ void Trigger::init( const std::string& gameName ) {
     L = luaL_newstate();
   }
   luaL_openlibs(L);
-  startup::mark( "lua state" );
   // The asset pack is mounted in bicycle::init, before the renderer (which loads fonts from it).
   lua_getglobal( L, "package" );
   lua_getfield( L, -1, "loaders" );  // LuaJIT (Lua 5.1) calls them loaders

@@ -119,7 +119,7 @@ auto AsciiRenderer::checkResize() -> bool {
 
 void AsciiRenderer::pollInput() {
   // SshInput::listen();
-  auto input = InputListener::getInstance();
+  auto& input = InputListener::getInstance();
   input.listen();
 }
 

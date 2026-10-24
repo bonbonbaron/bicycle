@@ -26,7 +26,7 @@ class Trigger {
     // Generic system actions
     enum Action { START, STOP, PAUSE, UNPAUSE };
     enum Component { RECT, COLLRECT, IMAGE };
-    enum System{ TIMER, MOTION };
+    enum System{ TIMER, MOTION, ANIMATION };
 
     static auto getInstance() -> Trigger&;
 		void init( const std::string& gameName );

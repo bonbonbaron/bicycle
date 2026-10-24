@@ -1,4 +1,3 @@
-#include "c/StartupStats.h"
 // Shared by the 2D and 3D renderers: SDL3 window and keyboard, and a software framebuffer drawn in cells.
 #include "v/sdl/PixelRenderer.h"
 #include "v/common/Capture.h"

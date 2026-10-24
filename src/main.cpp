@@ -1,14 +1,11 @@
 #include "bicycle.h"
 #include <iostream>
-#include "c/StartupStats.h"
 
 #if defined( BICYCLE_RELEASE ) && defined( __linux__ )
 #include <sys/prctl.h>
 #endif
 
 int main( int argc, char** argv ) {
-  startup::origin();
-  startup::mark( "main" );
 #ifdef BICYCLE_RELEASE
 #ifdef __linux__
   // A marker for tests/release_io_test.sh: everything strace sees after this prctl is the engine's doing (the

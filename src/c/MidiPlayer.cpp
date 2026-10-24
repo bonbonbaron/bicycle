@@ -1,4 +1,3 @@
-#include "c/StartupStats.h"
 #include <string>
 #include <algorithm>
 #include "data/Mem.h"
@@ -95,25 +94,6 @@ namespace {
   }
 }
 
-// BICYCLE_PROFILE=<file> appends how long each audio start-up step took (ms), to find what slows start-up.
-static void profile( const char* what ) {
-  startup::mark( ( std::string( "  audio: " ) + what ).c_str() );
-#ifdef BICYCLE_RELEASE
-  (void)what;  // release builds write no files
-#else
-  static FILE* f = std::getenv( "BICYCLE_PROFILE" ) ? std::fopen( std::getenv( "BICYCLE_PROFILE" ), "a" ) : nullptr;
-  if ( !f ) {
-    return;
-  }
-  using Clock = std::chrono::steady_clock;
-  static Clock::time_point last = Clock::now();
-  const auto now = Clock::now();
-  std::fprintf( f, "audio %-40s %8.1f ms\n", what, std::chrono::duration<double, std::milli>( now - last ).count() );
-  std::fflush( f );
-  last = now;
-#endif
-}
-
 #ifndef BICYCLE_RELEASE
 static auto fileExists( const std::string& fp ) -> bool {
   return std::ifstream( fp ).good();
@@ -139,7 +119,6 @@ static void addWavHeader( const std::string& path, const unsigned rate ) {
 #endif
 
 MidiPlayer::MidiPlayer() {
-  profile( "start" );
   // Settings
   _settingsP = new_fluid_settings();
   // fluidsynth supports the following audio drivers: alsa, file, jack, oss, pulseaudio, sdl2 
@@ -176,12 +155,10 @@ MidiPlayer::MidiPlayer() {
     fluid_synth_add_sfloader( _synthP, loader );  // tried before the built-in one
   }
   fluid_synth_set_gain( _synthP, 1.0 );
-  profile( "settings + synth" );
 
   // Audio driver output. Without one (e.g. no sound card) the game still runs, silently.
   _aDriverP = new_fluid_audio_driver( _settingsP, _synthP );
   _playerP = new_fluid_player( _synthP );
-  profile( _aDriverP ? "audio driver + player" : "audio driver (none) + player" );
 
   // General MIDI fallback: on demand (ensureGm), unless BICYCLE_EAGER_GM=1.
   if ( const char* e = std::getenv( "BICYCLE_EAGER_GM" ) ; e && *e == '1' ) ensureGm( "BICYCLE_EAGER_GM" );
@@ -231,7 +208,6 @@ void MidiPlayer::ensureGm( const char* why ) {
   for ( int chan = 0; chan < 16; ++chan ) {
     if ( _sel[chan].sfont >= 0 ) fluid_synth_program_select( _synthP, chan, currentId( _sel[chan].sfont ), _sel[chan].bank, _sel[chan].program );
   }
-  profile( ( std::string( "GM fallback " ) + used + " (for " + why + ")" ).c_str() );
 }
 
 auto MidiPlayer::currentId( int luaId ) const -> int {
@@ -326,7 +302,6 @@ auto MidiPlayer::loadMidi( const std::string& midiFilepath ) -> bool {
       if ( !hasPreset( bank, program ) ) { ensureGm( ( "song " + midiFilepath ).c_str() ); break; }
     }
   }
-  profile( ( "MIDI " + midiFilepath ).c_str() );
   return ok;
 }
 
@@ -394,7 +369,6 @@ auto MidiPlayer::loadSoundfont( const std::string& sfFilepath ) -> int {
     memFiles[name] = std::make_shared<const mem::Blob>( std::move( *data ) );
   }
   auto id = fluid_synth_sfload( _synthP, name.c_str(), 1 );
-  profile( ( "SoundFont " + sfFilepath ).c_str() );
   if ( id == FLUID_FAILED ) return -1;
   _gameFonts.push_back( { name, id } );
   _idMap.push_back( { id, id } );

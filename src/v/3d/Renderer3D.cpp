@@ -1,4 +1,3 @@
-#include "c/StartupStats.h"
 // 3D mode: OpenGL 3.3 core through SDL3. The scene's camera box picks what the 3D camera follows; entities with a
 // model (setModel, the Lua "model" gene) are drawn as meshes (.bmesh, Edgebreaker-compressed, from Blender via
 // scripts/blender/export.py), other entities as camera-facing billboards of their current sprite frame, and static

@@ -6,10 +6,17 @@
 #include <vector>
 #include <string_view>
 
-#include "c/LogicalKey.h"
+#include "c/Input.h"
 
 #if defined(_WIN32)
+#  ifndef WIN32_LEAN_AND_MEAN
+#    define WIN32_LEAN_AND_MEAN
+#  endif
+#  ifndef NOMINMAX
+#    define NOMINMAX
+#  endif
 #  include <windows.h>
+#  undef byte          // resolve the ambiguity with std::byte
 #else
 #  include <fcntl.h>
 #  include <unistd.h>
@@ -23,21 +30,21 @@
 // ────────────────────────────────────────────────
 //  Main listener class
 // ────────────────────────────────────────────────
-class Input {
+class InputListener {
 public:
-    static auto getInstance() -> Input&;
+    static auto getInstance() -> InputListener&;
     void listen();   // platform-specific implementation
 
 private:
-    Input();
-    Input(const Input&) = delete;
-    Input operator=(const Input&) = delete;
-    Input(const Input&&) = delete;
-    Input operator=(const Input&&) = delete;
+    InputListener();
+    InputListener(const InputListener&) = delete;
+    InputListener operator=(const InputListener&) = delete;
+    InputListener(const InputListener&&) = delete;
+    InputListener operator=(const InputListener&&) = delete;
 
     auto convertCodeToLogicalInt(int code) -> LogicalKey;
-
-    Input _inputState{};
+    void discoverPotentialKeyboards();
+    Input _state{};
 
 #if !defined(_WIN32)
     struct Device {

@@ -1,7 +1,6 @@
 // Lua FFI: the engine itself: assets (the game's pack or loose files, see data/Pack.h), the build, frame rate, dice.
 #include "export.h"
 #include "c/Dice.h"
-#include "c/FrameClock.h"
 #include "data/Mem.h"
 #include "data/Pack.h"
 #include <string>
@@ -37,9 +36,6 @@ EXPORT_API bool isReleaseBuild() {
   return false;
 #endif
 }
-
-// Frames per second, measured by the main loop over the last half second or so (0 until then).
-EXPORT_API float frameRate() { return FrameClock::get().fps(); }
 
 EXPORT_API int rollDice( const int min, const int max ) { return Dice( min, max ).roll(); }
 

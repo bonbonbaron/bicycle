@@ -139,6 +139,7 @@ struct Input {
   LogicalKey lastPressed{};  // the key (or button) this event is about
   int millisSinceLast{};  // i don't like making input dependent on Timer.
   Bitset currKeysPressed{};
+  Bitset prevKeysPressed{};
   Bitset deltaKeysPressed{};
   bool pressed{ true };      // true: it went down; false: it was released (Trigger::sendInput)
 };

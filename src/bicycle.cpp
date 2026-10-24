@@ -3,12 +3,10 @@
 #include "bicycle.h"
 #include "c/Animator.h"
 #include "c/CollisionDetector.h"
-#include "c/FrameClock.h"
 #include "c/InputState.h"
 #include "c/Kinematics.h"
 #include "c/MidiPlayer.h"
 #include "c/ScriptedInput.h"
-#include "c/StartupStats.h"
 #include "c/Timer.h"
 #include "c/Trigger.h"
 #include "data/Mem.h"
@@ -35,11 +33,8 @@ namespace bicycle {
 #else
     assets::mount( gameName );
 #endif
-    startup::mark( "asset pack" );
     gfx::renderer().init( gameName );
-    startup::mark( "renderer init (window, GL, fonts)" );
     Trigger::getInstance().init( gameName );
-    startup::mark( "game main.lua (scene, models, audio)" );
   }
 
   Entity push( std::shared_ptr<Window> shared ) {
@@ -52,7 +47,6 @@ namespace bicycle {
 
   int run() {
     auto& wm = WindowManager::getInstance();
-    auto& clock = FrameClock::get();
     auto scripted = ScriptedInput::fromEnv();
     // BICYCLE_MAX_FRAMES=<n>: quit after n frames (headless tests, e.g. tests/release_io_test.sh).
     const char* max = std::getenv( "BICYCLE_MAX_FRAMES" );
@@ -71,20 +65,15 @@ namespace bicycle {
       if ( gfx::renderer().quitRequested() ) break;
 
       // The world moves
-      clock.beginFrame();
       Kinematics::getInstance().run();  // 2D motions, then the 3D layer (physics, camera rig)
       MidiPlayer::getInstance().tickFade();
       CollisionDetector::check();
-      clock.endPhase( FrameClock::PHYSICS );
 
       // The game reacts (Lua: input, collisions, timeouts)
       Trigger::getInstance().send();
-      clock.endPhase( FrameClock::LUA );
 
       // Output
       wm.render();
-      if ( frame == 1 ) startup::mark( "first frame" );
-      clock.endPhase( FrameClock::RENDER );
 
       mem::memRst( mem::TEMPORARY );  // scratch never outlives a frame
       Timer::sleepFrame();            // burn off the rest of the frame's time
