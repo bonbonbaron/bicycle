@@ -17,7 +17,7 @@ int main( int argc, char** argv ) {
   if ( argc > 2 || ( argc == 2 && std::string( argv[1] ) != BICYCLE_RELEASE_GAME ) ) {
     std::cerr << "This release build runs only its embedded game: ./o [" BICYCLE_RELEASE_GAME "]\n";
     exit(1);
-  }
+  }   
   bicycle::init( BICYCLE_RELEASE_GAME );
   return bicycle::run();
 #endif

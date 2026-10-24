@@ -7,26 +7,17 @@
       "request": "launch",
       "program": "${workspaceFolder}/o.exe",
       "args": ["test"],
-      "stopAtEntry": false,
-      "cwd": "${fileDirname}",
+      "stopAtEntry": true,
+      "cwd": "${workspaceFolder}",
       "environment": [],
-      "externalConsole": false,
+      "externalConsole": true,
       "MIMode": "gdb",
-      // "miDebuggerPath": "/usr/bin/gdb",
       "miDebuggerPath": "C:/msys64/clang64/bin/gdb.exe",
-      "sourceFileMap": { "/c/": "C:/" },
       "setupCommands": [
-          {
-              "description": "Enable pretty-printing for gdb",
-              "text": "-enable-pretty-printing",
-              "ignoreFailures": true
-          },
-          {
-              "description": "Set Disassembly Flavor to Intel",
-              "text": "-gdb-set disassembly-flavor intel",
-              "ignoreFailures": true
-          }
-      ]
-    },
+        { "description": "Enable pretty-printing for gdb", "text": "-enable-pretty-printing", "ignoreFailures": true },
+        { "description": "Set Disassembly Flavor to Intel", "text": "-gdb-set disassembly-flavor intel", "ignoreFailures": true }
+      ],
+      "logging": { "engineLogging": true, "trace": true, "traceResponse": true }
+    }
   ]
 }

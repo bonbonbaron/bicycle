@@ -437,6 +437,11 @@ if ( NOT CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_NAME STREQUAL "Linux" )
   elseif ( lifecycleGame STREQUAL "plat3d" AND BICYCLE_RENDER STREQUAL "3D" )
     set( lifecyclePair "courtyard:bonus" )
   endif()
+  # ffi.C.setVelX/Y/Z from a genome (tests/velx_test.sh): declared in the cdef, and the entity actually moves.
+  if ( BICYCLE_RENDER STREQUAL "ASCII" AND NOT BICYCLE_RELEASE )
+    add_test( NAME set-vel-x COMMAND sh "${CMAKE_SOURCE_DIR}/tests/velx_test.sh" "${BICYCLE_TEST_EXE}" "${CMAKE_SOURCE_DIR}" )
+    set_tests_properties( set-vel-x PROPERTIES TIMEOUT 200 )
+  endif()
   # plat3d's coins (tests/coin_collect_test.sh): removing a body inside its collision dispatch. 3D dev builds run
   # loose files; a release build needs plat3d packed.
   if ( BICYCLE_RENDER STREQUAL "3D" AND ( NOT BICYCLE_RELEASE OR lifecycleGame STREQUAL "plat3d" ) )

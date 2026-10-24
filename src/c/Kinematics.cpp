@@ -385,24 +385,31 @@ void Kinematics::setVelocity( const Entity entity, const Position& vel ) {
   auto& term = _motion.at<TERM>( entity );
   term.pos.x = std::max( term.pos.x, std::abs( vel.x ) );
   term.pos.y = std::max( term.pos.y, std::abs( vel.y ) );
+  term.pos.z = std::max( term.pos.z, std::abs( vel.z ) );
   update( entity );
 }
 
 void Kinematics::setVelX( const Entity entity, const decltype(Position::x)& velX ) {
   motionRow( entity );
   _motion.at<VEL>( entity ).pos.x = velX;
+  auto& term = _motion.at<TERM>( entity ).pos.x;  // a fresh row's TERM is 0, and run() clamps VEL to it
+  term = std::max( term, std::abs( velX ) );
   update( entity );
 }
 
 void Kinematics::setVelY( const Entity entity, const decltype(Position::y)& velY ) {
   motionRow( entity );
   _motion.at<VEL>( entity ).pos.y = velY;
+  auto& term = _motion.at<TERM>( entity ).pos.y;  // a fresh row's TERM is 0, and run() clamps VEL to it
+  term = std::max( term, std::abs( velY ) );
   update( entity );
 }
 
 void Kinematics::setVelZ( const Entity entity, const decltype(Position::z)& velZ ) {
   motionRow( entity );
   _motion.at<VEL>( entity ).pos.z = velZ;
+  auto& term = _motion.at<TERM>( entity ).pos.z;  // a fresh row's TERM is 0, and run() clamps VEL to it
+  term = std::max( term, std::abs( velZ ) );
   update( entity );
 }
 

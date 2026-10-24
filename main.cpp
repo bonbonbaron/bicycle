@@ -4,12 +4,18 @@
 #include <unordered_set>
 using namespace std;
 
-struct A {
-  int i;
-  int j;
-};
+template<typename T>
+void print( T arg ) {
+	std::cout << arg;
+}
+
+template<typename T, typename ...Rest>
+void printall(T t, Rest r...) {
+	print(t);
+	printall(r);
+}
+
 int main() {
-  unordered_set<A> u{};
-  u.insert( A{1, 2} );
+	printall("i", " ", "love", " ", "you\n");
   return 0;
 }

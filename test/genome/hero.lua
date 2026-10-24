@@ -50,16 +50,16 @@ function hero:actOnInput(input)
 function hero:actOffInput(input)
   print("hero id: "..self.id)
   if input == ffi.C.A then
-     ffi.C.setVelX(self.id, 0)  -- TODO add velX/Y/Z setters so you don't have to set untouched components to themselves
-    elseif input == ffi.C.D then
-      ffi.C.setVelY(self.id, 0)  -- TODO add velX/Y/Z setters so you don't have to set untouched components to themselves
-    elseif input == ffi.C.W then
-      ffi.C.setVelZ(self.id, 0)
-    elseif input == ffi.C.S then
-      ffi.C.setVelZ(self.id, 0)
-    elseif input == ffi.C.LeftShift then
-      self.stepSize = 3
-    end
+    ffi.C.setVelX(self.id, 0)  -- TODO add velX/Y/Z setters so you don't have to set untouched components to themselves
+  elseif input == ffi.C.D then
+    ffi.C.setVelY(self.id, 0)  -- TODO add velX/Y/Z setters so you don't have to set untouched components to themselves
+  elseif input == ffi.C.W then
+    ffi.C.setVelZ(self.id, 0)
+  elseif input == ffi.C.S then
+    ffi.C.setVelZ(self.id, 0)
+  elseif input == ffi.C.LeftShift then
+    self.stepSize = 3
+  end
   end
 
 local SOLID, ENEMY, NPC = 2, 4, 5  -- Genome.COLL
