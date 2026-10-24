@@ -150,6 +150,34 @@ int main() {
     s.frame( 1600, "\x1b[57441;1:3u\x1b[1;1:3C" );
     CHECK( s.str() == "+W -W +Shift +D -Shift -D" );
   }
+  {  // Windows console records (term::ConsoleKeys)
+    using K = LogicalKey;
+    std::string log;
+    auto emit = [&]( K k, bool down ) { log += std::string( log.empty() ? "" : " " ) + ( down ? "+" : "-" ) + ( k == K::A ? "A" : "D" ); };
+    // A real console: down, repeated downs while held, then the up; a release only on the up.
+    term::ConsoleKeys real;
+    real.record( K::A, true, 0, emit ); real.endFrame( 0, emit );
+    for ( double t = 33; t < 1000; t += 33 ) { real.record( K::A, true, t, emit ); real.endFrame( t, emit ); }
+    CHECK( log == "+A" );
+    real.record( K::A, false, 1000, emit ); real.endFrame( 1000, emit );
+    CHECK( log == "+A -A" && !real.paired() );
+    // VS Code's terminal through ConPTY: each character is a down+up pair. The key must stay pressed for frames,
+    // not be released in the frame it was pressed (the hero never moved), and go up once the repeats stop.
+    log.clear();
+    term::ConsoleKeys pairs;
+    pairs.record( K::D, true, 0, emit ); pairs.record( K::D, false, 0, emit ); pairs.endFrame( 0, emit );
+    CHECK( log == "+D" && pairs.paired() );
+    double t = 17;
+    for ( ; t < 500; t += 17 ) pairs.endFrame( t, emit );  // the typematic delay: a tap's release, then
+    for ( double r = 500; r < 1500; r += 33 ) {             // the repeats of a hold
+      for ( ; t < r; t += 17 ) pairs.endFrame( t, emit );
+      pairs.record( K::D, true, t, emit ); pairs.record( K::D, false, t, emit ); pairs.endFrame( t, emit );
+      t += 17;
+    }
+    CHECK( log == "+D -D +D" );
+    for ( ; t < 2000; t += 17 ) pairs.endFrame( t, emit );
+    CHECK( log == "+D -D +D -D" );
+  }
   if ( failures ) { std::printf( "term-input: %d failure(s)\n", failures ); return 1; }
   std::printf( "term-input: all passed\n" );
   return 0;

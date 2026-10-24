@@ -1,5 +1,6 @@
 #include "c/InputListener.h"
 #include "c/Trigger.h"
+#include <chrono>
 #include <cstdlib>
 #include <iostream>
 #if defined(BICYCLE_RENDER_ASCII)
@@ -85,6 +86,8 @@ void InputListener::listen() {
 #if defined(_WIN32)
 // Console key records: real downs and ups, only while our terminal has focus. Peek first so we never block.
 void InputListener::pollConsole() {
+  const double t = std::chrono::duration<double, std::milli>( std::chrono::steady_clock::now().time_since_epoch() ).count();
+  auto emit = [this]( LogicalKey key, bool down ) { press( key, down ); };
   DWORD n{};
   while ( GetNumberOfConsoleInputEvents( _conin, &n ) && n > 0 ) {
     INPUT_RECORD rec[32];
@@ -93,12 +96,10 @@ void InputListener::pollConsole() {
     for ( DWORD i = 0; i < got; ++i ) {
       if ( rec[i].EventType != KEY_EVENT ) continue;
       const auto& k = rec[i].Event.KeyEvent;
-      const int vk = k.wVirtualKeyCode & 0xFF;
-      if ( static_cast<bool>( k.bKeyDown ) == _vkDown[vk] ) continue;  // auto-repeat
-      _vkDown[vk] = k.bKeyDown != 0;
-      press( nativeToLogical( vk ), _vkDown[vk] );
+      _consoleKeys.record( nativeToLogical( k.wVirtualKeyCode & 0xFF ), k.bKeyDown != 0, t, emit );
     }
   }
+  _consoleKeys.endFrame( t, emit );
 }
 
 // No console to read (mintty with a piped stdin): poll the keyboard. This can't tell whether our terminal has focus.

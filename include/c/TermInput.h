@@ -227,4 +227,43 @@ class KeyReleaseDetector {
     static auto avg( double prev, double sample ) -> double { return prev > 0 ? prev * 0.7 + sample * 0.3 : sample; }
 };
 
+// Windows console key records. A real console sends a key's down (repeated while it's held) and its up when it's let
+// go. A terminal that only has characters (VS Code's, through ConPTY) sends every character as a down+up pair at
+// once, so a held key reads as press+release in the same frame: the game sees the release before it ever moves.
+// Once a key's down and up come in the same frame, the downs are read as auto-repeat bytes (KeyReleaseDetector) and
+// the ups are ignored. record() each record of a frame, then endFrame(); emit( key, down ) gets the edges.
+class ConsoleKeys {
+  public:
+    KeyReleaseDetector keys{};
+    auto paired() const -> bool { return _paired; }
+    template <class F> void record( LogicalKey k, bool down, double t, F&& emit ) {
+      if ( k == LogicalKey::NOTHING || k >= LogicalKey::COUNT ) return;
+      const auto i = static_cast<unsigned>( k );
+      if ( !down && _downNow[i] && !_paired ) {
+        _paired = true;
+        keys.onByte( k, t );  // the key already went down; the byte timing releases it from here on
+      }
+      if ( down ) _downNow[i] = true;
+      if ( _paired ) {
+        if ( down && keys.onByte( k, t ) && !_held[i] ) { _held[i] = true; emit( k, true ); }
+        return;
+      }
+      if ( down == _held[i] ) return;  // a held key's auto-repeat
+      _held[i] = down;
+      emit( k, down );
+    }
+    template <class F> void endFrame( double t, F&& emit ) {
+      _downNow.fill( false );
+      if ( !_paired ) return;
+      keys.expire( t, [&]( LogicalKey k ) {
+        const auto i = static_cast<unsigned>( k );
+        if ( _held[i] ) { _held[i] = false; emit( k, false ); }
+      } );
+    }
+  private:
+    static constexpr unsigned N = static_cast<unsigned>( LogicalKey::COUNT );
+    std::array<bool, N> _held{}, _downNow{};
+    bool _paired{};
+};
+
 }  // namespace term

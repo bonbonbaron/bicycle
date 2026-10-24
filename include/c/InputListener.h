@@ -14,6 +14,7 @@
 #include <vector>
 
 #include "c/Input.h"
+#include "c/TermInput.h"
 
 #if defined(_WIN32)
 #  ifndef WIN32_LEAN_AND_MEAN
@@ -50,7 +51,8 @@ private:
 
 #if defined(_WIN32)
     HANDLE _conin{ INVALID_HANDLE_VALUE };
-    std::array<bool, 256> _vkDown{};
+    std::array<bool, 256> _vkDown{};  // (ASYNC_KEYS)
+    term::ConsoleKeys _consoleKeys{};
     void pollConsole();
     void pollAsyncKeys();
 #else
