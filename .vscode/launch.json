@@ -2,10 +2,31 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "type": "lua",
+      "name": "(gdb) Launch",
+      "type": "cppdbg",
       "request": "launch",
-      "name": "Debug Lua Script",
-      "program": "${workspaceFolder}/test/main.lua"
-    }
+      "program": "${workspaceFolder}/o.exe",
+      "args": ["test"],
+      "stopAtEntry": false,
+      "cwd": "${fileDirname}",
+      "environment": [],
+      "externalConsole": false,
+      "MIMode": "gdb",
+      // "miDebuggerPath": "/usr/bin/gdb",
+      "miDebuggerPath": "C:/msys64/clang64/bin/gdb.exe",
+      "sourceFileMap": { "/c/": "C:/" },
+      "setupCommands": [
+          {
+              "description": "Enable pretty-printing for gdb",
+              "text": "-enable-pretty-printing",
+              "ignoreFailures": true
+          },
+          {
+              "description": "Set Disassembly Flavor to Intel",
+              "text": "-gdb-set disassembly-flavor intel",
+              "ignoreFailures": true
+          }
+      ]
+    },
   ]
 }

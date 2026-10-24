@@ -1,5 +1,6 @@
 // Shared by the 2D and 3D renderers: SDL3 window and keyboard, and a software framebuffer drawn in cells.
 #include "v/sdl/PixelRenderer.h"
+#include "c/InputListener.h"
 #include "v/common/Capture.h"
 #include "v/sdl/Font8x8.h"
 #include "v/common/Image.h"
@@ -197,18 +198,8 @@ static auto sdlKeyToLogical( SDL_Keycode k ) -> LogicalKey {
   }
 }
 
-// Several physical sources can drive one logical key (W and the up arrow, the left stick): a key is pressed when its
-// first source goes down and released when its last one comes up, so games see one clean press/release pair.
-static std::array<uint8_t, static_cast<std::size_t>( LogicalKey::COUNT )> sourcesDown{};
-static void keyEdge( LogicalKey k, bool down ) {
-  auto& n = sourcesDown[static_cast<std::size_t>( k )];
-  if ( down ? n++ != 0 : ( n == 0 || --n != 0 ) ) return;
-  Input in{};
-  in.lastPressed = k;
-  if ( down ) in.currKeysPressed.set( static_cast<unsigned>( k ) );
-  in.pressed = down;
-  Trigger::sendInput( in );
-}
+// Key edges go to the one InputListener, which merges sources (W and the up arrow) and sends press/release events.
+static void keyEdge( LogicalKey k, bool down ) { InputListener::getInstance().press( k, down ); }
 
 void PixelRenderer::handleEvent( const SDL_Event& e ) {
   switch ( e.type ) {
@@ -341,6 +332,7 @@ void PixelRenderer::pollInput() {
     const float rx = std::abs( a[2] ) > DEAD ? a[2] : 0, ry = std::abs( a[3] ) > DEAD ? a[3] : 0;
     if ( rx != 0 || ry != 0 ) Trigger::sendLook( rx * STICK_LOOK, ry * STICK_LOOK );
   }
+  InputListener::getInstance().listen();  // send this frame's key presses and releases
 }
 
 // --- windows --------------------------------------------------------------------------------------------------------

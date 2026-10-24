@@ -246,6 +246,9 @@ ffi.cdef([[
   bool stepBlocked( Entity entity );
   void teleport( Entity entity, int x, int y );
   void setVelocity( Entity entity, int vx, int vy );
+  void setVelX( const Entity entity, int velX );
+  void setVelY( const Entity entity, int velY );
+  void setVelZ( const Entity entity, int velZ );
   void motionLinear( Entity entity, float speed, bool pingPong );
   void motionWaypoint( Entity entity, float x, float y );
   void motionOrbit( Entity entity, Entity center, float cx, float cy, float rx, float ry, float degPerSec, float phaseDeg );

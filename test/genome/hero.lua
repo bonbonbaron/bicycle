@@ -32,38 +32,35 @@ hero.stepSize = 3
 function hero:actOnInput(input)
   if input == ffi.C.A then
      self.anim:set( "walk_left" )
-     ffi.C.setVelocity(self.id, -self.stepSize * self.STEP, 0)  -- TODO add velX/Y/Z setters so you don't have to set untouched components to themselves
-  elseif input == ffi.C.D then
-     self.anim:set( "walk_right" )
-     ffi.C.setVelocity(self.id, self.stepSize * self.STEP, 0)
-  elseif input == ffi.C.W then
-     self.anim:set( "walk_up" )
-     ffi.C.setVelocity(self.id, 0, -self.STEP * self.stepSize)
+     ffi.C.setVelX(self.id, -self.stepSize * self.STEP)  -- TODO add velX/Y/Z setters so you don't have to set untouched components to themselves
+    elseif input == ffi.C.D then
+      self.anim:set( "walk_right" )
+      ffi.C.setVelY(self.id, self.stepSize * self.STEP)  -- TODO add velX/Y/Z setters so you don't have to set untouched components to themselves
+    elseif input == ffi.C.W then
+      self.anim:set( "walk_up" )
+      ffi.C.setVelZ(self.id, -self.STEP * self.stepSize)
     elseif input == ffi.C.S then
       self.anim:set( "walk_down" )
-      ffi.C.setVelocity(self.id, 0, self.STEP * self.stepSize)
-  elseif input == ffi.C.LeftShift then
+      ffi.C.setVelZ(self.id, self.STEP * self.stepSize)
+    elseif input == ffi.C.LeftShift then
       self.stepSize = 6
+    end
   end
-end
 
 function hero:actOffInput(input)
+  print("hero id: "..self.id)
   if input == ffi.C.A then
-    ffi.C.sys(ffi.C.STOP, ffi.C.SYS_MOTION, self.id);
-    ffi.C.sys(ffi.C.STOP, ffi.C.SYS_ANIMATION, self.id);
-  elseif input == ffi.C.D then
-    ffi.C.sys(ffi.C.STOP, ffi.C.SYS_MOTION, self.id);
-    ffi.C.sys(ffi.C.STOP, ffi.C.SYS_ANIMATION, self.id);
-  elseif input == ffi.C.W then
-    ffi.C.sys(ffi.C.STOP, ffi.C.SYS_MOTION, self.id);
-    ffi.C.sys(ffi.C.STOP, ffi.C.SYS_ANIMATION, self.id);
-  elseif input == ffi.C.S then
-    ffi.C.sys(ffi.C.STOP, ffi.C.SYS_MOTION, self.id);
-    ffi.C.sys(ffi.C.STOP, ffi.C.SYS_ANIMATION, self.id);
-  elseif input == ffi.C.LeftShift then
-    self.stepSize = 6
+     ffi.C.setVelX(self.id, 0)  -- TODO add velX/Y/Z setters so you don't have to set untouched components to themselves
+    elseif input == ffi.C.D then
+      ffi.C.setVelY(self.id, 0)  -- TODO add velX/Y/Z setters so you don't have to set untouched components to themselves
+    elseif input == ffi.C.W then
+      ffi.C.setVelZ(self.id, 0)
+    elseif input == ffi.C.S then
+      ffi.C.setVelZ(self.id, 0)
+    elseif input == ffi.C.LeftShift then
+      self.stepSize = 3
+    end
   end
-end
 
 local SOLID, ENEMY, NPC = 2, 4, 5  -- Genome.COLL
 hero.MAX_HEALTH = 10
@@ -101,10 +98,8 @@ end
 -- it's released; the newest held direction wins. Releases of other keys mean nothing here.
 function hero:onInput(input, pressed)
   if pressed then
-    print("on input for "..input)
     self:actOnInput(input)
   else
-    print("off input for "..input)
     self:actOffInput(input)
   end
   if input == ffi.C.Q then
