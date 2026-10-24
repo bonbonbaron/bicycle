@@ -355,6 +355,8 @@ endif()
 if ( NOT MSVC )
   # Unused code and data dropped at link time; exported (FFI) functions are roots, so they stay.
   target_compile_options( o PRIVATE -ffunction-sections -fdata-sections $<$<BOOL:${BICYCLE_SIZE}>:-Os> )
+  # Debug: DWARF 4, which every gdb reads (clang targeting MinGW emits DWARF, not CodeView, with -g).
+  target_compile_options( o PRIVATE $<$<CONFIG:Debug>:-gdwarf-4> )
   if ( APPLE )
     target_link_options( o PRIVATE -Wl,-dead_strip )
   else()
@@ -374,7 +376,10 @@ if ( BICYCLE_LTO )
 endif()
 # Debug info out of the executable into o.debug (o-2d.debug, ...), linked back with a .gnu_debuglink, which gdb
 # and lldb follow. Builds without -g skip it.
-if ( BICYCLE_SPLIT_DEBUG AND NOT MSVC AND NOT APPLE AND NOT BICYCLE_RELEASE AND CMAKE_BUILD_TYPE MATCHES "Deb" )
+# Only RelWithDebInfo: Debug keeps its DWARF in the executable, and Windows never splits (gdb there doesn't reliably
+# follow a PE's .gnu_debuglink, which leaves every breakpoint unbound).
+if ( BICYCLE_SPLIT_DEBUG AND NOT MSVC AND NOT APPLE AND NOT WIN32 AND NOT BICYCLE_RELEASE
+     AND CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo" )
   find_program( BICYCLE_OBJCOPY NAMES llvm-objcopy ${CMAKE_OBJCOPY} objcopy )
   if ( BICYCLE_OBJCOPY )
     add_custom_command( TARGET o POST_BUILD

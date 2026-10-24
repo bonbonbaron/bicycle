@@ -22,6 +22,7 @@
 #endif
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <io.h>
 #else
 #include <sys/ioctl.h>
 #include <unistd.h>
@@ -34,22 +35,35 @@ static auto W( WinHandle win ) -> WINDOW* {
 }
 
 #ifdef _WIN32
+static bool ownConsole = false;
+
 // PDCurses draws through the console behind stdout. Without one (VS Code's gdb with externalConsole off, mintty
 // without ConPTY: stdout is a pipe) it reads a garbage screen size, and its 512-cell line buffer overflows on the
-// first refresh. So give the game a console of its own, and point stdin/stdout at it, before initscr().
+// first refresh. So open a console of our own and point the std handles (PDCurses' GetStdHandle) and C stdio
+// (std::cout/cerr, die()'s messages) at it, before initscr().
 static void ensureConsole() {
   DWORD mode{};
   if ( GetConsoleMode( GetStdHandle( STD_OUTPUT_HANDLE ), &mode ) ) return;  // already a real console
-  FreeConsole();  // a hidden one (mintty's) is no use: nobody can see it
+  if ( GetConsoleWindow() ) FreeConsole();  // attached to a hidden one (mintty's): nobody can see it
   if ( !AllocConsole() ) return;
-  const auto open = []( const wchar_t* name ) {
-    return CreateFileW( name, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING,
-                        0, nullptr );
-  };
-  SetStdHandle( STD_OUTPUT_HANDLE, open( L"CONOUT$" ) );
-  SetStdHandle( STD_ERROR_HANDLE, open( L"CONOUT$" ) );
-  SetStdHandle( STD_INPUT_HANDLE, open( L"CONIN$" ) );
+  ownConsole = true;
+  std::freopen( "CONOUT$", "w", stdout );
+  std::freopen( "CONOUT$", "w", stderr );
+  std::freopen( "CONIN$", "r", stdin );
+  SetStdHandle( STD_OUTPUT_HANDLE, reinterpret_cast<HANDLE>( _get_osfhandle( _fileno( stdout ) ) ) );
+  SetStdHandle( STD_ERROR_HANDLE, reinterpret_cast<HANDLE>( _get_osfhandle( _fileno( stderr ) ) ) );
+  SetStdHandle( STD_INPUT_HANDLE, reinterpret_cast<HANDLE>( _get_osfhandle( _fileno( stdin ) ) ) );
 }
+
+// die() calls this after printing: a console we opened closes with the process, so keep it up until Enter.
+void holdConsoleIfOwned() {
+  if ( !ownConsole ) return;
+  std::fputs( "\nPress Enter to close.", stderr );
+  std::fflush( stderr );
+  std::getchar();
+}
+#else
+void holdConsoleIfOwned() {}
 #endif
 
 void AsciiRenderer::init( const std::string& ) {

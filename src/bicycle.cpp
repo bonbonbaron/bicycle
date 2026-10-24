@@ -15,12 +15,24 @@
 #include <cstdlib>
 #include <iostream>
 
+#include <fstream>
+
+#ifdef BICYCLE_RENDER_ASCII
+namespace gfx { void holdConsoleIfOwned(); }  // AsciiRenderer.cpp
+#endif
+
 namespace bicycle {
 
   void die( const std::string& s ) {
     std::unique_lock<std::mutex> l( bike_mtx );
     gfx::renderer().shutdown();
     std::cerr << "\e[91m" << s << "\e[0m\n";
+#ifdef _WIN32
+    std::ofstream( "bicycle-error.log" ) << s << "\n";  // in case the console it went to is already gone
+#endif
+#ifdef BICYCLE_RENDER_ASCII
+    gfx::holdConsoleIfOwned();
+#endif
     exit( 1 );
   }
 
