@@ -35,7 +35,6 @@ void Kinematics::run() {
   const uint32_t n = _motion.nActive();
   // Trackers need to know where they're going before we move them.
   for ( uint32_t i = 0; i < n; ++i ) {
-    std::cout << "Moving enetity " << _motion.key( i ) << " with target " << _motion.col<TRACK>()[i] << std::endl;
     const Entity follower = _motion.key( i ), target = _motion.col<TRACK>()[i];
     if ( target == 0 || target == follower ) continue;  // not tracking anything
     auto& trackerPos = boxes.at( follower ).pos;
@@ -80,7 +79,6 @@ void Kinematics::run() {
       CollisionDetector::getInstance().deactivate( e );
     }
   }
-  std::cout << "over" << std::endl;
 }
 
 // --- moving or still -----------------------------------------------------------------------------------------------
@@ -100,14 +98,11 @@ auto Kinematics::moving( Entity e ) const -> bool {
 
 void Kinematics::update( Entity e ) {
   motionRow( e );
-  std::cout << "sanity check\n";
   if ( moving( e ) ) {
-    std::cout << "activating entity " << e << std::endl;
     _motion.activate( e );
     CollisionDetector::getInstance().activate( e );  // (also when it was already moving but just got a collider)
   }
   else if ( _motion.deactivate( e ) ) {
-    std::cout << "deactivating entity " << e << std::endl;
     CollisionDetector::getInstance().deactivate( e );
   }
 }

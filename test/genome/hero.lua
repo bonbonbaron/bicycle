@@ -35,32 +35,31 @@ function hero:actOnInput(input)
      ffi.C.setVelX(self.id, -self.stepSize * self.STEP)  -- TODO add velX/Y/Z setters so you don't have to set untouched components to themselves
     elseif input == ffi.C.D then
       self.anim:set( "walk_right" )
-      ffi.C.setVelY(self.id, self.stepSize * self.STEP)  -- TODO add velX/Y/Z setters so you don't have to set untouched components to themselves
+      ffi.C.setVelX(self.id, self.stepSize * self.STEP)  -- TODO add velX/Y/Z setters so you don't have to set untouched components to themselves
     elseif input == ffi.C.W then
       self.anim:set( "walk_up" )
-      ffi.C.setVelZ(self.id, -self.STEP * self.stepSize)
+      ffi.C.setVelY(self.id, -self.STEP * self.stepSize/2)
     elseif input == ffi.C.S then
       self.anim:set( "walk_down" )
-      ffi.C.setVelZ(self.id, self.STEP * self.stepSize)
+      ffi.C.setVelY(self.id, self.STEP * self.stepSize/2)
     elseif input == ffi.C.LeftShift then
       self.stepSize = 6
     end
   end
 
 function hero:actOffInput(input)
-  print("hero id: "..self.id)
   if input == ffi.C.A then
     ffi.C.setVelX(self.id, 0)  -- TODO add velX/Y/Z setters so you don't have to set untouched components to themselves
   elseif input == ffi.C.D then
-    ffi.C.setVelY(self.id, 0)  -- TODO add velX/Y/Z setters so you don't have to set untouched components to themselves
+    ffi.C.setVelX(self.id, 0)  -- TODO add velX/Y/Z setters so you don't have to set untouched components to themselves
   elseif input == ffi.C.W then
-    ffi.C.setVelZ(self.id, 0)
+    ffi.C.setVelY(self.id, 0)
   elseif input == ffi.C.S then
-    ffi.C.setVelZ(self.id, 0)
+    ffi.C.setVelY(self.id, 0)
   elseif input == ffi.C.LeftShift then
     self.stepSize = 3
   end
-  end
+end
 
 local SOLID, ENEMY, NPC = 2, 4, 5  -- Genome.COLL
 hero.MAX_HEALTH = 10
@@ -112,8 +111,7 @@ function hero:onInput(input, pressed)
     local npc = self:speakerInReach()
     if npc then
       self:sound( "blip" )
-      dbglog( "talk to %s", npc.name )
-      Dialogue.new( npc.name..":\n"..table.concat( npc.lines, "\n\n" ), nil, nil, nil, nil, function() dbglog( "talk done" ) end )
+      Dialogue.new( npc.name..":\n"..table.concat( npc.lines, "\n\n" ), nil, nil, nil, nil, function() end )
     end
     return
   end
@@ -121,7 +119,6 @@ end
 
 function hero:hurt( by )
   if self.invulnerable > 0 or self.health <= 0 then
-    dbglog( "hero hit while invulnerable; no damage" )
     return
   end
   self.health = self.hp:set( self.health - self.DAMAGE )
@@ -131,9 +128,7 @@ function hero:hurt( by )
   local me, b = box( self.id ), box( by )
   local away = ( me.pos.x + me.size.w / 2 ) < ( b.pos.x + b.size.w / 2 ) and -1 or 1
   ffi.C.teleport( self.id, me.pos.x + away * self.KNOCKBACK, me.pos.y )
-  dbglog( "hero hurt: health %d", self.health )
   if self.health <= 0 then
-    dbglog( "game over" )
     Dialogue.new( "You collapse in the tall grass...\n\n...and wake at the edge of the meadow, rested. Press E to try again.",
       nil, nil, nil, nil, function() self:respawn() end )
   end
@@ -143,14 +138,12 @@ function hero:respawn()
   ffi.C.teleport( self.id, self.spawn.x, self.spawn.y )
   self.health = self.hp:set( self.MAX_HEALTH )
   self.invulnerable = self.INVULNERABLE_TICKS
-  dbglog( "respawn: health %d", self.health )
 end
 
 -- After walking through a door: we're at the new scene's spawn point.
 function hero:onSceneEnter( sceneName, spawnName )
   local pos = box( self.id ).pos
   self.spawn = { x = pos.x, y = pos.y }
-  dbglog( "hero entered %s (spawn %s)", sceneName, tostring( spawnName ) )
 end
 
 -- The walk timer steps in the newest held direction; the timer gene's tick flashes while invulnerable.
@@ -168,7 +161,6 @@ function hero:onCollision(other, collType)
     self:sound( "bump" )
     self.blocked = true
     local pos = box( self.id ).pos
-    dbglog( "hero bumped; flush at %d,%d", pos.x / self.STEP, pos.y / self.STEP )
   end
 end
 
