@@ -1874,7 +1874,8 @@ class Renderer3D final : public PixelRenderer {
       else {
         auto pot = []( int v ) { int p = 1; while ( p < v ) p <<= 1; return p; };
         const int tw = pot( _fbW ), th = pot( _fbH );
-        if ( !same ) {  // allocate the power-of-two texture (contents come from the sub-upload)
+        if ( _fbDirty || !same ) {  // allocate the power-of-two texture (contents come from the sub-upload)
+	  _fbDirty = false;
           std::vector<uint32_t> zero( static_cast<std::size_t>( tw ) * th, 0 );
           uploadBGRA( tw, th, zero.data() );
         }

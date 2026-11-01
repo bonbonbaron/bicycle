@@ -15,6 +15,7 @@ auto widget( int id ) -> Widget* {
 
 auto add( const Widget& w ) -> int {
   auto scene = lua::currentScene();
+  gfx::renderer().markOverlayDirty();
   return scene ? static_cast<int>( scene->addWidget( w ) ) : -1;
 }
 }  // namespace
@@ -30,11 +31,18 @@ EXPORT_API int addHudBar( const char* label, int max, int len, int x, int y ) {
   w.len = std::max( 1, len );
   w.x = x;
   w.y = y;
+  gfx::renderer().markOverlayDirty();
   return add( w );
 }
 
 EXPORT_API void setHudBar( int id, int val ) {
-  if ( Widget* w = widget( id ) ) w->curr = std::clamp( val, 0, w->max );
+  if ( Widget* w = widget( id ) ) {
+	  auto v = std::clamp( val, 0, w->max );
+	  if ( w->curr != v ) {
+		  w->curr = v;
+		  gfx::renderer().markOverlayDirty();
+	  }
+  }
 }
 
 // Pixel modes: draw meter id from images (asset paths of .bimg files; either may be null or "").
@@ -44,6 +52,7 @@ EXPORT_API bool setHudBarSprites( int id, const char* framePath, const char* fil
   if ( !w ) return false;
   w->frameSprite = pixels::loadShared( framePath );
   w->fillSprite = pixels::loadShared( fillPath );
+  gfx::renderer().markOverlayDirty();
   return ( !framePath || !*framePath || w->frameSprite ) && ( !fillPath || !*fillPath || w->fillSprite );
 }
 
@@ -55,16 +64,24 @@ EXPORT_API int addHudText( const char* text, int x, int y ) {
   w.text = text ? text : "";
   w.x = x;
   w.y = y;
+  gfx::renderer().markOverlayDirty();
   return add( w );
 }
 
 EXPORT_API void setHudText( int id, const char* text ) {
-  if ( Widget* w = widget( id ) ) w->text = text ? text : "";
+  if ( Widget* w = widget( id ) ) {
+	  const char* t = text ? text : "";
+	  if (w->text != t) {
+		  w->text = t;
+		  gfx::renderer().markOverlayDirty();
+	  }
+  }
 }
 
 // Takes a meter or label off the current scene's HUD.
 EXPORT_API void removeHudItem( int id ) {
   auto scene = lua::currentScene();
+  gfx::renderer().markOverlayDirty();
   if ( scene && id >= 0 ) scene->removeWidget( static_cast<Entity>( id ) );
 }
 

@@ -440,7 +440,7 @@ function Camera.track( target, opts )
 end
 
 -- Frames per second, smoothed over about half a second (0 for the first half second), e.g. for a HUD label.
-function fps() return tonumber( ffi.C.frameRate() ) end
+function fps() return end -- tonumber( ffi.C.frameRate() ) end
 
 function focusOn( entity )
   focus = entity

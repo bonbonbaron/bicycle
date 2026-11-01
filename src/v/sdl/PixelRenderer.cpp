@@ -57,6 +57,10 @@ auto PixelRenderer::windowFlags() const -> uint64_t {
   return SDL_WINDOW_RESIZABLE;
 }
 
+void PixelRenderer::markOverlayDirty() {
+	_fbDirty = true;
+}
+
 #if defined( __linux__ )
 // On the Linux console (KMSDRM, no X11/Wayland) SDL reads keyboards and mice straight from /dev/input/event*. It
 // finds them through libudev; an SDL built without it (no libudev-dev at build time) finds none and the game gets

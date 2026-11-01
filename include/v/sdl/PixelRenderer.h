@@ -35,6 +35,7 @@ class PixelRenderer : public Renderer {
     void setMouseCapture( bool on ) override;
     void enableGamepad() override;
     auto quitRequested() const -> bool override { return _quit; }
+    void markOverlayDirty();
 
     auto createWindow( int x, int y, int w, int h ) -> WinHandle override;
     void destroyWindow( WinHandle win ) override;
@@ -106,6 +107,7 @@ class PixelRenderer : public Renderer {
 
     SDL_Window* _window{};
     gfx::Pixels _fb;
+    bool _fbDirty{true};  // overlay changed since it was last uploaded to GPU
     int _fbW{};
     int _fbH{};
     bool _quit{};

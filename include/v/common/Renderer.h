@@ -71,6 +71,11 @@ class Renderer {
     // The user closed the window (pixel modes).
     virtual auto quitRequested() const -> bool { return false; }
 
+    virtual void markOverlayDirty() { _fbDirty = true; }
+    virtual bool overlayDirty() { return _fbDirty; }
+    virtual void overlayClean() { _fbDirty = false; }
+    virtual void clearOverlay() {}
+
     // Windows: rectangles of cells drawn in stack order, each frame.
     virtual auto createWindow( int x, int y, int w, int h ) -> WinHandle = 0;
     virtual void destroyWindow( WinHandle win ) = 0;
@@ -126,7 +131,7 @@ class Renderer {
   protected:
     int _transKind{};
     float _transT{};
-  public:
+    bool _fbDirty{true};
 };
 
 auto renderer() -> Renderer&;  // the build's renderer (BICYCLE_RENDER)

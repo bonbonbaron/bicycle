@@ -76,8 +76,8 @@ function hero:onTimer( id, kind )
     for _, b in ipairs( W.live ) do
       if b.genomeName == "coin" then local cx, cy, cz = b:pos() self:setPos( cx, cy - 0.4, cz ) break end
     end
-  elseif kind == FPS_TIMER then
-    self.fpsLabel:set( string.format( "%.0f fps", fps() ) )
+  -- elseif kind == FPS_TIMER then
+    -- self.fpsLabel:set( string.format( "%.0f fps", fps() ) )
   elseif kind == LOG_TIMER then
     local x, y, z = self:pos()
     local ex, ey, ez = W.Camera.eye()
