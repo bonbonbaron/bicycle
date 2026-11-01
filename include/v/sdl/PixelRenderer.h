@@ -35,7 +35,6 @@ class PixelRenderer : public Renderer {
     void setMouseCapture( bool on ) override;
     void enableGamepad() override;
     auto quitRequested() const -> bool override { return _quit; }
-    void markOverlayDirty();
 
     auto createWindow( int x, int y, int w, int h ) -> WinHandle override;
     void destroyWindow( WinHandle win ) override;
@@ -50,10 +49,21 @@ class PixelRenderer : public Renderer {
     void setAttr( WinHandle win, int attr, bool on ) override;
     void presentWindow( WinHandle ) override {}
     void endFrame() override;
+    bool reuseOverlay() override;
+    void setPixelWrites( bool on ) override { _writePixels = on; }
+    bool takeOverlayRepaint() override;
     void applyTransition();
+    void markOverlayDirty() override;
+    void markHudPatch( Entity id ) override;
+    bool hudPatch() override;
+    void beginHudPatch() override;
+    bool hudPatching() override { return _patching; }
+    void beginWidget( Entity e ) override;
+    void endWidget() override;
+    void erasePatchedWidgets() override;
 
     void preloadImage( const std::shared_ptr<const BImg>& img ) override { _atlas.add( img ); }
-    void onSceneUnloaded() override { _atlas.prune(); }
+    void onSceneUnloaded() override { _atlas.prune(); dropHudTracking(); }
 
   protected:
     struct Win {
@@ -82,6 +92,8 @@ class PixelRenderer : public Renderer {
 
     // Pixel helpers, in screen pixels, clipped to win (null = whole screen). ARGB; alpha 0 skips.
     void fillRect( const Win* win, int x, int y, int w, int h, uint32_t argb );
+    // Like fillRect, but writes argb even when its alpha is 0 (the 3D scene window is cleared to transparent).
+    void fillUnchecked( int x0, int y0, int x1, int y1, uint32_t argb );
     void glyph( const Win* win, int px, int py, unsigned char c, uint32_t fg, uint32_t bg );
     // Alpha-blended drawing (straight alpha, so the 3D overlay composites right).
     void clip( const Win* w, int& x0, int& y0, int& x1, int& y1 ) const;  // to w (null = screen) and the screen
@@ -107,9 +119,52 @@ class PixelRenderer : public Renderer {
 
     SDL_Window* _window{};
     gfx::Pixels _fb;
-    bool _fbDirty{true};  // overlay changed since it was last uploaded to GPU
     int _fbW{};
     int _fbH{};
+    // What was drawn into _fb this frame (fills and blends, plus a playing transition). presentFramebuffer and
+    // drawOverlay copy _fb to the GPU only when this differs from the last copy, or markOverlayDirty() was called.
+    // On 3D, a frame that built the same picture leaves _fb in place, so the next frame does not clear it or fill
+    // it again. A HUD patch uploads only the rectangles it erased.
+    // _baseSig is everything except HUD widgets; _hudSig is the widgets. A patch whose base still matches did not
+    // change dialogue, the scene clear, or the crosshair, so the widget rectangles are the whole update.
+    static auto mix( uint64_t s, uint64_t v ) -> uint64_t {
+      return s ^ ( v + 0x9e3779b97f4a7c15ull + ( s << 6 ) + ( s >> 2 ) );
+    }
+    void mixSig( uint64_t v ) {
+      _drawSig = mix( _drawSig, v );
+      if ( _mixHud ) _hudSig = mix( _hudSig, v );
+      else _baseSig = mix( _baseSig, v );
+    }
+    auto overlayStale() -> bool;
+    void noteOverlayUpload();
+    void blankFramebuffer();  // the whole _fb to frameClearColor(); a 0 clear is one memset
+    auto coverOnCpu() const -> bool;  // a transition that rewrites _fb (not a 3D fade or wipe)
+    void dropHudTracking();
+    void eraseRect( int x0, int y0, int x1, int y1 );  // zeros, no signature; the following draws mix as usual
+    void rememberSpan( Entity e, int x0, int y0, int x1, int y1 );
+    void noteHudBox( Entity e, int x0, int y0, int x1, int y1 );
+    struct HudSpan { Entity e{}; int x0{}, y0{}, x1{}, y1{}; bool write{}; };
+    HudSpan* findSpan( Entity e );
+    uint64_t _drawSig{};
+    uint64_t _baseSig{};
+    uint64_t _hudSig{};
+    uint64_t _uploadedSig{};
+    uint64_t _uploadedBase{};
+    uint64_t _uploadedHud{};
+    bool _fbUploaded{};
+    bool _writePixels{true};   // false: mix the signature, don't store (the 3D "is this the same picture?" pass)
+    bool _mixHud{};            // the draw in progress is a HUD widget
+    bool _holdReady{};         // _fb still holds the picture that was uploaded
+    bool _overlayRepaint{};    // that pass's signature did not match; draw the overlay for real
+    bool _fbBlank{};           // every pixel is 0, so a transparent fill can be skipped
+    bool _patching{};          // this frame rewrites HUD rectangles on the held framebuffer
+    bool _hudPatch{};          // markHudPatch asked for that, and a full rebuild was not
+    bool _hasDamage{};
+    int _dmgX0{}, _dmgY0{}, _dmgX1{}, _dmgY1{};
+    Entity _hudEntity{};
+    std::vector<Entity> _patchIds;
+    std::vector<HudSpan> _hudSpans;  // last rectangle each widget actually drew
+    std::vector<HudSpan> _noted;     // rectangles measured for this patch
     bool _quit{};
     bool _console{};         // SDL kmsdrm (Linux console): one always-focused window
     int _unreadableInput{};  // console input devices we may not open (not in the input group)

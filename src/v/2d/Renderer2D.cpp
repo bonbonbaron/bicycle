@@ -198,7 +198,11 @@ class Renderer2D final : public FlatRenderer<PixelRenderer> {
     void onResized() override { makeTexture(); }
     void presentFramebuffer() override {
       if ( !_sdl || !_tex ) return;
-      SDL_UpdateTexture( _tex, nullptr, _fb.data(), _fbW * 4 );
+      // The framebuffer is redrawn from scratch every frame. Copy it only when that picture changed.
+      if ( overlayStale() ) {
+        SDL_UpdateTexture( _tex, nullptr, _fb.data(), _fbW * 4 );
+        noteOverlayUpload();
+      }
       SDL_RenderClear( _sdl );
       SDL_RenderTexture( _sdl, _tex, nullptr, nullptr );
       SDL_RenderPresent( _sdl );

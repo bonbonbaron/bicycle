@@ -215,17 +215,33 @@ void Scene::setHidden( const Entity entity, const bool hidden ) {
 // The HUD layer: glued, so a widget's screen cell is its position (an edge resolves against the window's size).
 void Scene::renderHud() {
   using gfx::Widget;
+  auto& r = gfx::renderer();
   const int w = static_cast<int>( getWidth() ), h = static_cast<int>( getHeight() );
-  for ( const Entity e : _hud.fg ) {
-    const Widget* wd = widget( e );
-    if ( !wd || ( wd->kind == Widget::TEXT && wd->text.empty() ) ) continue;
-    if ( const bool* hidden = _hidden.find( e ); hidden && *hidden ) continue;
-    const int x = wd->x >= 0 ? wd->x : wd->x == Widget::RIGHT ? w : wd->x == Widget::CENTER ? w / 2 : 2;
-    const int y = wd->y >= 0 ? wd->y : wd->y == Widget::BOTTOM ? std::max( 0, h - 2 ) : 1;
-    const auto align = wd->x == Widget::RIGHT ? gfx::Align::End : wd->x == Widget::CENTER ? gfx::Align::Center : gfx::Align::Start;
-    World::get<Box>( e ).pos = Position( x, y ) << FIXEDPT_DEC_BITS;
-    gfx::renderer().drawWidget( getHandle(), y, x, align, *wd );
+  const bool patch = r.hudPatching();
+  // Screen cell of one widget. The same rules the draw uses, so a patch measures the rectangle it will redraw.
+  auto visit = [&]( auto&& fn ) {
+    for ( const Entity e : _hud.fg ) {
+      const Widget* wd = widget( e );
+      if ( !wd || ( wd->kind == Widget::TEXT && wd->text.empty() ) ) continue;
+      if ( const bool* hidden = _hidden.find( e ); hidden && *hidden ) continue;
+      const int x = wd->x >= 0 ? wd->x : wd->x == Widget::RIGHT ? w : wd->x == Widget::CENTER ? w / 2 : 2;
+      const int y = wd->y >= 0 ? wd->y : wd->y == Widget::BOTTOM ? std::max( 0, h - 2 ) : 1;
+      const auto align = wd->x == Widget::RIGHT ? gfx::Align::End : wd->x == Widget::CENTER ? gfx::Align::Center : gfx::Align::Start;
+      fn( e, *wd, x, y, align );
+    }
+  };
+  if ( patch ) {
+    visit( [&]( Entity e, const Widget& wd, int x, int y, gfx::Align align ) {
+      r.markWidgetArea( e, getHandle(), y, x, align, wd );
+    } );
+    r.erasePatchedWidgets();
   }
+  visit( [&]( Entity e, const Widget& wd, int x, int y, gfx::Align align ) {
+    World::get<Box>( e ).pos = Position( x, y ) << FIXEDPT_DEC_BITS;
+    r.beginWidget( e );
+    r.drawWidget( getHandle(), y, x, align, wd );
+    r.endWidget();
+  } );
 }
 
 void Scene::onInput( Input& input ) {

@@ -54,13 +54,31 @@ void WindowManager::refreshAll() {
       }
     }
   }
-  for (unsigned i = 0; i < _population; ++i ) {
-    if ( _windows.at(i) != nullptr ) {
-      _windows.at(i)->clear();
-      _windows.at(i)->render();
-      _windows.at(i)->repaint();
+  // clear, render, repaint. Pulled out so a 3D frame can hash that paint and, when it matches the framebuffer
+  // already on the GPU, present without doing it again.
+  auto paint = [&] {
+    for ( unsigned i = 0; i < _population; ++i ) {
+      if ( _windows.at(i) != nullptr ) {
+        _windows.at(i)->clear();
+        _windows.at(i)->render();
+        _windows.at(i)->repaint();
+      }
     }
+  };
+  // A coin changes one meter. Repaint that rectangle on the overlay already held, instead of the whole screen.
+  if ( r.hudPatch() ) {
+    r.beginHudPatch();
+    paint();
+    r.endFrame();
+    if ( !r.takeOverlayRepaint() ) return;
   }
+  if ( r.reuseOverlay() ) {
+    r.setPixelWrites( false );
+    paint();
+    r.endFrame();
+    if ( !r.takeOverlayRepaint() ) return;
+  }
+  paint();
   r.endFrame();  // displays results of the above window-painting
 }
 

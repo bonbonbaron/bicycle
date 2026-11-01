@@ -57,8 +57,143 @@ auto PixelRenderer::windowFlags() const -> uint64_t {
   return SDL_WINDOW_RESIZABLE;
 }
 
+auto PixelRenderer::overlayStale() -> bool {
+  return !_fbUploaded || overlayDirty() || _drawSig != _uploadedSig;
+}
+
+void PixelRenderer::noteOverlayUpload() {
+  _fbUploaded = true;
+  _uploadedSig = _drawSig;
+  _uploadedBase = _baseSig;
+  _uploadedHud = _hudSig;
+  overlayClean();
+}
+
+// 3D fade and wipe darken the finished frame with a quad. Dissolve, and every 2D transition, still rewrite _fb.
+auto PixelRenderer::coverOnCpu() const -> bool {
+  return _transKind != 0 && _transT > 0.0f && !( mode() == Mode::ThreeD && ( _transKind == 1 || _transKind == 2 ) );
+}
+
+void PixelRenderer::dropHudTracking() {
+  _hudSpans.clear();
+  _noted.clear();
+  _patchIds.clear();
+  _hudPatch = false;
+}
+
+// 3D only. 2D's picture usually changes every frame (the whole screen is this buffer); hashing it and then drawing
+// it again would do the work twice. A dissolve still rewrites the buffer; a 3D fade or wipe does not.
+bool PixelRenderer::reuseOverlay() {
+  return mode() == Mode::ThreeD && _holdReady && _fbUploaded && !overlayDirty() && !coverOnCpu();
+}
+
 void PixelRenderer::markOverlayDirty() {
-	_fbDirty = true;
+  Renderer::markOverlayDirty();
+  _hudPatch = false;
+  _patchIds.clear();
+}
+
+void PixelRenderer::markHudPatch( Entity id ) {
+  // No held picture yet, or a dissolve is rewriting every pixel: the next present rebuilds the overlay.
+  if ( id == 0 || _fbDirty || mode() != Mode::ThreeD || !_holdReady || !_fbUploaded || coverOnCpu() ) {
+    markOverlayDirty();
+    return;
+  }
+  if ( std::find( _patchIds.begin(), _patchIds.end(), id ) == _patchIds.end() ) _patchIds.push_back( id );
+  _hudPatch = true;
+}
+
+bool PixelRenderer::hudPatch() {
+  return _hudPatch && !_patchIds.empty() && !_fbDirty && mode() == Mode::ThreeD && _holdReady && _fbUploaded && !coverOnCpu();
+}
+
+void PixelRenderer::beginHudPatch() {
+  _patching = true;
+  _writePixels = false;
+  _hasDamage = false;
+  _noted.clear();
+}
+
+void PixelRenderer::beginWidget( Entity e ) {
+  _hudEntity = e;
+  _mixHud = true;
+  if ( !_patching ) return;
+  _writePixels = false;
+  for ( const auto& n : _noted ) if ( n.e == e ) { _writePixels = n.write; break; }
+}
+
+void PixelRenderer::endWidget() {
+  _mixHud = false;
+  if ( _patching ) _writePixels = false;
+}
+
+void PixelRenderer::noteHudBox( Entity e, int x0, int y0, int x1, int y1 ) {
+  _noted.push_back( { e, x0, y0, x1, y1, false } );
+}
+
+auto PixelRenderer::findSpan( Entity e ) -> HudSpan* {
+  for ( auto& s : _hudSpans ) if ( s.e == e ) return &s;
+  return nullptr;
+}
+
+void PixelRenderer::rememberSpan( Entity e, int x0, int y0, int x1, int y1 ) {
+  if ( !e ) return;
+  if ( HudSpan* s = findSpan( e ) ) { s->x0 = x0; s->y0 = y0; s->x1 = x1; s->y1 = y1; return; }
+  _hudSpans.push_back( { e, x0, y0, x1, y1, false } );
+}
+
+void PixelRenderer::eraseRect( int x0, int y0, int x1, int y1 ) {
+  x0 = std::max( x0, 0 ); y0 = std::max( y0, 0 );
+  x1 = std::min( x1, _fbW ); y1 = std::min( y1, _fbH );
+  if ( x0 >= x1 || y0 >= y1 ) return;
+  if ( !_hasDamage ) { _dmgX0 = x0; _dmgY0 = y0; _dmgX1 = x1; _dmgY1 = y1; _hasDamage = true; }
+  else {
+    _dmgX0 = std::min( _dmgX0, x0 ); _dmgY0 = std::min( _dmgY0, y0 );
+    _dmgX1 = std::max( _dmgX1, x1 ); _dmgY1 = std::max( _dmgY1, y1 );
+  }
+  const std::size_t row = static_cast<std::size_t>( _fbW );
+  for ( int y = y0; y < y1; ++y )
+    std::memset( _fb.data() + static_cast<std::size_t>( y ) * row + x0, 0, sizeof( uint32_t ) * static_cast<std::size_t>( x1 - x0 ) );
+}
+
+void PixelRenderer::erasePatchedWidgets() {
+  // Two pixels past the plate, for a glyph that overhangs it. A neighbor drawn later repaints whatever this erase
+  // cut out of it (blendPixel stores into the damage rectangle even when writes are off).
+  constexpr int pad = 2;
+  for ( auto& n : _noted ) n.write = std::find( _patchIds.begin(), _patchIds.end(), n.e ) != _patchIds.end();
+  // A patched widget that is not drawn this frame (emptied text, now hidden) still owns pixels from last frame.
+  for ( const Entity id : _patchIds ) {
+    bool noted = false;
+    for ( const auto& n : _noted ) if ( n.e == id ) { noted = true; break; }
+    if ( noted ) continue;
+    const HudSpan* old = findSpan( id );
+    if ( !old ) continue;
+    const HudSpan gone = *old;
+    eraseRect( gone.x0 - pad, gone.y0 - pad, gone.x1 + pad, gone.y1 + pad );
+    std::erase_if( _hudSpans, [id]( const HudSpan& s ) { return s.e == id; } );
+  }
+  for ( const auto& n : _noted ) {
+    if ( !n.write ) continue;
+    int x0 = n.x0, y0 = n.y0, x1 = n.x1, y1 = n.y1;
+    if ( const HudSpan* old = findSpan( n.e ) ) {
+      x0 = std::min( x0, old->x0 ); y0 = std::min( y0, old->y0 );
+      x1 = std::max( x1, old->x1 ); y1 = std::max( y1, old->y1 );
+    }
+    eraseRect( x0 - pad, y0 - pad, x1 + pad, y1 + pad );
+  }
+}
+
+bool PixelRenderer::takeOverlayRepaint() {
+  const bool again = _overlayRepaint;
+  _overlayRepaint = false;
+  return again;
+}
+
+void PixelRenderer::blankFramebuffer() {
+  const uint32_t c = frameClearColor();
+  if ( c == 0 ) std::memset( _fb.data(), 0, _fb.size() * sizeof( uint32_t ) );
+  else std::fill( _fb.begin(), _fb.end(), c );
+  _fbBlank = c == 0;
 }
 
 #if defined( __linux__ )
@@ -151,6 +286,7 @@ void PixelRenderer::init( const std::string& gameName ) {
   }
   SDL_GetWindowSizeInPixels( _window, &_fbW, &_fbH );
   _fb.assign( static_cast<std::size_t>( _fbW ) * _fbH, frameClearColor() );
+  _fbBlank = frameClearColor() == 0;
   onWindowCreated();
   reportInput();
   _up = true;
@@ -174,6 +310,9 @@ auto PixelRenderer::checkResize() -> bool {
   _fbW = std::max( w, CELL_W );
   _fbH = std::max( h, CELL_H );
   _fb.assign( static_cast<std::size_t>( _fbW ) * _fbH, frameClearColor() );
+  _fbBlank = frameClearColor() == 0;
+  _fbUploaded = false;  // the GPU texture is the old size
+  _holdReady = false;
   onResized();
   return true;
 }
@@ -375,6 +514,37 @@ void PixelRenderer::fillRect( const Win* win, int x, int y, int w, int h, uint32
   x0 = std::max( x0, 0 ); y0 = std::max( y0, 0 );
   x1 = std::min( x1, _fbW ); y1 = std::min( y1, _fbH );
   if ( x0 >= x1 || y0 >= y1 ) return;
+  mixSig( static_cast<uint32_t>( x0 ) | ( static_cast<uint64_t>( y0 ) << 32 ) );
+  mixSig( static_cast<uint32_t>( x1 - x0 ) | ( static_cast<uint64_t>( y1 - y0 ) << 32 ) );
+  mixSig( argb );
+  if ( !_writePixels ) return;
+  _fbBlank = false;
+  for ( int yy = y0; yy < y1; ++yy ) {
+    std::fill( _fb.begin() + static_cast<std::size_t>( yy ) * _fbW + x0, _fb.begin() + static_cast<std::size_t>( yy ) * _fbW + x1, argb );
+  }
+}
+
+void PixelRenderer::fillUnchecked( int x0, int y0, int x1, int y1, uint32_t argb ) {
+  x0 = std::max( x0, 0 ); y0 = std::max( y0, 0 );
+  x1 = std::min( x1, _fbW ); y1 = std::min( y1, _fbH );
+  if ( x0 >= x1 || y0 >= y1 ) return;
+  mixSig( static_cast<uint32_t>( x0 ) | ( static_cast<uint64_t>( y0 ) << 32 ) );
+  mixSig( static_cast<uint32_t>( x1 - x0 ) | ( static_cast<uint64_t>( y1 - y0 ) << 32 ) );
+  mixSig( argb ^ 0x0100000000ull );  // distinct from a fillRect of the same color (alpha 0 never reaches fillRect)
+  if ( !_writePixels ) return;
+  // The frame clear already made the whole buffer 0. Writing that again is a full-window memset for nothing.
+  if ( _fbBlank && argb == 0 ) return;
+  _fbBlank = false;
+  if ( argb == 0 ) {
+    const std::size_t row = static_cast<std::size_t>( _fbW );
+    if ( x0 == 0 && x1 == _fbW ) {
+      std::memset( _fb.data() + static_cast<std::size_t>( y0 ) * row, 0, sizeof( uint32_t ) * row * static_cast<std::size_t>( y1 - y0 ) );
+      return;
+    }
+    for ( int yy = y0; yy < y1; ++yy )
+      std::memset( _fb.data() + static_cast<std::size_t>( yy ) * row + x0, 0, sizeof( uint32_t ) * static_cast<std::size_t>( x1 - x0 ) );
+    return;
+  }
   for ( int yy = y0; yy < y1; ++yy ) {
     std::fill( _fb.begin() + static_cast<std::size_t>( yy ) * _fbW + x0, _fb.begin() + static_cast<std::size_t>( yy ) * _fbW + x1, argb );
   }
@@ -431,6 +601,12 @@ void PixelRenderer::blendPixel( int x, int y, uint32_t argb, unsigned coverage )
   if ( x < 0 || y < 0 || x >= _fbW || y >= _fbH ) return;
   const unsigned sa = ( ( argb >> 24 ) * coverage + 127 ) / 255;
   if ( sa == 0 ) return;
+  mixSig( static_cast<uint32_t>( x ) | ( static_cast<uint64_t>( y ) << 32 ) );
+  mixSig( argb ^ ( static_cast<uint64_t>( coverage ) << 32 ) );
+  // A patch erased this rectangle. Writes stay off for the rest of the overlay, but a pixel in that rectangle
+  // (the meter, a neighbor that overlapped it, the crosshair) has to be stored or the erase leaves a hole.
+  if ( !_writePixels && !( _patching && _hasDamage && x >= _dmgX0 && y >= _dmgY0 && x < _dmgX1 && y < _dmgY1 ) ) return;
+  _fbBlank = false;
   uint32_t& d = _fb[static_cast<std::size_t>( y ) * _fbW + x];
   if ( sa == 255 ) { d = ( argb & 0x00FFFFFFu ) | 0xFF000000u; return; }
   const unsigned da = d >> 24;
@@ -586,7 +762,16 @@ void PixelRenderer::saveScreenshotIfDue() {
 // Scene transitions over the finished frame (setTransition). 2D: the framebuffer is the screen. 3D: it's the overlay
 // composited over the GL world with alpha, so covering it with (alpha) black darkens the world under it too.
 void PixelRenderer::applyTransition() {
-  if ( _transKind == 0 || _transT <= 0.0f ) return;
+  // No fade, wipe, or dissolve: don't touch the framebuffer. Kind 0 is "none"; t <= 0 is the clear end of a fade-in.
+  // 3D fade and wipe are a quad in presentFramebuffer. Rewriting and reuploading this buffer each step is what made
+  // a scene change drop to a few frames a second.
+  if ( _transKind == 0 || _transT <= 0.0f || !coverOnCpu() ) return;
+  uint32_t bits = 0;
+  std::memcpy( &bits, &_transT, sizeof bits );
+  mixSig( static_cast<uint64_t>( _transKind ) );
+  mixSig( bits );
+  if ( !_writePixels ) return;  // the real paint will run the pixels; this pass only needed the signature
+  _fbBlank = false;
   const float t = std::min( 1.0f, _transT );
   if ( _transKind == 2 ) {  // wipe: a black edge sweeping left to right
     const int edge = static_cast<int>( t * _fbW );
@@ -619,11 +804,46 @@ void PixelRenderer::applyTransition() {
 }
 
 void PixelRenderer::endFrame() {
+  const bool probing = !_writePixels && !_patching;
   ++_frame;
+  _mixHud = false;  // present's crosshair is not a widget; a patch compares it with the last upload
   applyTransition();
   presentFramebuffer();
+  if ( _overlayRepaint && ( probing || _patching ) ) {  // not a presented frame; the redraw presents this same number
+    --_frame;
+    _writePixels = true;
+    _mixHud = false;
+    _patching = false;
+    _hudPatch = false;
+    _patchIds.clear();
+    _noted.clear();
+    _hasDamage = false;
+    _drawSig = 0;
+    _baseSig = 0;
+    _hudSig = 0;
+    _holdReady = false;
+    blankFramebuffer();
+    return;
+  }
   saveScreenshotIfDue();
-  std::fill( _fb.begin(), _fb.end(), frameClearColor() );
+  _drawSig = 0;  // next frame mixes its own draws; the GPU copy keeps _uploadedSig
+  _baseSig = 0;
+  _hudSig = 0;
+  _writePixels = true;
+  _mixHud = false;
+  _patching = false;
+  _hudPatch = false;
+  _patchIds.clear();
+  _noted.clear();
+  _hasDamage = false;
+  // The picture matches what's on the GPU. Keep these pixels so the next 3D frame can skip the clear and the fills.
+  // A fade or wipe quad does not change them.
+  if ( mode() == Mode::ThreeD && _fbUploaded && !overlayDirty() && !coverOnCpu() ) {
+    _holdReady = true;
+    return;
+  }
+  _holdReady = false;
+  blankFramebuffer();
 }
 
 // --- images ---------------------------------------------------------------------------------------------------------

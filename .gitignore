@@ -16,3 +16,12 @@ build-*/
 gen/
 *.debug
 build-ci-*.log
+perf*
+tools/pack/CMakeFiles/
+tools/pack/Makefile
+tools/pack/cmake_install.cmake
+compile_commands.json
+*.cmake
+CTestTestfile.cmake
+CMakeCache.txt
+CMakeFiles/

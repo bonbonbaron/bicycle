@@ -71,10 +71,31 @@ class Renderer {
     // The user closed the window (pixel modes).
     virtual auto quitRequested() const -> bool { return false; }
 
+    // Pixel modes: the GPU's copy of the software framebuffer is out of date. Drawing the same picture again does
+    // not call this; the copy is skipped until something here (or a changed draw) says it is stale.
     virtual void markOverlayDirty() { _fbDirty = true; }
     virtual bool overlayDirty() { return _fbDirty; }
     virtual void overlayClean() { _fbDirty = false; }
     virtual void clearOverlay() {}
+    // 3D: one HUD meter's value or one label's text changed. That widget's rectangle is redrawn and uploaded.
+    // Anything else (a widget added or removed, sprites, a dialogue) still uses markOverlayDirty.
+    virtual void markHudPatch( Entity ) { markOverlayDirty(); }
+    virtual bool hudPatch() { return false; }
+    virtual void beginHudPatch() {}
+    virtual bool hudPatching() { return false; }
+    // Around one HUD widget draw, so a patch can rewrite just that widget and a signature can tell HUD draws from
+    // the rest of the overlay (the scene clear, dialogue, the crosshair).
+    virtual void beginWidget( Entity ) {}
+    virtual void endWidget() {}
+    virtual void markWidgetArea( Entity, WinHandle, int, int, Align, const Widget& ) {}
+    virtual void erasePatchedWidgets() {}
+    // 3D: the last frame's overlay is still in the CPU framebuffer and on the GPU, and nothing has asked for a new
+    // one. The paint that follows only checks that the same draws would happen; when they would, the framebuffer
+    // is not written or uploaded again.
+    virtual bool reuseOverlay() { return false; }
+    virtual void setPixelWrites( bool on ) { (void)on; }
+    // Set by endFrame when that check failed. The windows have to be drawn for real, then presented again.
+    virtual bool takeOverlayRepaint() { return false; }
 
     // Windows: rectangles of cells drawn in stack order, each frame.
     virtual auto createWindow( int x, int y, int w, int h ) -> WinHandle = 0;

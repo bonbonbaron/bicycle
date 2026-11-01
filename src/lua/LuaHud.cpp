@@ -15,8 +15,9 @@ auto widget( int id ) -> Widget* {
 
 auto add( const Widget& w ) -> int {
   auto scene = lua::currentScene();
+  if ( !scene ) return -1;
   gfx::renderer().markOverlayDirty();
-  return scene ? static_cast<int>( scene->addWidget( w ) ) : -1;
+  return static_cast<int>( scene->addWidget( w ) );
 }
 }  // namespace
 
@@ -31,17 +32,16 @@ EXPORT_API int addHudBar( const char* label, int max, int len, int x, int y ) {
   w.len = std::max( 1, len );
   w.x = x;
   w.y = y;
-  gfx::renderer().markOverlayDirty();
   return add( w );
 }
 
 EXPORT_API void setHudBar( int id, int val ) {
   if ( Widget* w = widget( id ) ) {
-	  auto v = std::clamp( val, 0, w->max );
-	  if ( w->curr != v ) {
-		  w->curr = v;
-		  gfx::renderer().markOverlayDirty();
-	  }
+    const int v = std::clamp( val, 0, w->max );
+    if ( w->curr != v ) {
+      w->curr = v;
+      gfx::renderer().markHudPatch( static_cast<Entity>( id ) );
+    }
   }
 }
 
@@ -64,25 +64,25 @@ EXPORT_API int addHudText( const char* text, int x, int y ) {
   w.text = text ? text : "";
   w.x = x;
   w.y = y;
-  gfx::renderer().markOverlayDirty();
   return add( w );
 }
 
 EXPORT_API void setHudText( int id, const char* text ) {
   if ( Widget* w = widget( id ) ) {
-	  const char* t = text ? text : "";
-	  if (w->text != t) {
-		  w->text = t;
-		  gfx::renderer().markOverlayDirty();
-	  }
+    const char* t = text ? text : "";
+    if ( w->text != t ) {
+      w->text = t;
+      gfx::renderer().markHudPatch( static_cast<Entity>( id ) );
+    }
   }
 }
 
 // Takes a meter or label off the current scene's HUD.
 EXPORT_API void removeHudItem( int id ) {
   auto scene = lua::currentScene();
+  if ( !scene || id < 0 || !scene->widget( static_cast<Entity>( id ) ) ) return;
+  scene->removeWidget( static_cast<Entity>( id ) );
   gfx::renderer().markOverlayDirty();
-  if ( scene && id >= 0 ) scene->removeWidget( static_cast<Entity>( id ) );
 }
 
 }  // extern "C"

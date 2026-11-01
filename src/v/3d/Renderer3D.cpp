@@ -62,7 +62,7 @@ enum : GLenum {
   GL_RGBA8 = 0x8058, GL_UNSIGNED_BYTE = 0x1401, GL_TEXTURE_MIN_FILTER = 0x2801, GL_TEXTURE_MAG_FILTER = 0x2800,
   GL_NEAREST = 0x2600, GL_TEXTURE_WRAP_S = 0x2802, GL_TEXTURE_WRAP_T = 0x2803, GL_REPEAT = 0x2901,
   GL_UNSIGNED_INT = 0x1405, GL_CLAMP_TO_EDGE = 0x812F, GL_TRIANGLES = 0x0004, GL_TRIANGLE_STRIP = 0x0005, GL_TEXTURE0 = 0x84C0,
-  GL_LEQUAL = 0x0203, GL_PACK_ALIGNMENT = 0x0D05, GL_UNPACK_ALIGNMENT = 0x0CF5, GL_VERSION = 0x1F02,
+  GL_LEQUAL = 0x0203, GL_PACK_ALIGNMENT = 0x0D05, GL_UNPACK_ALIGNMENT = 0x0CF5, GL_SCISSOR_TEST = 0x0C11, GL_VERSION = 0x1F02,
   GL_RENDERER = 0x1F01, GL_FRAMEBUFFER = 0x8D40, GL_DEPTH_ATTACHMENT = 0x8D00, GL_DEPTH_COMPONENT = 0x1902,
   GL_DEPTH_COMPONENT24 = 0x81A6, GL_NONE = 0, GL_POLYGON_OFFSET_FILL = 0x8037, GL_LINEAR = 0x2601,
   GL_TEXTURE_COMPARE_MODE = 0x884C, GL_COMPARE_REF_TO_TEXTURE = 0x884E, GL_TEXTURE_COMPARE_FUNC = 0x884D,
@@ -77,6 +77,7 @@ enum : GLenum {
   X( void, ClearColor, GLfloat, GLfloat, GLfloat, GLfloat ) \
   X( void, Clear, GLbitfield ) \
   X( void, Viewport, GLint, GLint, GLsizei, GLsizei ) \
+  X( void, Scissor, GLint, GLint, GLsizei, GLsizei ) \
   X( void, Enable, GLenum ) \
   X( void, Disable, GLenum ) \
   X( void, BlendFunc, GLenum, GLenum ) \
@@ -353,6 +354,15 @@ uniform sampler2D tex;
 out vec4 o;
 void main() { o = texture(tex, vUv); })";
 
+// Scene fade / wipe: one black quad over the world and the overlay. The software framebuffer is not touched.
+const char* FADE_VS = R"(#version 330 core
+layout(location = 0) in vec2 aPos;
+void main() { gl_Position = vec4(aPos, 0.0, 1.0); })";
+const char* FADE_FS = R"(#version 330 core
+uniform vec4 uColor;
+out vec4 o;
+void main() { o = uColor; })";
+
 // OpenGL ES 2.0 (Pi Zero / Zero 2 / 3: vc4). vc4's vertex shader compiler fails register allocation on the
 // GL 3.3 shader above (32 bone matrices = 512 uniform floats, a 4-matrix blend, the light matrix): it rejects the
 // shader when it's first drawn ("Failed to register allocate", no GL error) and nothing 3D is drawn. So GLES2 has
@@ -541,7 +551,15 @@ class Renderer3D final : public PixelRenderer {
       const int x0 = std::max( 0, _sceneWin->x * CELL_W ), y0 = std::max( 0, _sceneWin->y * CELL_H );
       const int x1 = std::min( _fbW, ( _sceneWin->x + _sceneWin->w ) * CELL_W );
       const int y1 = std::min( _fbH, ( _sceneWin->y + _sceneWin->h ) * CELL_H );
-      for ( int y = y0; y < y1; ++y ) std::fill( _fb.begin() + y * _fbW + x0, _fb.begin() + y * _fbW + x1, 0u );
+      fillUnchecked( x0, y0, x1, y1, 0u );
+    }
+
+    // The scene panel used to be filled opaque and then immediately zeroed by beginScene. That was a full-window
+    // store the profile spent most of a Pi Zero frame on. The framebuffer is already clear, or beginScene clears it.
+    void clearWindow( WinHandle win ) override {
+      Win* w = static_cast<Win*>( win );
+      if ( w && w->panel == Panel::Scene ) return;
+      PixelRenderer::clearWindow( win );
     }
 
     // 3D UI: drawn into the overlay (composited over the GL world with alpha), soft and glossy to sit over a lit
@@ -552,19 +570,68 @@ class Renderer3D final : public PixelRenderer {
       else drawLabel( win, y, x, align, w.text );
     }
 
+    void markWidgetArea( Entity e, WinHandle win, int y, int x, Align align, const Widget& wd ) override {
+      const Win* w = static_cast<Win*>( win );
+      if ( wd.kind == Widget::BAR ) {
+        const auto lay = layoutMeter( w, y, x, wd );
+        if ( lay.ok ) noteHudBox( e, lay.x0, lay.y0, lay.x1, lay.y1 );
+      }
+      else {
+        const auto lay = layoutLabel( w, y, x, align, wd.text );
+        if ( lay.ok ) noteHudBox( e, lay.x0, lay.y0, lay.x1, lay.y1 );
+      }
+    }
+
   private:
+    struct MeterLay { int px, top, bw, bh, labelW, numsW, x0, y0, x1, y1; bool ok; };
+    struct LabelLay { int px, top, x0, y0, x1, y1; bool ok; };
+
+    auto layoutMeter( const Win* w, int y, int x, const Widget& bar ) -> MeterLay {
+      MeterLay m{};
+      if ( !w || ( w->attr & ATTR_INVISIBLE ) ) return m;
+      m.px = ( w->x + x ) * CELL_W + 6;
+      m.top = ( w->y + y ) * CELL_H + 2;
+      m.bw = std::max( 24, bar.len * CELL_W * 2 );
+      m.bh = 16;
+      m.labelW = bar.text.empty() ? 0 : measureString( bar.text, UI_TEXT_PX, true ) + 10;
+      const std::string nums = std::to_string( bar.curr ) + "/" + std::to_string( bar.max );
+      m.numsW = measureString( nums, UI_TEXT_PX ) + 10;
+      m.x0 = m.px - 6;
+      m.y0 = m.top - 4;
+      m.x1 = m.x0 + m.labelW + m.bw + m.numsW + 12;
+      m.y1 = m.y0 + m.bh + 8;
+      m.ok = true;
+      return m;
+    }
+
+    auto layoutLabel( const Win* w, int y, int x, Align align, const std::string& s ) -> LabelLay {
+      LabelLay m{};
+      if ( !w || ( w->attr & ATTR_INVISIBLE ) || s.empty() ) return m;
+      const int tw = measureString( s, UI_TEXT_PX );
+      const int anchor = ( w->x + x ) * CELL_W;
+      m.px = align == Align::End ? anchor - 12 - tw : align == Align::Center ? anchor - tw / 2 : anchor + 6;
+      m.top = ( w->y + y ) * CELL_H + 2;
+      m.x0 = m.px - 6;
+      m.y0 = m.top - 4;
+      m.x1 = m.x0 + tw + 12;
+      m.y1 = m.y0 + 16 + 8;
+      m.ok = true;
+      return m;
+    }
+
     void drawMeter( WinHandle win, int y, int x, const Widget& bar ) {
       const Win* w = static_cast<Win*>( win );
-      if ( !w || ( w->attr & ATTR_INVISIBLE ) ) return;
-      int px = ( w->x + x ) * CELL_W + 6;
-      const int top = ( w->y + y ) * CELL_H + 2;
+      const auto lay = layoutMeter( w, y, x, bar );
+      if ( !lay.ok ) return;
+      if ( _writePixels ) rememberSpan( _hudEntity, lay.x0, lay.y0, lay.x1, lay.y1 );
+      int px = lay.px;
+      const int top = lay.top;
       const float frac = std::clamp( static_cast<float>( bar.curr ) / std::max( 1, bar.max ), 0.0f, 1.0f );
-      const int bw = std::max( 24, bar.len * CELL_W * 2 ), bh = 16;
-      const int labelW = bar.text.empty() ? 0 : measureString( bar.text, UI_TEXT_PX, true ) + 10;
+      const int bw = lay.bw, bh = lay.bh;
+      const int labelW = lay.labelW;
       const std::string nums = std::to_string( bar.curr ) + "/" + std::to_string( bar.max );
-      const int numsW = measureString( nums, UI_TEXT_PX ) + 10;
       // A translucent plate behind the whole meter so it reads over any background.
-      gradientRoundRect( nullptr, px - 6, top - 4, labelW + bw + numsW + 12, bh + 8, 8, 0xA0202838u, 0xA0101420u );
+      gradientRoundRect( nullptr, lay.x0, lay.y0, lay.x1 - lay.x0, lay.y1 - lay.y0, 8, 0xA0202838u, 0xA0101420u );
       if ( !bar.text.empty() ) {
         drawString( w, px, top, bar.text, 0xFFFFFFFFu, UI_TEXT_PX, true );
         px += labelW;
@@ -592,13 +659,11 @@ class Renderer3D final : public PixelRenderer {
     // A HUD label on the same translucent plate as the meter's.
     void drawLabel( WinHandle win, int y, int x, Align align, const std::string& s ) {
       const Win* w = static_cast<Win*>( win );
-      if ( !w || ( w->attr & ATTR_INVISIBLE ) || s.empty() ) return;
-      const int tw = measureString( s, UI_TEXT_PX );
-      const int anchor = ( w->x + x ) * CELL_W;
-      const int px = align == Align::End ? anchor - 12 - tw : align == Align::Center ? anchor - tw / 2 : anchor + 6;
-      const int top = ( w->y + y ) * CELL_H + 2;
-      gradientRoundRect( nullptr, px - 6, top - 4, tw + 12, 16 + 8, 8, 0xA0202838u, 0xA0101420u );
-      drawString( w, px, top, s, 0xFFFFFFFFu, UI_TEXT_PX );
+      const auto lay = layoutLabel( w, y, x, align, s );
+      if ( !lay.ok ) return;
+      if ( _writePixels ) rememberSpan( _hudEntity, lay.x0, lay.y0, lay.x1, lay.y1 );
+      gradientRoundRect( nullptr, lay.x0, lay.y0, lay.x1 - lay.x0, lay.y1 - lay.y0, 8, 0xA0202838u, 0xA0101420u );
+      drawString( w, lay.px, lay.top, s, 0xFFFFFFFFu, UI_TEXT_PX );
     }
 
   public:
@@ -836,6 +901,8 @@ class Renderer3D final : public PixelRenderer {
         std::fprintf( stderr, "bicycle 3D: shadows %s%s\n", qualityName( _envQuality >= 0 ? _envQuality : _autoQuality ),
                       _envQuality >= 0 ? " (BICYCLE_SHADOWS)" : " (auto; BICYCLE_SHADOWS=off|low|med|high)" );
       _overlayProg = program( OVERLAY_VS, OVERLAY_FS );
+      _fadeProg = program( FADE_VS, FADE_FS );
+      _fadeColor = gl.GetUniformLocation( _fadeProg, "uColor" );
       // Blob shadows: the program, a dynamic buffer and the prerendered soft circle (64x64, alpha falls off smoothly).
       _blobProg = program( BLOB_VS, BLOB_FS );
       if ( !s_es2 ) gl.GenVertexArrays( 1, &_blobVao );
@@ -953,6 +1020,13 @@ class Renderer3D final : public PixelRenderer {
       if ( glDebug() && _dbgFrame < 2 ) glCheck( "the scene" );
       fpsMark( P_MAIN );  // 2.5D scenes: all of it
       drawOverlay();
+      if ( _overlayRepaint ) {  // hashed paint did not match; the caller draws the overlay for real. Don't show this one.
+        _drawn.clear();
+        _haveScene = false;
+        fpsEnd();
+        return;
+      }
+      drawCover();
       if ( glDebug() && _dbgFrame < 2 ) glCheck( "the overlay" );
       fpsMark( P_OVERLAY );
       if ( screenshotDue() ) readBack();
@@ -1021,6 +1095,24 @@ class Renderer3D final : public PixelRenderer {
       }
       if ( sub ) gl.TexSubImage2D( GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, tmp.data() );
       else gl.TexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, tmp.data() );
+    }
+    // A rectangle of _fb (top row first, same as the full upload) into the overlay texture. GLES2 has no
+    // GL_UNPACK_ROW_LENGTH, so the rows are packed. The texture's row 0 is framebuffer row 0.
+    static void uploadRect( int x, int y, int w, int h, int stride, const uint32_t* fb ) {
+      if ( w <= 0 || h <= 0 || !fb ) return;
+      static std::vector<uint32_t> pack;
+      pack.resize( static_cast<std::size_t>( w ) * static_cast<std::size_t>( h ) );
+      const bool bgra = s_tier == CORE || s_bgraExt;
+      for ( int row = 0; row < h; ++row ) {
+        const uint32_t* src = fb + static_cast<std::size_t>( y + row ) * static_cast<std::size_t>( stride ) + x;
+        uint32_t* dst = pack.data() + static_cast<std::size_t>( row ) * static_cast<std::size_t>( w );
+        if ( bgra ) std::memcpy( dst, src, sizeof( uint32_t ) * static_cast<std::size_t>( w ) );
+        else for ( int i = 0; i < w; ++i ) {
+          const uint32_t c = src[i];
+          dst[i] = ( c & 0xFF00FF00u ) | ( ( c >> 16 ) & 0xFFu ) | ( ( c & 0xFFu ) << 16 );
+        }
+      }
+      gl.TexSubImage2D( GL_TEXTURE_2D, 0, x, y, w, h, bgra ? GL_BGRA : GL_RGBA, GL_UNSIGNED_BYTE, pack.data() );
     }
 
     // Meshes: pos3 nrm3 uv2 joints4 weights4.
@@ -1870,25 +1962,68 @@ class Renderer3D final : public PixelRenderer {
       gl.PixelStorei( GL_UNPACK_ALIGNMENT, 4 );
       const bool same = _overlayW == _fbW && _overlayH == _fbH;
       float scale[2] = { 1, 1 };
-      if ( s_npot ) uploadBGRA( _fbW, _fbH, reinterpret_cast<const uint32_t*>( _fb.data() ), same );  // ARGB words
-      else {
+      if ( !s_npot ) {
         auto pot = []( int v ) { int p = 1; while ( p < v ) p <<= 1; return p; };
-        const int tw = pot( _fbW ), th = pot( _fbH );
-        if ( _fbDirty || !same ) {  // allocate the power-of-two texture (contents come from the sub-upload)
-	  _fbDirty = false;
-          std::vector<uint32_t> zero( static_cast<std::size_t>( tw ) * th, 0 );
-          uploadBGRA( tw, th, zero.data() );
-        }
-        uploadSubBGRA( _fbW, _fbH, reinterpret_cast<const uint32_t*>( _fb.data() ) );
-        scale[0] = static_cast<float>( _fbW ) / tw;
-        scale[1] = static_cast<float>( _fbH ) / th;
+        scale[0] = static_cast<float>( _fbW ) / pot( _fbW );
+        scale[1] = static_cast<float>( _fbH ) / pot( _fbH );
       }
-      _overlayW = _fbW;
-      _overlayH = _fbH;
+      // The overlay is redrawn every frame. Copy it only when the picture changed (HUD, dialogue, transition, resize).
+      // A checking pass (_writePixels off) must not upload: the stores were skipped, so _fb is still the previous
+      // picture. The caller draws it for real when the signature says it changed.
+      // A HUD patch has already rewritten a few rectangles of the held picture. Upload those, not the screen.
+      if ( _patching ) {
+        if ( !same || _baseSig != _uploadedBase || ( _drawSig != _uploadedSig && !_hasDamage ) ) {
+          _overlayRepaint = true;
+          return;
+        }
+        if ( _hasDamage )
+          uploadRect( _dmgX0, _dmgY0, _dmgX1 - _dmgX0, _dmgY1 - _dmgY0, _fbW, reinterpret_cast<const uint32_t*>( _fb.data() ) );
+        noteOverlayUpload();
+      }
+      else if ( !_writePixels && ( !same || overlayStale() ) ) {
+        _overlayRepaint = true;
+        return;
+      }
+      else if ( !same || overlayStale() ) {
+        if ( s_npot ) uploadBGRA( _fbW, _fbH, reinterpret_cast<const uint32_t*>( _fb.data() ), same && _fbUploaded );  // ARGB words
+        else {
+          auto pot = []( int v ) { int p = 1; while ( p < v ) p <<= 1; return p; };
+          const int tw = pot( _fbW ), th = pot( _fbH );
+          if ( !same || !_fbUploaded ) {  // allocate the power-of-two texture (contents come from the sub-upload)
+            std::vector<uint32_t> zero( static_cast<std::size_t>( tw ) * th, 0 );
+            uploadBGRA( tw, th, zero.data() );
+          }
+          uploadSubBGRA( _fbW, _fbH, reinterpret_cast<const uint32_t*>( _fb.data() ) );
+        }
+        _overlayW = _fbW;
+        _overlayH = _fbH;
+        noteOverlayUpload();
+      }
       gl.Uniform2fv( gl.GetUniformLocation( _overlayProg, "uUvScale" ), 1, scale );
       gl.Uniform1i( gl.GetUniformLocation( _overlayProg, "tex" ), 0 );
       bindVertices( _overlayVao, _overlayVbo, overlayLayout );
       gl.DrawArrays( GL_TRIANGLE_STRIP, 0, 4 );
+    }
+
+    // Fade (kind 1) and wipe (kind 2). One blended quad; the overlay texture stays as the HUD underneath.
+    void drawCover() {
+      if ( !_fadeProg || _transT <= 0.0f || ( _transKind != 1 && _transKind != 2 ) ) return;
+      gl.Disable( GL_DEPTH_TEST );
+      gl.Enable( GL_BLEND );
+      gl.BlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
+      gl.UseProgram( _fadeProg );
+      const float a = _transKind == 2 ? 1.0f : std::clamp( _transT, 0.0f, 1.0f );
+      const float color[4] = { 0, 0, 0, a };
+      gl.Uniform4fv( _fadeColor, 1, color );
+      if ( _transKind == 2 ) {
+        const int edge = static_cast<int>( _transT * _fbW );
+        if ( edge <= 0 ) return;
+        gl.Enable( GL_SCISSOR_TEST );
+        gl.Scissor( 0, 0, std::min( edge, _fbW ), _fbH );
+      }
+      bindVertices( _overlayVao, _overlayVbo, overlayLayout );
+      gl.DrawArrays( GL_TRIANGLE_STRIP, 0, 4 );
+      gl.Disable( GL_SCISSOR_TEST );
     }
 
     void readBack() {
@@ -2038,7 +2173,8 @@ class Renderer3D final : public PixelRenderer {
     GLuint _skinProg{};
     int _dbgFrame{};
     m3::Vec3 _dbgEye{};  // GLES2: the skinned shader (BICYCLE_GLES2_GPU_SKIN=1), else 0 (CPU skinning)
-    GLuint _prog{}, _overlayProg{}, _quadVao{}, _quadVbo{}, _overlayVao{}, _overlayVbo{}, _overlayTex{};
+    GLuint _prog{}, _overlayProg{}, _fadeProg{}, _quadVao{}, _quadVbo{}, _overlayVao{}, _overlayVbo{}, _overlayTex{};
+    GLint _fadeColor{ -1 };
     Box _cam{};
     bool _haveScene{};
     Win* _sceneWin{};
